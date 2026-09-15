@@ -1,5 +1,5 @@
 import { env } from '@/lib/env';
-import type { RiseupTransaction } from '@/lib/types';
+import type { RiseupBudget, RiseupTransaction } from '@/lib/types';
 
 const TOKENS_URL = 'https://input.riseup.co.il/developer/tokens';
 
@@ -59,6 +59,15 @@ export async function fetchTransactions(cashflowMonth: string): Promise<RiseupTr
     `/api/external/transactions?cashflowMonth=${encodeURIComponent(cashflowMonth)}`,
   );
   return payload.transactions ?? [];
+}
+
+/**
+ * The month's budget: envelopes with their planned amounts and their actual
+ * transactions. This is the shape the RiseUp dashboard itself is built on, so
+ * it is what the dashboard here reads too.
+ */
+export async function fetchBudget(month: string): Promise<RiseupBudget> {
+  return riseupGet<RiseupBudget>(`/api/external/budget/${encodeURIComponent(month)}`);
 }
 
 /** "2026-09" for the current month, and N months back from it. */

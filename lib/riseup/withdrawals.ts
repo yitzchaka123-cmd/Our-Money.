@@ -21,6 +21,12 @@ export const WITHDRAWAL_PATTERNS: RegExp[] = [
 /** Account types that can dispense cash. A credit card line is never a withdrawal here. */
 const CASH_SOURCE_TYPES = new Set(['checkingaccount', 'bankaccount']);
 
+/** Name-only test, for envelope actuals which carry no sourceType. */
+export function matchesWithdrawalName(businessName: string | null | undefined): boolean {
+  const name = businessName ?? '';
+  return WITHDRAWAL_PATTERNS.some((pattern) => pattern.test(name));
+}
+
 export function isWithdrawal(transaction: RiseupTransaction): boolean {
   if (transaction.isIncome) return false;
 
@@ -29,8 +35,7 @@ export function isWithdrawal(transaction: RiseupTransaction): boolean {
   const sourceType = transaction.sourceType?.toLowerCase();
   if (sourceType && !CASH_SOURCE_TYPES.has(sourceType)) return false;
 
-  const name = transaction.businessName ?? '';
-  return WITHDRAWAL_PATTERNS.some((pattern) => pattern.test(name));
+  return matchesWithdrawalName(transaction.businessName);
 }
 
 /** RiseUp returns ISO datetimes at UTC midnight; we store plain dates. */

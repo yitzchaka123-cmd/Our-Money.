@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { formatAmount, splitAmount } from '@/lib/money';
 import {
   categoryKeyboard,
   decodeCallback,
@@ -96,5 +97,54 @@ describe('categoryKeyboard', () => {
       spendId: UUID,
       categoryIndex: 1,
     });
+  });
+});
+
+describe('splitAmount', () => {
+  it('splits into the three runs RiseUp renders at three sizes', () => {
+    expect(splitAmount(161.7)).toEqual({
+      sign: '',
+      integer: '161',
+      decimal: '.7',
+      currency: 'ש״ח',
+    });
+  });
+
+  it('always shows one decimal, even for whole amounts', () => {
+    expect(splitAmount(500)).toMatchObject({ integer: '500', decimal: '.0' });
+    expect(splitAmount(0)).toMatchObject({ integer: '0', decimal: '.0' });
+  });
+
+  it('separates thousands', () => {
+    expect(splitAmount(7635)).toMatchObject({ integer: '7,635', decimal: '.0' });
+    expect(splitAmount(16114.25)).toMatchObject({ integer: '16,114', decimal: '.3' });
+  });
+
+  it('puts the minus before the digits', () => {
+    expect(splitAmount(-8478.2)).toMatchObject({ sign: '-', integer: '8,478', decimal: '.2' });
+  });
+
+  it('rounds before splitting, so 161.65 is not 161 and .6', () => {
+    expect(splitAmount(161.65)).toMatchObject({ integer: '161', decimal: '.7' });
+  });
+
+  it('carries a rounded tenth into the integer', () => {
+    expect(splitAmount(9.99)).toMatchObject({ integer: '10', decimal: '.0' });
+  });
+
+  it('drops decimals entirely for hero figures', () => {
+    expect(splitAmount(-8478.2, 0)).toEqual({
+      sign: '-',
+      integer: '8,478',
+      decimal: '',
+      currency: 'ש״ח',
+    });
+  });
+});
+
+describe('formatAmount', () => {
+  it('renders the flat form', () => {
+    expect(formatAmount(1284.7)).toBe('1,284.7 ש״ח');
+    expect(formatAmount(-1284.7, 0)).toBe('-1,285 ש״ח');
   });
 });

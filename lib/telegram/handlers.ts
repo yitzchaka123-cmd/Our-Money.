@@ -509,6 +509,7 @@ async function runSync(chatId: number): Promise<void> {
     '',
     `חודשים: ${result.months.join(', ')}`,
     `עסקאות: ${result.transactionsUpserted}`,
+    `מעטפות: ${result.envelopesUpserted}`,
   ];
 
   if (result.newTopups.length > 0) {

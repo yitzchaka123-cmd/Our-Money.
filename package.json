@@ -13,7 +13,8 @@
     "test:watch": "vitest",
     "telegram:register": "tsx scripts/register-webhook.ts",
     "riseup:probe": "tsx scripts/probe-riseup.ts",
-    "dashboard:preview": "tsx scripts/preview-dashboard.tsx"
+    "dashboard:preview": "tsx scripts/preview-dashboard.tsx",
+    "ui:shots": "bash scripts/ui-shots.sh"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.125.0",

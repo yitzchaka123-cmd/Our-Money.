@@ -1,89 +1,51 @@
 /* ---------------------------------------------------------------------------
-   Design tokens.
+   Our Money — RiseUp visual system.
 
-   Chrome (brand green, surfaces, ink) is styling. The --series-* slots are the
-   data palette and are NOT decorative: they were validated for colour-vision
-   separation against these exact surfaces in both modes. Changing them means
-   re-running the validator.
+   Values here come from docs/riseup-ui-spec.md, which is measured off
+   screenshots of the live app. Change the spec first, then this file.
+
+   Light-only on purpose: RiseUp has no dark mode, and the goal is for this to
+   be indistinguishable from it.
    --------------------------------------------------------------------------- */
 :root {
   color-scheme: light;
 
-  --page: #f1f4f2;
+  /* Envelope hues — accent plus the light tint its progress track uses. */
+  --income: #00b33c;
+  --income-track: #d6f5e0;
+  --variable: #ffc800;
+  --variable-track: #fff0b8;
+  --fixed: #f04e8c;
+  --fixed-track: #fcdce9;
+  --tracking: #5b6bf5;
+  --tracking-track: #dce1fb;
+  --goal: #ff7a30;
+  --goal-track: #ffdfcc;
+
+  /* System */
+  --primary: #5b6bf5;
+  --primary-pressed: #4a59e0;
+  --alert: #ff6b4a;
+
+  --ink: #1a1a1a;
+  --ink-2: #5c5c5c;
+  --muted: #9a9a9a;
+
+  --page: #f7f7f5;
   --surface: #ffffff;
-  --surface-sunken: #f7f9f8;
+  --surface-sunken: #fafafa;
+  --hairline: #eaeaea;
 
-  --ink: #0b0b0b;
-  --ink-2: #52514e;
-  --muted: #898781;
-  --hairline: #e6e8e5;
+  --drawer: #faf6ec;
+  --drawer-ink: #14452f;
+  --info-wash: #dde7f7;
+  --blob: #12b76a;
 
-  --brand: #00805f;
-  --brand-strong: #006b50;
-  --brand-wash: #e2f2ec;
-  --on-brand: #ffffff;
-
-  --series-bank: #2a78d6;
-  --series-cash: #eb6834;
-  --series-unlogged: #1baf7a;
-
-  --status-good: #0ca30c;
-  --status-warning: #fab219;
-  --status-critical: #d03b3b;
-
-  --radius: 18px;
-  --radius-sm: 12px;
-  --shadow: 0 1px 2px rgba(11, 11, 11, 0.04), 0 8px 24px rgba(11, 11, 11, 0.05);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    color-scheme: dark;
-
-    --page: #0d0d0d;
-    --surface: #1a1a19;
-    --surface-sunken: #232322;
-
-    --ink: #ffffff;
-    --ink-2: #c3c2b7;
-    --muted: #898781;
-    --hairline: #2c2c2a;
-
-    --brand: #2fbf94;
-    --brand-strong: #52d1ab;
-    --brand-wash: #14302a;
-    --on-brand: #06231b;
-
-    --series-bank: #3987e5;
-    --series-cash: #d95926;
-    --series-unlogged: #199e70;
-
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.3);
-  }
-}
-
-:root[data-theme='dark'] {
-  color-scheme: dark;
-
-  --page: #0d0d0d;
-  --surface: #1a1a19;
-  --surface-sunken: #232322;
-
-  --ink: #ffffff;
-  --ink-2: #c3c2b7;
-  --muted: #898781;
-  --hairline: #2c2c2a;
-
-  --brand: #2fbf94;
-  --brand-strong: #52d1ab;
-  --brand-wash: #14302a;
-  --on-brand: #06231b;
-
-  --series-bank: #3987e5;
-  --series-cash: #d95926;
-  --series-unlogged: #199e70;
-
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.3);
+  --radius-card: 20px;
+  --radius-row: 14px;
+  --page-gutter: 12px;
+  --card-pad: 20px;
+  --max-width: 480px;
 }
 
 * {
@@ -98,453 +60,840 @@ body {
 
 body {
   background: var(--page);
-  overflow-x: hidden;
   color: var(--ink);
-  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: system-ui, -apple-system, 'Segoe UI', 'Noto Sans Hebrew', sans-serif;
   font-size: 15px;
-  line-height: 1.55;
+  line-height: 1.5;
+  overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
 }
 
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
 /* --- shell ---------------------------------------------------------------- */
-.shell {
-  max-width: 560px;
+.app {
+  max-width: var(--max-width);
   margin: 0 auto;
-  padding: 0 16px calc(48px + env(safe-area-inset-bottom, 0px));
   min-width: 0;
+  padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
 }
 
-.card,
-.tile,
-.row-head,
-.activity li {
-  min-width: 0;
-}
-
-.topbar {
+.appbar {
   position: sticky;
   top: 0;
-  z-index: 10;
-  background: var(--page);
-  padding-top: calc(14px + env(safe-area-inset-top, 0px));
-  padding-bottom: 10px;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 10px;
-}
-
-.wordmark {
+  z-index: 30;
+  background: var(--surface);
+  border-bottom: 1px solid var(--hairline);
+  height: 56px;
+  padding: 0 16px;
+  padding-top: env(safe-area-inset-top, 0px);
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-weight: 650;
-  letter-spacing: -0.01em;
+  justify-content: space-between;
 }
 
-.wordmark .dot {
-  width: 22px;
-  height: 22px;
-  border-radius: 7px;
-  background: var(--brand);
+.appbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+
+.icon-btn {
   display: grid;
   place-items: center;
-  color: var(--on-brand);
-  font-size: 13px;
+  width: 32px;
+  height: 32px;
+  color: var(--ink);
+}
+
+.monthnav {
+  position: sticky;
+  /* Sits directly beneath the app bar, which is 56px plus any notch inset. */
+  top: calc(56px + env(safe-area-inset-top, 0px));
+  z-index: 29;
+  background: var(--surface);
+  border-bottom: 1px solid var(--hairline);
+  height: 56px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.monthnav-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 18px;
   font-weight: 700;
 }
 
-.months {
-  display: flex;
-  gap: 6px;
-  overflow-x: auto;
-  /* Without this a scrolling flex child sizes to its content and widens the page. */
-  min-width: 0;
-  scrollbar-width: none;
-}
-.months::-webkit-scrollbar {
-  display: none;
+.monthnav-arrow {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  color: var(--ink);
 }
 
-.month-chip {
-  flex: 0 0 auto;
-  padding: 5px 11px;
-  border-radius: 999px;
-  font-size: 13px;
-  color: var(--ink-2);
-  text-decoration: none;
-  border: 1px solid transparent;
-  white-space: nowrap;
-}
-.month-chip:hover {
-  background: var(--surface);
-}
-.month-chip[aria-current='page'] {
-  background: var(--brand);
-  color: var(--on-brand);
-  font-weight: 600;
+.monthnav-arrow[aria-disabled='true'] {
+  color: var(--hairline);
+  pointer-events: none;
 }
 
 /* --- cards ---------------------------------------------------------------- */
+.section {
+  padding: 0 var(--page-gutter);
+}
+
 .card {
   background: var(--surface);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  padding: 20px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-card);
+  margin-bottom: 14px;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.card-body {
+  padding: var(--card-pad);
+}
+
+.card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
   margin-bottom: 14px;
 }
 
-.card h2 {
-  margin: 0 0 4px;
-  font-size: 15px;
-  font-weight: 650;
+.card-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
-.card .sub {
-  margin: 0 0 16px;
-  font-size: 13px;
-  color: var(--muted);
+.kebab {
+  color: var(--ink);
+  flex: 0 0 auto;
+  line-height: 1;
+  font-size: 20px;
+  letter-spacing: 1px;
+  padding: 0 4px;
+}
+
+/* --- the three-run amount ------------------------------------------------- */
+.amount {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4em;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Only the digits are LTR, so the minus leads them while the currency stays
+   after them in RTL order — which puts it on the left, as RiseUp has it. */
+.amount .num {
+  direction: ltr;
+  unicode-bidi: isolate;
+  display: inline-flex;
+  align-items: baseline;
+}
+
+.amount .int {
+  font-size: 1em;
+}
+
+.amount .dec {
+  font-size: 0.62em;
+}
+
+.amount .cur {
+  font-size: 0.82em;
 }
 
 /* --- hero ----------------------------------------------------------------- */
-.hero {
-  background: var(--brand);
-  color: var(--on-brand);
-  text-align: center;
-  padding: 26px 20px 22px;
-}
-
-.hero .label {
+.hero-greeting {
   font-size: 14px;
-  opacity: 0.85;
+  color: var(--ink);
   margin: 0;
 }
 
-.hero .figure {
-  /* A six-digit shekel amount must not outgrow a narrow phone. */
-  font-size: clamp(40px, 12vw, 52px);
-  overflow-wrap: anywhere;
-  font-weight: 680;
-  letter-spacing: -0.03em;
-  line-height: 1.1;
-  margin: 6px 0 2px;
+.hero-question {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.3;
+  margin: 10px 0 18px;
 }
 
-.hero .note {
+.hero-figure {
+  font-size: 44px;
+  line-height: 1.15;
+  display: flex;
+  justify-content: flex-start;
+  gap: 0.22em;
+  margin-bottom: 18px;
+}
+
+.hero-figure.is-negative {
+  color: var(--alert);
+}
+
+.pill-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #dddddd;
+  border-radius: 999px;
+  padding: 9px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  background: var(--surface);
+}
+
+.hero-foot {
+  border-top: 1px solid var(--hairline);
+  padding: 16px var(--card-pad);
+}
+
+.hero-foot .headline {
+  font-weight: 700;
+  color: var(--alert);
+  margin: 0;
+}
+
+.hero-foot .sub {
+  margin: 0;
+}
+
+/* --- envelope ------------------------------------------------------------- */
+.envelope {
+  --accent: var(--tracking);
+  --track: var(--tracking-track);
+}
+
+.envelope[data-type='variableIncome'] {
+  --accent: var(--income);
+  --track: var(--income-track);
+}
+.envelope[data-type='variable'] {
+  --accent: var(--variable);
+  --track: var(--variable-track);
+}
+.envelope[data-type='fixed'] {
+  --accent: var(--fixed);
+  --track: var(--fixed-track);
+}
+.envelope[data-type='riseupGoal'] {
+  --accent: var(--goal);
+  --track: var(--goal-track);
+}
+.envelope[data-type='cashUnlogged'] {
+  --accent: var(--alert);
+  --track: #ffe0d8;
+}
+
+.envelope-figures {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.figure-label {
   font-size: 13px;
-  opacity: 0.85;
-  margin: 0;
+  color: var(--ink-2);
+  margin: 0 0 2px;
 }
 
-/* --- stat tiles ----------------------------------------------------------- */
-.tiles {
+.figure-actual {
+  font-size: 18px;
+  color: var(--accent);
+}
+
+.figure-expected {
+  font-size: 18px;
+  color: var(--ink);
+}
+
+.bar {
+  height: 16px;
+  border-radius: 999px;
+  background: var(--track);
+  overflow: hidden;
+  /* Fills from the inline start, which is the right in RTL. */
+  display: flex;
+}
+
+.bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+  min-width: 16px;
+}
+
+.bar-remaining {
+  margin: 10px 0 0;
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.expander {
+  border-top: 1px solid var(--hairline);
+  width: 100%;
+  padding: 16px var(--card-pad);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 15px;
+  font-weight: 700;
+  text-align: start;
+}
+
+.expander .chev {
+  color: var(--ink);
   display: grid;
-  /* Two columns for the month figures; the wallet tile spans the row beneath,
-     since it is the headline of the whole cash feature. */
-  grid-template-columns: repeat(2, 1fr);
+  place-items: center;
+  transition: transform 0.15s ease;
+}
+
+.expander[aria-expanded='true'] .chev {
+  transform: rotate(180deg);
+}
+
+/* --- breakdown table ------------------------------------------------------ */
+.breakdown {
+  border-top: 1px solid var(--hairline);
+}
+
+.breakdown-head,
+.breakdown-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 32px;
+  align-items: center;
+  gap: 8px;
+  padding: 14px var(--card-pad);
+}
+
+.breakdown-head {
+  background: var(--surface-sunken);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.breakdown-row {
+  border-top: 1px solid var(--hairline);
+  font-size: 14px;
+  width: 100%;
+  text-align: start;
+}
+
+.breakdown-row.is-empty {
+  color: var(--muted);
+}
+
+.breakdown-row .bucket {
+  font-weight: 400;
+}
+
+.breakdown-row .actual {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.breakdown-row.is-empty .actual {
+  color: var(--muted);
+}
+
+.bucket-pill {
+  display: inline-block;
+  background: var(--accent);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-weight: 700;
+}
+
+.txn-row {
+  background: var(--surface-sunken);
+  border-top: 1px solid var(--hairline);
+  padding: 12px var(--card-pad);
+  display: grid;
+  grid-template-columns: 1fr auto 24px;
+  gap: 4px 10px;
+  align-items: start;
+  width: 100%;
+  text-align: start;
+}
+
+.txn-row .date {
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.txn-row .merchant {
+  grid-column: 1 / 3;
+  font-size: 14px;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+
+.txn-row .amount {
+  font-size: 14px;
+}
+
+.txn-row.is-missing .amount {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+/* --- carousel ------------------------------------------------------------- */
+.carousel {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  padding: 14px var(--page-gutter) 0;
+}
+
+.carousel::-webkit-scrollbar {
+  display: none;
+}
+
+.carousel > * {
+  flex: 0 0 100%;
+  scroll-snap-align: center;
+  margin-bottom: 0;
+}
+
+.dots {
+  display: flex;
+  justify-content: center;
   gap: 10px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--hairline);
+  margin-bottom: 16px;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #d4d4d4;
+}
+
+.dot[data-active='true'] {
+  background: var(--primary);
+}
+
+/* --- insight + banner ----------------------------------------------------- */
+.insight-art {
+  height: 120px;
+  background: var(--info-wash);
+  position: relative;
+}
+
+.insight-close {
+  position: absolute;
+  inset-inline-start: 14px;
+  top: 14px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.55);
+  display: grid;
+  place-items: center;
+  color: var(--ink-2);
+}
+
+.btn {
+  display: block;
+  width: 100%;
+  background: var(--primary);
+  color: #ffffff;
+  border-radius: var(--radius-row);
+  padding: 15px;
+  font-size: 16px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.btn:active {
+  background: var(--primary-pressed);
+}
+
+.steps-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--info-wash);
+  border-radius: var(--radius-row);
+  padding: 14px 16px;
+  margin: 0 var(--page-gutter) 18px;
+  font-size: 15px;
+}
+
+.steps-blob {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  background: #e879f9;
+  /* Four-lobed, like RiseUp's little flower mark. */
+  border-radius: 62% 38% 62% 38% / 38% 62% 38% 62%;
+}
+
+/* --- summary card --------------------------------------------------------- */
+.summary {
+  text-align: center;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.summary .accent {
+  color: var(--alert);
+}
+
+/* --- floating daily-brief blob -------------------------------------------- */
+.blob {
+  position: fixed;
+  inset-inline-start: 10px;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  z-index: 25;
+  width: 132px;
+  height: 132px;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 15px;
+  line-height: 1.25;
+  background: var(--blob);
+  border-radius: 42% 58% 56% 44% / 48% 42% 58% 52%;
+  transform: rotate(-8deg);
+}
+
+.blob-count {
+  position: absolute;
+  top: 6px;
+  inset-inline-end: 4px;
+  min-width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: var(--alert);
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+  transform: rotate(8deg);
+}
+
+/* --- bottom sheet --------------------------------------------------------- */
+.scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(60, 60, 60, 0.55);
+  z-index: 40;
+}
+
+.sheet {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 41;
+  background: var(--surface);
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
+  max-height: 88vh;
+  overflow-y: auto;
+  padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+}
+
+.sheet-handle {
+  width: 40px;
+  height: 4px;
+  border-radius: 999px;
+  background: #c4c4c4;
+  margin: 10px auto 0;
+}
+
+.sheet-body {
+  padding: 16px var(--page-gutter) 0;
+}
+
+.sheet-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 8px 0 18px;
+  padding: 0 8px;
+}
+
+.sheet-head {
+  padding: 26px var(--card-pad) 30px;
+  background: var(--accent);
+  color: var(--ink);
+}
+
+.sheet-head[data-on-dark='true'] {
+  color: #ffffff;
+}
+
+.sheet-head .label {
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0 0 8px;
+}
+
+.sheet-head .figure {
+  font-size: 40px;
+  display: flex;
+  justify-content: flex-start;
+  gap: 0.22em;
   margin-bottom: 14px;
 }
 
-.tile {
-  background: var(--surface);
-  border-radius: var(--radius-sm);
-  box-shadow: var(--shadow);
-  padding: 14px;
+.sheet-head .meta {
+  font-size: 15px;
+  margin: 0;
 }
 
-.tile--wide {
-  grid-column: 1 / -1;
+.action-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-row);
+  padding: 18px 16px;
+  margin-bottom: 12px;
+  font-size: 16px;
+  font-weight: 700;
+  text-align: start;
 }
 
-.tile .label {
-  font-size: 12px;
-  color: var(--muted);
+.action-row .ico {
+  flex: 0 0 auto;
+  color: var(--ink);
+  order: 2;
+  margin-inline-start: auto;
+}
+
+.radio-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 14px 8px;
+  font-size: 17px;
+  text-align: start;
+}
+
+.radio {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid #c4c4c4;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+}
+
+.radio[data-checked='true'] {
+  border-color: var(--primary);
+}
+
+.radio[data-checked='true']::after {
+  content: '';
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--primary);
+}
+
+/* --- drawer --------------------------------------------------------------- */
+.drawer {
+  position: fixed;
+  inset-block: 0;
+  inset-inline-end: 0;
+  z-index: 41;
+  width: min(88%, 420px);
+  background: var(--drawer);
+  color: var(--drawer-ink);
+  overflow-y: auto;
+  padding: calc(24px + env(safe-area-inset-top, 0px)) 20px
+    calc(24px + env(safe-area-inset-bottom, 0px));
+}
+
+.drawer-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.drawer-name {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.drawer-updated {
+  font-size: 14px;
+  color: #6b7f74;
+  margin: 2px 0 0;
+}
+
+.drawer-gear {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #ffffff;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.drawer-link {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 4px;
+  font-size: 19px;
+  font-weight: 600;
+  width: 100%;
+  text-align: start;
+  text-decoration: none;
+}
+
+.drawer-badge {
+  min-width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  background: var(--alert);
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.drawer-chip {
+  background: #12b76a;
+  color: #ffffff;
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* --- accounts page -------------------------------------------------------- */
+.page-title {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 20px 0 16px;
+  padding: 0 var(--page-gutter);
+}
+
+.tip {
+  background: var(--info-wash);
+  border-radius: var(--radius-row);
+  padding: 16px;
+  margin: 0 var(--page-gutter) 22px;
+}
+
+.tip .tip-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
   margin: 0 0 4px;
 }
 
-.tile .value {
-  font-size: 21px;
-  overflow-wrap: anywhere;
-  font-weight: 650;
-  letter-spacing: -0.02em;
-  margin: 0;
+.tip a {
+  color: var(--ink);
+  text-decoration: underline;
 }
 
-.tile .delta {
-  font-size: 12px;
-  color: var(--ink-2);
-  margin: 2px 0 0;
+.section-label {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 0;
+  margin: 0 var(--page-gutter) 12px;
 }
 
-.tile .delta[data-state='good'] {
-  color: var(--status-good);
-}
-.tile .delta[data-state='warning'] {
-  color: var(--ink-2);
-}
-
-/* --- legend --------------------------------------------------------------- */
-.legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 16px;
-  margin: 0 0 14px;
-  padding: 0;
-  list-style: none;
-  font-size: 13px;
-  color: var(--ink-2);
-}
-
-.legend li {
-  display: flex;
+.section-label .chip {
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  background: var(--accent);
+  color: #ffffff;
+  font-weight: 700;
+  padding: 5px 12px;
+  order: 2;
 }
 
-.legend .swatch {
-  width: 10px;
-  height: 10px;
-  border-radius: 3px;
-  flex: 0 0 auto;
-}
-
-/* --- composition bar ------------------------------------------------------ */
-.composition {
-  position: relative;
-  display: flex;
-  height: 24px;
-  border-radius: 6px;
-  overflow: visible;
-  gap: 2px; /* the surface gap that separates touching segments */
-}
-
-.segment {
-  /* Deliberately static: tooltips anchor to the bar, not to the segment, so a
-     narrow segment near an edge cannot push its label off the page. */
-  min-width: 3px;
-  background: var(--seg);
-}
-.segment:first-child {
-  border-start-start-radius: 4px;
-  border-end-start-radius: 4px;
-}
-.segment:last-child {
-  border-start-end-radius: 4px;
-  border-end-end-radius: 4px;
-}
-
-/* --- category rows -------------------------------------------------------- */
-.rows {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.row-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 6px;
-}
-
-.row-label {
-  font-size: 14px;
-  font-weight: 550;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-
-.row-label span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.row-value {
-  font-size: 14px;
-  color: var(--ink-2);
-  font-variant-numeric: tabular-nums;
-  flex: 0 0 auto;
-}
-
-.track {
-  height: 10px;
-  border-radius: 5px;
-  background: var(--surface-sunken);
-  display: flex;
-  gap: 2px;
-}
-
-.track-fill {
-  position: relative;
-  display: flex;
-  gap: 2px;
-  height: 100%;
-}
-
-.track .segment {
-  height: 100%;
-}
-.track .segment:first-child {
-  border-start-start-radius: 4px;
-  border-end-start-radius: 4px;
-}
-.track .segment:last-child {
-  border-start-end-radius: 4px;
-  border-end-end-radius: 4px;
-}
-
-.row-split {
-  font-size: 12px;
-  color: var(--muted);
-  margin-top: 5px;
-  display: flex;
-  gap: 12px;
-}
-
-/* --- tooltip (hover layer) ------------------------------------------------ */
-.tip {
-  position: absolute;
-  bottom: calc(100% + 8px);
-  /* Pinned to the start of the bar (the right, in RTL) and bounded by it, so it
-     is always fully on screen whatever the segment's size or position. */
-  inset-inline-start: 0;
-  background: var(--ink);
-  color: var(--page);
-  font-size: 12px;
-  line-height: 1.4;
-  padding: 6px 9px;
-  border-radius: 8px;
-  white-space: nowrap;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.12s ease;
-  z-index: 5;
-}
-
-.segment:hover .tip,
-.segment:focus-visible .tip {
-  opacity: 1;
-}
-
-/* --- activity list -------------------------------------------------------- */
-.activity {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.activity li {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 11px 0;
-  border-bottom: 1px solid var(--hairline);
-}
-.activity li:last-child {
-  border-bottom: 0;
-}
-
-.activity .icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
-  background: var(--brand-wash);
-  color: var(--brand-strong);
-  display: grid;
-  place-items: center;
-  font-size: 14px;
-  flex: 0 0 auto;
-}
-
-.activity .body {
+.section-label .rule {
   flex: 1;
-  min-width: 0;
+  height: 4px;
+  background: var(--accent);
+  order: 1;
 }
 
-.activity .title {
-  font-size: 14px;
-  font-weight: 550;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.account-figure {
+  font-size: 34px;
+  display: flex;
+  justify-content: flex-start;
+  gap: 0.22em;
+  margin-top: 10px;
+  color: var(--income);
 }
 
-.activity .meta {
-  font-size: 12px;
-  color: var(--muted);
+.account-figure.is-negative {
+  color: var(--alert);
 }
 
-.activity .amount {
+.account-foot {
+  border-top: 1px solid var(--hairline);
+  padding: 16px var(--card-pad);
   font-size: 15px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  flex: 0 0 auto;
 }
 
-.pill {
-  display: inline-block;
-  font-size: 11px;
-  padding: 1px 7px;
-  border-radius: 999px;
-  background: var(--surface-sunken);
+.disclaimer {
+  display: flex;
+  gap: 8px;
+  padding: 18px var(--page-gutter);
   color: var(--ink-2);
-  margin-inline-start: 6px;
+  font-size: 14px;
+  background: #efefed;
 }
 
-/* --- table view (the accessibility fallback) ------------------------------ */
-details.table-view {
-  margin-top: 8px;
-}
-
-details.table-view summary {
-  cursor: pointer;
-  font-size: 13px;
-  color: var(--ink-2);
-  padding: 6px 0;
-}
-
-.table-view table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-  margin-top: 8px;
-}
-
-.table-view th,
-.table-view td {
-  text-align: start;
-  padding: 7px 8px;
-  border-bottom: 1px solid var(--hairline);
-  font-variant-numeric: tabular-nums;
-}
-
-.table-view th {
-  color: var(--muted);
-  font-weight: 550;
-}
-
-/* --- empty + auth states -------------------------------------------------- */
+/* --- misc ----------------------------------------------------------------- */
 .notice {
   text-align: center;
-  padding: 40px 24px;
+  padding: 48px 24px;
 }
 
 .notice h1 {
-  font-size: 20px;
-  margin: 0 0 8px;
+  font-size: 22px;
+  margin: 0 0 10px;
 }
 
 .notice p {
@@ -553,9 +902,11 @@ details.table-view summary {
   max-width: 34ch;
 }
 
-.footnote {
-  font-size: 12px;
-  color: var(--muted);
-  text-align: center;
-  margin: 18px 0 0;
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }

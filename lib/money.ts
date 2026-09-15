@@ -44,3 +44,55 @@ export function monthLabel(month: string): string {
   const name = MONTH_NAMES[Number(monthPart) - 1] ?? month;
   return `${name} ${year}`;
 }
+
+export interface AmountParts {
+  /** "-" for negatives, empty otherwise. Rendered before the digits. */
+  sign: string;
+  /** Thousands-separated integer part, e.g. "16,114". */
+  integer: string;
+  /** Leading dot included, e.g. ".7". Empty when rendering without decimals. */
+  decimal: string;
+  currency: string;
+}
+
+export const CURRENCY = 'ש״ח';
+
+/**
+ * RiseUp renders every amount as three runs at three sizes — big integer, small
+ * decimal, medium currency — so amounts have to be split rather than formatted
+ * into one string.
+ *
+ * Envelope and table values carry exactly one decimal place even when whole
+ * (`0.0`, `500.0`); hero figures and prose totals are rounded to whole shekels.
+ */
+export function splitAmount(value: number, decimals: 0 | 1 = 1): AmountParts {
+  const negative = value < 0;
+  const magnitude = Math.abs(value);
+
+  if (decimals === 0) {
+    return {
+      sign: negative ? '-' : '',
+      integer: Math.round(magnitude).toLocaleString('en-US'),
+      decimal: '',
+      currency: CURRENCY,
+    };
+  }
+
+  // Round first so 161.65 does not render as "161" + ".6".
+  const rounded = Math.round(magnitude * 10) / 10;
+  const integer = Math.floor(rounded);
+  const tenths = Math.round((rounded - integer) * 10);
+
+  return {
+    sign: negative ? '-' : '',
+    integer: integer.toLocaleString('en-US'),
+    decimal: `.${tenths}`,
+    currency: CURRENCY,
+  };
+}
+
+/** Flat single-string form, for places that are not the three-run treatment. */
+export function formatAmount(value: number, decimals: 0 | 1 = 1): string {
+  const parts = splitAmount(value, decimals);
+  return `${parts.sign}${parts.integer}${parts.decimal} ${parts.currency}`;
+}

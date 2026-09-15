@@ -1,12 +1,19 @@
 import { db } from '@/lib/db/client';
 import { recordRiseupCategories } from '@/lib/intake/categories';
-import { fetchTransactions, recentMonths, RiseupAuthError } from '@/lib/riseup/client';
+import {
+  fetchBudget,
+  fetchTransactions,
+  recentMonths,
+  RiseupAuthError,
+} from '@/lib/riseup/client';
+import { normalizeBudget, type NormalizedEnvelope } from '@/lib/riseup/envelopes';
 import { isWithdrawal, toDateOnly } from '@/lib/riseup/withdrawals';
 import type { CashTopup, RiseupTransaction } from '@/lib/types';
 
 export interface SyncResult {
   months: string[];
   transactionsUpserted: number;
+  envelopesUpserted: number;
   newTopups: CashTopup[];
   tokenExpired: boolean;
   error: string | null;
@@ -79,6 +86,13 @@ export async function syncRiseup(monthsBack = 2): Promise<SyncResult> {
 
     const newTopups = await createTopupsForWithdrawals(transactions);
 
+    // The dashboard is built on envelopes, not on the raw transaction feed, so
+    // the budget endpoint is the one that actually feeds the UI.
+    let envelopesUpserted = 0;
+    for (const month of months) {
+      envelopesUpserted += await storeEnvelopes(month, normalizeBudget(await fetchBudget(month)));
+    }
+
     await finish({
       status: 'succeeded',
       transactions_upserted: transactions.length,
@@ -88,6 +102,7 @@ export async function syncRiseup(monthsBack = 2): Promise<SyncResult> {
     return {
       months,
       transactionsUpserted: transactions.length,
+      envelopesUpserted,
       newTopups,
       tokenExpired: false,
       error: null,
@@ -99,6 +114,7 @@ export async function syncRiseup(monthsBack = 2): Promise<SyncResult> {
     return {
       months,
       transactionsUpserted: 0,
+      envelopesUpserted: 0,
       newTopups: [],
       tokenExpired: error instanceof RiseupAuthError,
       error: message,
@@ -142,4 +158,72 @@ async function createTopupsForWithdrawals(
   if (insertError) throw new Error(`Failed to create top-ups: ${insertError.message}`);
 
   return (inserted ?? []) as CashTopup[];
+}
+
+/**
+ * Replace a month's envelopes wholesale. RiseUp re-plans a month as it goes —
+ * envelopes appear, disappear and get renamed — so merging would leave stale
+ * cards on the dashboard long after they are gone upstream.
+ */
+async function storeEnvelopes(
+  month: string,
+  envelopes: NormalizedEnvelope[],
+): Promise<number> {
+  const supabase = db();
+
+  const { error: clearEnvelopes } = await supabase
+    .from('riseup_envelopes')
+    .delete()
+    .eq('month', month);
+  if (clearEnvelopes) throw new Error(`Failed to clear envelopes: ${clearEnvelopes.message}`);
+
+  const { error: clearActuals } = await supabase
+    .from('riseup_envelope_actuals')
+    .delete()
+    .eq('month', month);
+  if (clearActuals) throw new Error(`Failed to clear envelope actuals: ${clearActuals.message}`);
+
+  if (envelopes.length === 0) return 0;
+
+  const { error: insertEnvelopes } = await supabase.from('riseup_envelopes').insert(
+    envelopes.map((envelope) => ({
+      month,
+      envelope_id: envelope.envelopeId,
+      envelope_type: envelope.type,
+      name: envelope.name,
+      planned_ils: envelope.plannedIls,
+      actual_ils: envelope.actualIls,
+      position: envelope.position,
+      raw: envelope,
+    })),
+  );
+  if (insertEnvelopes) throw new Error(`Failed to store envelopes: ${insertEnvelopes.message}`);
+
+  const actualRows = envelopes.flatMap((envelope) =>
+    envelope.actuals.map((actual) => ({
+      month,
+      envelope_id: envelope.envelopeId,
+      transaction_id: actual.transactionId,
+      transaction_date: actual.transactionDate,
+      billing_date: actual.billingDate,
+      business_name: actual.businessName,
+      amount_ils: actual.amountIls,
+      is_income: actual.isIncome,
+      account_nickname: actual.accountNickname,
+      account_number_hash: actual.accountNumberHash,
+      source: actual.source,
+      is_installment: actual.isInstallment,
+      payment_number: actual.paymentNumber,
+      total_payments: actual.totalPayments,
+      category_label: actual.categoryLabel,
+      raw: actual,
+    })),
+  );
+
+  if (actualRows.length > 0) {
+    const { error } = await supabase.from('riseup_envelope_actuals').insert(actualRows);
+    if (error) throw new Error(`Failed to store envelope actuals: ${error.message}`);
+  }
+
+  return envelopes.length;
 }

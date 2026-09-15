@@ -57,3 +57,54 @@ export interface RiseupTransaction {
   categoryLabel?: string;
   categoryType?: string;
 }
+
+/** RiseUp envelope types, as returned by the budget endpoint. */
+export type EnvelopeType =
+  | 'variableIncome'
+  | 'variable'
+  | 'fixed'
+  | 'trackingCategory'
+  | 'riseupGoal'
+  /** Not a RiseUp type — the cash envelopes this app adds. */
+  | 'cash'
+  | 'cashUnlogged';
+
+export interface RiseupEnvelopeActual {
+  transactionId: string;
+  transactionDate?: string;
+  billingDate?: string;
+  businessName?: string;
+  isIncome?: boolean;
+  billingAmount?: number | null;
+  incomeAmount?: number | null;
+  originalAmount?: number;
+  accountNickname?: string | null;
+  accountNumberHash?: string | null;
+  source?: string;
+  isInstallment?: boolean;
+  paymentNumber?: number;
+  totalNumberOfPayments?: number;
+  expense?: string;
+  categoryLabel?: string;
+}
+
+export interface RiseupEnvelope {
+  id: string;
+  type: EnvelopeType;
+  originalAmount?: number;
+  balancedAmount?: number;
+  balanceDate?: string;
+  isCustomPrediction?: boolean;
+  sequenceCustomerComment?: string;
+  /** The field carrying a tracking category's display name is not documented. */
+  name?: string;
+  categoryName?: string;
+  label?: string;
+  actuals?: RiseupEnvelopeActual[];
+}
+
+export interface RiseupBudget {
+  budgetDate?: string;
+  lastUpdatedAt?: string;
+  envelopes?: RiseupEnvelope[];
+}
