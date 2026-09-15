@@ -175,13 +175,9 @@ function DrawerContent({
       </a>
       <a className="drawer-link" href="/daily">
         <Chart />
-        <span>הרייזאפ היומי</span>
-        {briefCount > 0 ? <span className="drawer-badge">{briefCount}</span> : null}
-      </a>
-      <a className="drawer-link" href="/cash">
-        <Coins />
-        <span>יומן המזומן</span>
+        <span>המזומן היומי</span>
         <span className="drawer-chip">חדש!</span>
+        {briefCount > 0 ? <span className="drawer-badge">{briefCount}</span> : null}
       </a>
     </>
   );

@@ -344,6 +344,11 @@ a {
   height: 100%;
   border-radius: 999px;
   background: var(--accent);
+}
+
+/* Give a non-zero-but-tiny fill enough width to read as a pill; a true zero
+   stays empty, as RiseUp renders an untouched envelope. */
+.bar-fill[data-nonzero='true'] {
   min-width: 16px;
 }
 
@@ -574,7 +579,8 @@ a {
 /* --- floating daily-brief blob -------------------------------------------- */
 .blob {
   position: fixed;
-  inset-inline-start: 10px;
+  /* inline-end is the left in RTL, which is where RiseUp floats it. */
+  inset-inline-end: 10px;
   bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   z-index: 25;
   width: 132px;
@@ -594,7 +600,7 @@ a {
 .blob-count {
   position: absolute;
   top: 6px;
-  inset-inline-end: 4px;
+  inset-inline-start: 4px;
   min-width: 34px;
   height: 34px;
   border-radius: 999px;

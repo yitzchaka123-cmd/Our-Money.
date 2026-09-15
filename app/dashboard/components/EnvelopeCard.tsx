@@ -107,7 +107,11 @@ export function EnvelopeCard({
           role="img"
           aria-label={`${formatAmount(actual)} מתוך ${formatAmount(expected)}`}
         >
-          <div className="bar-fill" style={{ width: `${ratio * 100}%` }} />
+          <div
+            className="bar-fill"
+            data-nonzero={actual > 0}
+            style={{ width: `${ratio * 100}%` }}
+          />
         </div>
 
         {showRemaining ? (

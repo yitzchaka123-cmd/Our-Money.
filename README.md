@@ -67,43 +67,61 @@ mis-categorised expense is one tap to fix.
 
 ## The dashboard
 
-`/dashboard` in the bot sends a personal link. It opens a Hebrew, RTL, mobile-first view
-built in RiseUp's visual language — hero cashflow figure, category rows, month switcher —
-with the cash layer folded in:
+`/dashboard` in the bot sends a personal link. What opens is RiseUp's own
+interface, rebuilt: the same app bar and month navigation, the same hero
+cashflow card, the same envelope cards in the same colours — income green,
+variable yellow, fixed pink, tracking periwinkle, savings orange — with the same
+planned-vs-actual bars that fill from the right, the same weekly and monthly
+breakdowns that expand into real charges, and the same bottom sheets.
 
-- **Hero** — what's left of this month's income, after card, cash *and* unaccounted cash.
-- **Wallet tile** — what should physically be in the wallet right now, across all months.
-- **"לאן הלך הכסף"** — one bar splitting the month into card/bank, logged cash, and cash
-  still unaccounted for.
-- **Category rows** — each category as one bar, card and cash side by side, so you can
-  finally see that groceries were ₪3,420 on the card *and* ₪640 in cash.
+It is built on RiseUp's **envelopes**, not on the raw transaction feed. That is
+what makes it the same interface rather than a lookalike: `GET
+/api/external/budget/:month` returns the month as envelopes with planned amounts
+and their actual transactions, which is exactly the shape the RiseUp dashboard
+itself renders.
 
-The one real difference from RiseUp's own view: **an ATM withdrawal is not counted as
-spending.** RiseUp has to treat it as an expense, because it can't see what happened next.
-Here the withdrawal drops out and is replaced by what the cash actually bought, plus a
-`מזומן שטרם נרשם` row for whatever is still unlogged — so the categories still add up to
-total spending instead of quietly under-reporting.
+`docs/riseup-ui-spec.md` records the measured spec — colours, type sizes, card
+anatomy, the money format. `docs/ui-comparison.md` is the loop to run whenever
+new RiseUp screenshots arrive.
+
+### Where cash appears
+
+Cash is not a separate section; it is two more envelopes in the same language:
+
+- **`מזומן`** — logged cash for the month, against cash withdrawn, with
+  `נשאר להוציא` showing the wallet balance. It expands into your entries, each
+  marked with who logged it and whether it came by voice.
+- **`מזומן שטרם נרשם`** — appears only when withdrawn exceeds logged.
+
+The one deliberate difference from RiseUp: **an ATM withdrawal is not counted as
+spending.** RiseUp has to count it, having no visibility past the cash machine.
+Here it drops out of the fixed and variable envelopes and is replaced by what the
+cash actually bought, so the envelopes add up to real spending.
+
+### The other screens
+
+- **`מצב העו״ש`** (`/accounts`) — the cash wallet in RiseUp's account-card
+  style. Bank and credit balances are not there yet: the read-only API exposes
+  cashflow and transactions, and `get_balances` is still on RiseUp's roadmap.
+- **המזומן היומי** (`/daily`) — the entries the AI intake was unsure about,
+  gathered for one confirmation pass. This is what the floating green badge
+  counts.
 
 ### Access
 
-There are no passwords. `/dashboard` mints a signed, member-bound token that is valid for
-seven days and arrives over Telegram, so only the two allowlisted accounts can ever get in.
-Opening the link exchanges it for an httpOnly cookie.
+There are no passwords. `/dashboard` mints a signed, member-bound token that is
+valid for seven days and arrives over Telegram, so only the two allowlisted
+accounts can ever get in. Opening the link exchanges it for an httpOnly cookie.
 
 ### Working on the design
 
 ```bash
-npm run dashboard:preview -- /tmp/dash.html         # light
-npm run dashboard:preview -- /tmp/dash-dark.html dark
+npm run ui:shots -- /tmp/shots     # renders + screenshots at a true 432px width
+npm run dashboard:preview -- /tmp/dash.html expanded
 ```
 
-This renders the real `DashboardView` against fixtures — no database, session, or deploy —
-so the layout can be opened in a browser or screenshotted. It renders the same component the
-live page does, deliberately: a separate mock-up would drift within a week.
-
-The chart colours in `app/globals.css` (`--series-*`) are **not decorative**. They were
-validated for colour-vision separation against both the light and dark surfaces. Changing
-them means re-validating.
+Both render the real `DashboardView` against fixtures — no database, session or
+deploy. A separate mock-up would drift within a week.
 
 ## Setup
 
@@ -209,9 +227,14 @@ date formatting (`lib/telegram/format.ts`), and the date/amount guards around th
 ```
 app/api/telegram/webhook   Telegram entry point (secret-verified)
 app/api/cron/sync-riseup   Scheduled RiseUp pull
-app/dashboard              The web dashboard (page = auth + data, view = pure UI)
-lib/dashboard              Dashboard aggregation, merging RiseUp and cash
+app/dashboard              The dashboard (page = auth + data, view = pure UI)
+app/dashboard/components   RiseUp's UI, rebuilt: envelopes, sheets, drawer, amounts
+app/accounts               מצב העו״ש
+app/daily                  The daily cash review
+lib/dashboard              Envelope + cash aggregation and breakdown buckets
 lib/auth                   Signed dashboard login links
+docs/riseup-ui-spec.md     Measured spec for the UI
+docs/ui-comparison.md      How to check ours against new screenshots
 lib/intake                 Claude structured extraction + category catalog
 lib/stt                    Voice transcription (provider behind one function)
 lib/riseup                 Read-only API client, withdrawal detection, sync
