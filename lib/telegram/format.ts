@@ -1,6 +1,9 @@
+import { formatIls, friendlyDate } from '@/lib/money';
 import { escapeHtml } from '@/lib/telegram/client';
 import type { InlineKeyboard } from '@/lib/telegram/types';
 import type { CashSpend } from '@/lib/types';
+
+export { formatDate, formatIls, friendlyDate } from '@/lib/money';
 
 /**
  * Telegram caps callback_data at 64 bytes, so ids travel dash-free (32 chars)
@@ -78,29 +81,6 @@ export function decodeCallback(data: string): CallbackAction | null {
     default:
       return null;
   }
-}
-
-export function formatIls(amount: number): string {
-  return `₪${amount.toLocaleString('he-IL', {
-    minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
-    maximumFractionDigits: 2,
-  })}`;
-}
-
-export function formatDate(iso: string): string {
-  const [year, month, day] = iso.split('-');
-  return `${day}/${month}/${year}`;
-}
-
-/** Relative day label, so "היום" reads naturally instead of a bare date. */
-export function friendlyDate(iso: string, today: string): string {
-  if (iso === today) return 'היום';
-
-  const dayMs = 24 * 60 * 60 * 1000;
-  const diff = Date.parse(`${today}T00:00:00Z`) - Date.parse(`${iso}T00:00:00Z`);
-  if (diff === dayMs) return 'אתמול';
-  if (diff === 2 * dayMs) return 'שלשום';
-  return formatDate(iso);
 }
 
 export function spendLine(spend: CashSpend, today: string): string {

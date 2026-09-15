@@ -56,6 +56,7 @@ than guessing. If you say you paid by card, it declines — that's already track
 | `/today` | Today's cash spending |
 | `/month [YYYY-MM]` | Monthly totals by category and by person |
 | `/undo` | Deletes your most recent entry |
+| `/dashboard` | Sends you a personal link to the web dashboard |
 | `/sync` | Pulls RiseUp now instead of waiting for the cron |
 | `/categories` | The current category list |
 | `/id` | Chat and user ids — how you get the group chat id for setup |
@@ -63,6 +64,46 @@ than guessing. If you say you paid by card, it declines — that's already track
 
 Every saved entry comes back with **✏️ שינוי קטגוריה** and **🗑 מחיקה** buttons, so a
 mis-categorised expense is one tap to fix.
+
+## The dashboard
+
+`/dashboard` in the bot sends a personal link. It opens a Hebrew, RTL, mobile-first view
+built in RiseUp's visual language — hero cashflow figure, category rows, month switcher —
+with the cash layer folded in:
+
+- **Hero** — what's left of this month's income, after card, cash *and* unaccounted cash.
+- **Wallet tile** — what should physically be in the wallet right now, across all months.
+- **"לאן הלך הכסף"** — one bar splitting the month into card/bank, logged cash, and cash
+  still unaccounted for.
+- **Category rows** — each category as one bar, card and cash side by side, so you can
+  finally see that groceries were ₪3,420 on the card *and* ₪640 in cash.
+
+The one real difference from RiseUp's own view: **an ATM withdrawal is not counted as
+spending.** RiseUp has to treat it as an expense, because it can't see what happened next.
+Here the withdrawal drops out and is replaced by what the cash actually bought, plus a
+`מזומן שטרם נרשם` row for whatever is still unlogged — so the categories still add up to
+total spending instead of quietly under-reporting.
+
+### Access
+
+There are no passwords. `/dashboard` mints a signed, member-bound token that is valid for
+seven days and arrives over Telegram, so only the two allowlisted accounts can ever get in.
+Opening the link exchanges it for an httpOnly cookie.
+
+### Working on the design
+
+```bash
+npm run dashboard:preview -- /tmp/dash.html         # light
+npm run dashboard:preview -- /tmp/dash-dark.html dark
+```
+
+This renders the real `DashboardView` against fixtures — no database, session, or deploy —
+so the layout can be opened in a browser or screenshotted. It renders the same component the
+live page does, deliberately: a separate mock-up would drift within a week.
+
+The chart colours in `app/globals.css` (`--series-*`) are **not decorative**. They were
+validated for colour-vision separation against both the light and dark surfaces. Changing
+them means re-validating.
 
 ## Setup
 
@@ -139,6 +180,7 @@ See `.env.example` for the annotated list. The ones with real decisions behind t
 | `INTAKE_EFFORT` | `low` by default. Short expense messages don't need more; raise to `medium` if long voice notes mis-parse. |
 | `STT_LANGUAGE` | Blank = auto-detect, which is right when you mix Hebrew and English. Set `he` for maximum Hebrew accuracy at the cost of English. |
 | `TELEGRAM_ALLOWED_USER_IDS` | The allowlist. An empty value means nobody can log anything. |
+| `APP_BASE_URL` | Must match the deployment exactly — it's what the dashboard links are built from. |
 
 ## Why these services
 
@@ -167,6 +209,9 @@ date formatting (`lib/telegram/format.ts`), and the date/amount guards around th
 ```
 app/api/telegram/webhook   Telegram entry point (secret-verified)
 app/api/cron/sync-riseup   Scheduled RiseUp pull
+app/dashboard              The web dashboard (page = auth + data, view = pure UI)
+lib/dashboard              Dashboard aggregation, merging RiseUp and cash
+lib/auth                   Signed dashboard login links
 lib/intake                 Claude structured extraction + category catalog
 lib/stt                    Voice transcription (provider behind one function)
 lib/riseup                 Read-only API client, withdrawal detection, sync

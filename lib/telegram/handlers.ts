@@ -1,3 +1,4 @@
+import { createSessionToken } from '@/lib/auth/session';
 import { env } from '@/lib/env';
 import { activeCategories } from '@/lib/intake/categories';
 import { isoDateInIsrael, parseIntake } from '@/lib/intake/parse';
@@ -56,6 +57,7 @@ const HELP = [
   '/today — ההוצאות של היום',
   '/month — סיכום החודש לפי קטגוריה',
   '/undo — מחיקת הרישום האחרון',
+  '/dashboard — קישור לדאשבורד המלא',
   '/sync — משיכת נתונים מרייזאפ עכשיו',
   '/categories — רשימת הקטגוריות',
   '/id — מזהי הצ׳אט (שימושי להגדרת קבוצה)',
@@ -152,6 +154,21 @@ async function handleCommand(
       await sendMessage(
         chatId,
         ['<b>קטגוריות פעילות</b>', '', ...categories.map((c) => `• ${escapeHtml(c)}`)].join('\n'),
+      );
+      return;
+    }
+
+    case '/dashboard': {
+      const token = createSessionToken(member.id);
+      await sendMessage(
+        chatId,
+        [
+          '📊 <b>הדאשבורד שלכם</b>',
+          '',
+          `${env.appBaseUrl}/api/auth/telegram?t=${token}`,
+          '',
+          'הקישור אישי ותקף לשבוע. אל תעבירו אותו הלאה.',
+        ].join('\n'),
       );
       return;
     }

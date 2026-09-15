@@ -84,6 +84,14 @@ export const env = {
     );
   },
 
+  get sessionSecret(): string {
+    return required('APP_SESSION_SECRET', 'Signs dashboard login links.');
+  },
+  /** Absolute base URL of the deployment — used to build dashboard links. */
+  get appBaseUrl(): string {
+    return required('APP_BASE_URL', 'e.g. https://our-money.vercel.app').replace(/\/$/, '');
+  },
+
   get cronSecret(): string {
     return required('CRON_SECRET', 'Protects the RiseUp sync endpoint.');
   },

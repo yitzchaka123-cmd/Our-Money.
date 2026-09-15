@@ -1,0 +1,561 @@
+/* ---------------------------------------------------------------------------
+   Design tokens.
+
+   Chrome (brand green, surfaces, ink) is styling. The --series-* slots are the
+   data palette and are NOT decorative: they were validated for colour-vision
+   separation against these exact surfaces in both modes. Changing them means
+   re-running the validator.
+   --------------------------------------------------------------------------- */
+:root {
+  color-scheme: light;
+
+  --page: #f1f4f2;
+  --surface: #ffffff;
+  --surface-sunken: #f7f9f8;
+
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --hairline: #e6e8e5;
+
+  --brand: #00805f;
+  --brand-strong: #006b50;
+  --brand-wash: #e2f2ec;
+  --on-brand: #ffffff;
+
+  --series-bank: #2a78d6;
+  --series-cash: #eb6834;
+  --series-unlogged: #1baf7a;
+
+  --status-good: #0ca30c;
+  --status-warning: #fab219;
+  --status-critical: #d03b3b;
+
+  --radius: 18px;
+  --radius-sm: 12px;
+  --shadow: 0 1px 2px rgba(11, 11, 11, 0.04), 0 8px 24px rgba(11, 11, 11, 0.05);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --surface-sunken: #232322;
+
+    --ink: #ffffff;
+    --ink-2: #c3c2b7;
+    --muted: #898781;
+    --hairline: #2c2c2a;
+
+    --brand: #2fbf94;
+    --brand-strong: #52d1ab;
+    --brand-wash: #14302a;
+    --on-brand: #06231b;
+
+    --series-bank: #3987e5;
+    --series-cash: #d95926;
+    --series-unlogged: #199e70;
+
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.3);
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --page: #0d0d0d;
+  --surface: #1a1a19;
+  --surface-sunken: #232322;
+
+  --ink: #ffffff;
+  --ink-2: #c3c2b7;
+  --muted: #898781;
+  --hairline: #2c2c2a;
+
+  --brand: #2fbf94;
+  --brand-strong: #52d1ab;
+  --brand-wash: #14302a;
+  --on-brand: #06231b;
+
+  --series-bank: #3987e5;
+  --series-cash: #d95926;
+  --series-unlogged: #199e70;
+
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--page);
+  overflow-x: hidden;
+  color: var(--ink);
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* --- shell ---------------------------------------------------------------- */
+.shell {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 0 16px calc(48px + env(safe-area-inset-bottom, 0px));
+  min-width: 0;
+}
+
+.card,
+.tile,
+.row-head,
+.activity li {
+  min-width: 0;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--page);
+  padding-top: calc(14px + env(safe-area-inset-top, 0px));
+  padding-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.wordmark {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.wordmark .dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: var(--brand);
+  display: grid;
+  place-items: center;
+  color: var(--on-brand);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.months {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  /* Without this a scrolling flex child sizes to its content and widens the page. */
+  min-width: 0;
+  scrollbar-width: none;
+}
+.months::-webkit-scrollbar {
+  display: none;
+}
+
+.month-chip {
+  flex: 0 0 auto;
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-size: 13px;
+  color: var(--ink-2);
+  text-decoration: none;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.month-chip:hover {
+  background: var(--surface);
+}
+.month-chip[aria-current='page'] {
+  background: var(--brand);
+  color: var(--on-brand);
+  font-weight: 600;
+}
+
+/* --- cards ---------------------------------------------------------------- */
+.card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px;
+  margin-bottom: 14px;
+}
+
+.card h2 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.card .sub {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* --- hero ----------------------------------------------------------------- */
+.hero {
+  background: var(--brand);
+  color: var(--on-brand);
+  text-align: center;
+  padding: 26px 20px 22px;
+}
+
+.hero .label {
+  font-size: 14px;
+  opacity: 0.85;
+  margin: 0;
+}
+
+.hero .figure {
+  /* A six-digit shekel amount must not outgrow a narrow phone. */
+  font-size: clamp(40px, 12vw, 52px);
+  overflow-wrap: anywhere;
+  font-weight: 680;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  margin: 6px 0 2px;
+}
+
+.hero .note {
+  font-size: 13px;
+  opacity: 0.85;
+  margin: 0;
+}
+
+/* --- stat tiles ----------------------------------------------------------- */
+.tiles {
+  display: grid;
+  /* Two columns for the month figures; the wallet tile spans the row beneath,
+     since it is the headline of the whole cash feature. */
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.tile {
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  padding: 14px;
+}
+
+.tile--wide {
+  grid-column: 1 / -1;
+}
+
+.tile .label {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0 0 4px;
+}
+
+.tile .value {
+  font-size: 21px;
+  overflow-wrap: anywhere;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.tile .delta {
+  font-size: 12px;
+  color: var(--ink-2);
+  margin: 2px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.tile .delta[data-state='good'] {
+  color: var(--status-good);
+}
+.tile .delta[data-state='warning'] {
+  color: var(--ink-2);
+}
+
+/* --- legend --------------------------------------------------------------- */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 0 0 14px;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend .swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex: 0 0 auto;
+}
+
+/* --- composition bar ------------------------------------------------------ */
+.composition {
+  position: relative;
+  display: flex;
+  height: 24px;
+  border-radius: 6px;
+  overflow: visible;
+  gap: 2px; /* the surface gap that separates touching segments */
+}
+
+.segment {
+  /* Deliberately static: tooltips anchor to the bar, not to the segment, so a
+     narrow segment near an edge cannot push its label off the page. */
+  min-width: 3px;
+  background: var(--seg);
+}
+.segment:first-child {
+  border-start-start-radius: 4px;
+  border-end-start-radius: 4px;
+}
+.segment:last-child {
+  border-start-end-radius: 4px;
+  border-end-end-radius: 4px;
+}
+
+/* --- category rows -------------------------------------------------------- */
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.row-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.row-label {
+  font-size: 14px;
+  font-weight: 550;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.row-label span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row-value {
+  font-size: 14px;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+  flex: 0 0 auto;
+}
+
+.track {
+  height: 10px;
+  border-radius: 5px;
+  background: var(--surface-sunken);
+  display: flex;
+  gap: 2px;
+}
+
+.track-fill {
+  position: relative;
+  display: flex;
+  gap: 2px;
+  height: 100%;
+}
+
+.track .segment {
+  height: 100%;
+}
+.track .segment:first-child {
+  border-start-start-radius: 4px;
+  border-end-start-radius: 4px;
+}
+.track .segment:last-child {
+  border-start-end-radius: 4px;
+  border-end-end-radius: 4px;
+}
+
+.row-split {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 5px;
+  display: flex;
+  gap: 12px;
+}
+
+/* --- tooltip (hover layer) ------------------------------------------------ */
+.tip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  /* Pinned to the start of the bar (the right, in RTL) and bounded by it, so it
+     is always fully on screen whatever the segment's size or position. */
+  inset-inline-start: 0;
+  background: var(--ink);
+  color: var(--page);
+  font-size: 12px;
+  line-height: 1.4;
+  padding: 6px 9px;
+  border-radius: 8px;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+  z-index: 5;
+}
+
+.segment:hover .tip,
+.segment:focus-visible .tip {
+  opacity: 1;
+}
+
+/* --- activity list -------------------------------------------------------- */
+.activity {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.activity li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--hairline);
+}
+.activity li:last-child {
+  border-bottom: 0;
+}
+
+.activity .icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: var(--brand-wash);
+  color: var(--brand-strong);
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  flex: 0 0 auto;
+}
+
+.activity .body {
+  flex: 1;
+  min-width: 0;
+}
+
+.activity .title {
+  font-size: 14px;
+  font-weight: 550;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activity .meta {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.activity .amount {
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  flex: 0 0 auto;
+}
+
+.pill {
+  display: inline-block;
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--surface-sunken);
+  color: var(--ink-2);
+  margin-inline-start: 6px;
+}
+
+/* --- table view (the accessibility fallback) ------------------------------ */
+details.table-view {
+  margin-top: 8px;
+}
+
+details.table-view summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--ink-2);
+  padding: 6px 0;
+}
+
+.table-view table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin-top: 8px;
+}
+
+.table-view th,
+.table-view td {
+  text-align: start;
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--hairline);
+  font-variant-numeric: tabular-nums;
+}
+
+.table-view th {
+  color: var(--muted);
+  font-weight: 550;
+}
+
+/* --- empty + auth states -------------------------------------------------- */
+.notice {
+  text-align: center;
+  padding: 40px 24px;
+}
+
+.notice h1 {
+  font-size: 20px;
+  margin: 0 0 8px;
+}
+
+.notice p {
+  color: var(--ink-2);
+  margin: 0 auto;
+  max-width: 34ch;
+}
+
+.footnote {
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+  margin: 18px 0 0;
+}
