@@ -1,12 +1,14 @@
 # RiseUp UI specification
 
 Derived from screenshots of the live RiseUp web app at `input.riseup.co.il`
-(captured 2026-09-16, Android Chrome, 1080px device width ≈ 432 CSS px, DPR 2.5).
+(captured 2026-09-16, Android Chrome, 1080 device px at DPR 3 = a 360 CSS px viewport).
 
 This is the contract the dashboard is built against. When new screenshots arrive,
 update this file first, then the code.
 
-Physical pixel measurements below are divided by 2.5 to give CSS px.
+Device pixels below are divided by 3 to give CSS px. An earlier revision of this
+file assumed DPR 2.5; that inflated every derived size by 20% and is corrected
+throughout.
 
 ---
 
@@ -18,8 +20,8 @@ Physical pixel measurements below are divided by 2.5 to give CSS px.
 |---|---|---|---|
 | Income | הכנסות | `#00B33C` green | `#D6F5E0` |
 | Variable expenses | הוצאות משתנות | `#FFC800` yellow | `#FFF0B8` |
-| Fixed expenses | הוצאות קבועות | `#F04E8C` pink | `#FCDCE9` |
-| Tracking category | (per-category) | `#5B6BF5` periwinkle | `#DCE1FB` |
+| Fixed expenses | הוצאות קבועות | `#F04E8C` pink | `#FEEEF1` |
+| Tracking category | (per-category) | `#5D7AFC` cornflower | `#DCE8F6` |
 | Savings deposits | הפקדות לחיסכון | `#FF7A30` orange | `#FFDFCC` |
 
 ### System
@@ -30,9 +32,9 @@ Physical pixel measurements below are divided by 2.5 to give CSS px.
 | Primary action pressed | `#4A59E0` | |
 | Alert / deficit | `#FF6B4A` | negative cashflow figure, badges, "נשארו 0" |
 | Ink | `#1A1A1A` | headings, values |
-| Ink secondary | `#5C5C5C` | labels ("יצא", "צפוי לצאת") |
+| Ink secondary | `#5C5C5C` | muted body copy — **not** the envelope column labels, which are full ink |
 | Ink muted | `#9A9A9A` | timestamps, disabled rows |
-| Page | `#F7F7F5` | app background |
+| Page | `#FFFFFF` | app background — cards are separated by a shadow, not a tint |
 | Surface | `#FFFFFF` | cards, sheets |
 | Hairline | `#EAEAEA` | card dividers, table rows |
 | Drawer surface | `#FAF6EC` cream | side menu |
@@ -46,15 +48,19 @@ Physical pixel measurements below are divided by 2.5 to give CSS px.
 
 System Hebrew sans throughout (no display face). Weights: 400 / 600 / 700.
 
+The face is a geometric Hebrew sans (Assistant), pinned rather than left to
+`system-ui`: the host fallback renders digits ~35% wider and a weight step
+heavier, which changes the texture of every amount on the page.
+
 | Element | Size (CSS px) | Weight |
 |---|---|---|
-| Hero figure (cashflow) | 44 | 700 |
-| Card title (הוצאות משתנות) | 20 | 700 |
+| Hero figure (cashflow) | 50 | 400 | light, not bold |
+| Card title (הוצאות משתנות) | 23 | 700 |
 | Hero question | 20 | 700 |
 | Envelope value integer | 18 | 700 |
 | Envelope value decimal | 12 | 700 |
-| Currency suffix (ש״ח) | 15 | 700 |
-| Column label (יצא) | 13 | 400 |
+| Currency sign (₪) | 0.75× the integer run | 700 |
+| Column label (יצא) | 11 | 400 | full ink, not grey |
 | Table header | 14 | 600 |
 | Table cell | 14 | 400/700 |
 | Greeting (היי יצחק) | 14 | 400 |
@@ -65,24 +71,26 @@ System Hebrew sans throughout (no display face). Weights: 400 / 600 / 700.
 Amounts always split into three runs at three sizes:
 
 ```
-‎161.7 ש״ח   →   [161]  [.7]  [ש״ח]
-                 18px   12px  15px
+‎161.7 ₪   →   [161]  [.7]  [₪]
+               18px   12px  15px
 ```
 
 - Always exactly one decimal place, even for whole numbers (`0.0`, `500.0`).
 - Thousands separator comma: `7,635.0`, `16,114`.
-- Currency is the string `ש״ח`, never `₪`.
-- Negative: minus sign **before** the digits: `‎-8,478 ש״ח`.
-- In an envelope the *actual* value wears the envelope colour; the *expected*
-  value is ink.
+- Currency is the `₪` sign (U+20AA), never the string `ש״ח`. (An earlier revision
+  of this file claimed the opposite; a 6x zoom on the reference settles it.)
+- Negative: minus sign **before** the digits: `‎-8,478 ₪`.
+- In an envelope the *actual* value wears the envelope colour **and is bold**;
+  the *expected* value is ink **at regular weight**.
 
 ---
 
 ## 3. Layout shell
 
 - Page background `#F7F7F5`; cards `#FFFFFF`.
-- Page side margin **12px**; card inner padding **20px**.
-- Card radius **20px**; border `1px solid #EAEAEA`, no shadow (or a very soft one).
+- Page side margin **24px**; card inner padding **24px**; card gap **22px**.
+- Card radius **20px**; border `1px solid #EAEAEA` plus a soft ambient shadow —
+  the page behind is white, so the shadow is what separates card from page.
 - Max content width 480px, centred, for desktop.
 
 ### App bar (sticky, white, hairline bottom)
@@ -91,7 +99,7 @@ Amounts always split into three runs at three sizes:
 - Right, in order: search, filter, hamburger. 24px stroke icons, ~28px apart.
 
 ### Month navigation bar (sticky under the app bar, white, hairline bottom)
-- Height 56px.
+- Height 60px — deliberately taller than the 56px app bar above it.
 - Left: `‹` chevron (previous month — visually left in RTL = *forward* in time is right).
 - Centre: `ספטמבר 2026` bold 18px, followed by a `⌄` chevron (opens month sheet).
 - Right: `›` chevron.
@@ -119,9 +127,13 @@ Amounts always split into three runs at three sizes:
 └──────────────────────────────────────┘
 ```
 
-The hero sits inside a horizontal **carousel** with insight cards; page dots
-(8px, `#5B6BF5` active / `#D4D4D4` inactive) sit centred below the carousel,
-followed by a full-width hairline.
+In RiseUp the order down the page is: an insight **carousel**, its page dots
+(8px, `#8D93F7` active / `#E7E6E3` inactive — the inactive ones barely separate
+from the page), a 2px full-width rule, the `השלמת 2 צעדים` banner on a white
+band, and only then this hero card as a normal card.
+
+Our Money has no insight cards of its own, so it drops the carousel and its
+dots rather than faking four slides, and starts at the banner.
 
 ---
 
@@ -160,11 +172,19 @@ Header row (`#FAFAFA`), then one row per bucket:
 |---|---|---|---|
 | bucket name / `שבוע 1` | `יצא` value in envelope colour | `נשאר להוציא` / `צפוי לצאת` in ink | `⌄` |
 
+- Every bucket row is exactly **60px** tall — the pill row, the greyed rows and
+  the chevron rows alike, so the table keeps one rhythm.
+- The header row is white with a soft inset shadow along its top edge, not a
+  grey band.
 - Rows separated by hairlines.
-- The **current week** gets a filled pill badge in the envelope colour.
+- The **current week** gets a filled pill badge in the envelope colour, with
+  **white** text. The pill's *text* lines up with the plain week labels; only
+  its fill bleeds outward.
 - Future/empty buckets are rendered in `#9A9A9A` throughout.
 - Expanding a bucket reveals transaction rows on `#FAFAFA`:
-  date (right, 13px) · amount (bold) · merchant + card on the second line · `⋮`.
+  the transaction rows share the bucket rows' column rails: date in the first
+  column, amount in the `יצא` column, `⋮` in the chevron column, and the
+  merchant line on a second row under the *amount* — not under the date.
 - An expected-but-absent charge shows the expected amount **struck through**
   with a grey `!` circle and the label `לא צפוי לרדת`.
 
@@ -211,9 +231,14 @@ Slides from the right, covering ~88% width, cream `#FAF6EC`, dark-green ink.
 
 ## 8. Floating daily-brief button
 
-Fixed at the bottom-left, ~150px, a green scalloped blob (an 8-lobed
-border-radius blob) with white text `לרייזאפ היומי שלי ←` rotated ~-10°, and an
-orange counter circle at its top-right.
+Fixed at the bottom-left, 113 × 112px, a green **8-lobed** scalloped blob with
+white text `לרייזאפ היומי שלי ←`, the whole thing rotated **-19°**, and a 25px
+orange counter circle tucked inside its top-right corner.
+
+Two traps: a four-value `border-radius` cannot produce eight lobes (it needs a
+`clip-path` rosette), and because the blob is `position: fixed` its containing
+block is the viewport — whose direction comes from `<html>`, not from the RTL
+page — so it needs the **physical** `left`, not `inset-inline-*`.
 
 ---
 

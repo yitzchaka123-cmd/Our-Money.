@@ -16,7 +16,7 @@ import {
   Search,
   SparkleBubble,
 } from '@/app/dashboard/components/icons';
-import { monthLabel } from '@/lib/money';
+import { monthLabel, monthParts } from '@/lib/money';
 
 export function Shell({
   month,
@@ -80,7 +80,10 @@ export function Shell({
           type="button"
           onClick={() => setMonthSheetOpen(true)}
         >
-          <span>{monthLabel(month)}</span>
+          <span>
+            {monthParts(month).name}{' '}
+            <span className="monthnav-year">{monthParts(month).year}</span>
+          </span>
           <ChevronDown />
         </button>
 

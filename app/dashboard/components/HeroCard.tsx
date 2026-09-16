@@ -1,5 +1,5 @@
 import { Amount } from '@/app/dashboard/components/Amount';
-import { ChevronLeft } from '@/app/dashboard/components/icons';
+import { ChevronLeft, Kebab } from '@/app/dashboard/components/icons';
 
 export function HeroCard({
   greeting,
@@ -20,9 +20,7 @@ export function HeroCard({
       <div className="card-body">
         <div className="card-head" style={{ marginBottom: 0 }}>
           <p className="hero-greeting">היי {greeting}</p>
-          <button className="kebab" type="button" aria-label="אפשרויות">
-            ⋮
-          </button>
+          <Kebab label="אפשרויות" />
         </div>
 
         <h1 className="hero-question">איך צפוי להסתיים התזרים של {monthName}?</h1>

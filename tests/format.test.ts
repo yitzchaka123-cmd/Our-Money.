@@ -106,7 +106,7 @@ describe('splitAmount', () => {
       sign: '',
       integer: '161',
       decimal: '.7',
-      currency: 'ש״ח',
+      currency: '₪',
     });
   });
 
@@ -137,14 +137,14 @@ describe('splitAmount', () => {
       sign: '-',
       integer: '8,478',
       decimal: '',
-      currency: 'ש״ח',
+      currency: '₪',
     });
   });
 });
 
 describe('formatAmount', () => {
   it('renders the flat form', () => {
-    expect(formatAmount(1284.7)).toBe('1,284.7 ש״ח');
-    expect(formatAmount(-1284.7, 0)).toBe('-1,285 ש״ח');
+    expect(formatAmount(1284.7)).toBe('1,284.7 ₪');
+    expect(formatAmount(-1284.7, 0)).toBe('-1,285 ₪');
   });
 });

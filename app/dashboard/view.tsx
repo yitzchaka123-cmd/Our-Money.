@@ -2,7 +2,7 @@ import { DailyBriefBlob } from '@/app/dashboard/components/Blob';
 import { EnvelopeList } from '@/app/dashboard/components/EnvelopeList';
 import { HeroCard } from '@/app/dashboard/components/HeroCard';
 import { Shell } from '@/app/dashboard/components/Shell';
-import { ChevronLeft } from '@/app/dashboard/components/icons';
+import { ChevronLeft, Clover } from '@/app/dashboard/components/icons';
 import type { DashboardData } from '@/lib/dashboard/data';
 import { isoDateInIsrael } from '@/lib/intake/parse';
 import { monthLabel } from '@/lib/money';
@@ -31,30 +31,25 @@ export function DashboardView({
       briefCount={data.briefCount}
     >
       <div className="app">
-        <div className="carousel">
+        <div className="steps-section">
+          <div className="steps-banner">
+            <Clover />
+            <span>
+              השלמת <strong>2 צעדים</strong> והתחלת לצמוח!
+            </span>
+            <span style={{ marginInlineStart: 'auto' }}>
+              <ChevronLeft size={20} />
+            </span>
+          </div>
+        </div>
+
+        <div className="section">
           <HeroCard
             greeting={data.greeting}
             monthName={monthName}
             forecast={data.forecast}
             variableRemaining={data.variableRemaining}
           />
-        </div>
-
-        <div className="dots">
-          <span className="dot" data-active="true" />
-          <span className="dot" />
-          <span className="dot" />
-          <span className="dot" />
-        </div>
-
-        <div className="steps-banner">
-          <span className="steps-blob" aria-hidden="true" />
-          <span>
-            השלמת <strong>2 צעדים</strong> והתחלת לצמוח!
-          </span>
-          <span style={{ marginInlineStart: 'auto' }}>
-            <ChevronLeft size={20} />
-          </span>
         </div>
 
         <div className="section">

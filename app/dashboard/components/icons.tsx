@@ -18,12 +18,13 @@ function svgProps(size: number) {
   };
 }
 
-export function SparkleBubble({ size = 26 }: Props) {
+export function SparkleBubble({ size = 28 }: Props) {
   return (
-    <svg {...svgProps(size)}>
-      <path d="M21 11.5a8.5 8.5 0 1 1-3.6-6.9" />
-      <path d="M3.8 18.2 3 21l2.9-.8" />
-      <path d="M12 7.5 13.1 10l2.4 1.1-2.4 1.1L12 14.7l-1.1-2.5L8.5 11l2.4-1.1z" />
+    <svg {...svgProps(size)} strokeWidth={2.1}>
+      {/* One continuous outline: the bubble runs unbroken into its tail. */}
+      <path d="M12 2.6a9.4 9.4 0 1 1-7.2 15.4l-1.9 3.4 3.8-1.1A9.4 9.4 0 0 1 12 2.6z" />
+      {/* The star fills most of the bubble, not a fraction of it. */}
+      <path d="M12 5.2 13.9 9.3l4.1 1.9-4.1 1.9L12 17.2l-1.9-4.1L6 11.2l4.1-1.9z" />
     </svg>
   );
 }
@@ -48,31 +49,35 @@ export function Filter({ size = 24 }: Props) {
 export function Menu({ size = 24 }: Props) {
   return (
     <svg {...svgProps(size)}>
-      <path d="M3 6h18M3 12h18M3 18h18" />
+      <path d="M4 5h16M4 12h16M4 19h16" />
     </svg>
   );
 }
 
+/* The month arrows and the dropdown caret are cut flat and mitered, unlike the
+   rounded stroke every other icon here uses. */
+const CUT = { strokeLinecap: 'butt' as const, strokeLinejoin: 'miter' as const };
+
 export function ChevronRight({ size = 26 }: Props) {
   return (
-    <svg {...svgProps(size)} strokeWidth={2.6}>
-      <path d="m9 5 7 7-7 7" />
+    <svg {...svgProps(size)} {...CUT} strokeWidth={2.7}>
+      <path d="m7 2 10 10-10 10" />
     </svg>
   );
 }
 
 export function ChevronLeft({ size = 26 }: Props) {
   return (
-    <svg {...svgProps(size)} strokeWidth={2.6}>
-      <path d="m15 5-7 7 7 7" />
+    <svg {...svgProps(size)} {...CUT} strokeWidth={2.7}>
+      <path d="m17 2-10 10 10 10" />
     </svg>
   );
 }
 
-export function ChevronDown({ size = 20 }: Props) {
+export function ChevronDown({ size = 24 }: Props) {
   return (
-    <svg {...svgProps(size)} strokeWidth={2.6}>
-      <path d="m5 9 7 7 7-7" />
+    <svg {...svgProps(size)} {...CUT} strokeWidth={3.4}>
+      <path d="M4 9l8 6 8-6" />
     </svg>
   );
 }
@@ -189,6 +194,31 @@ export function Mic({ size = 14 }: Props) {
     <svg {...svgProps(size)}>
       <rect x="9" y="3" width="6" height="11" rx="3" />
       <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
+    </svg>
+  );
+}
+
+/** The card overflow control: three solid dots, not a "⋮" text glyph. */
+export function Kebab({ label }: { label: string }) {
+  return (
+    <button className="kebab" type="button" aria-label={label}>
+      <span />
+      <span />
+      <span />
+    </button>
+  );
+}
+
+/** The four-lobed clover on the steps banner. */
+export function Clover({ size = 30 }: Props) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 30 30" aria-hidden="true">
+      <g fill="#e879f9">
+        <circle cx="10" cy="10" r="7.6" />
+        <circle cx="20" cy="10" r="7.6" />
+        <circle cx="10" cy="20" r="7.6" />
+        <circle cx="20" cy="20" r="7.6" />
+      </g>
     </svg>
   );
 }

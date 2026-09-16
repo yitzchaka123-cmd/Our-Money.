@@ -40,9 +40,17 @@ const MONTH_NAMES = [
 ];
 
 export function monthLabel(month: string): string {
+  const { name, year } = monthParts(month);
+  return year ? `${name} ${year}` : name;
+}
+
+/** Split so the name can be bold and the year regular, as RiseUp sets it. */
+export function monthParts(month: string): { name: string; year: string } {
   const [year, monthPart] = month.split('-');
-  const name = MONTH_NAMES[Number(monthPart) - 1] ?? month;
-  return `${name} ${year}`;
+  return {
+    name: MONTH_NAMES[Number(monthPart) - 1] ?? month,
+    year: year ?? '',
+  };
 }
 
 export interface AmountParts {
@@ -55,7 +63,8 @@ export interface AmountParts {
   currency: string;
 }
 
-export const CURRENCY = 'ש״ח';
+/** Verified against the reference screenshots at 6x: RiseUp uses the ₪ sign. */
+export const CURRENCY = '₪';
 
 /**
  * RiseUp renders every amount as three runs at three sizes — big integer, small

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 
 import { Amount } from '@/app/dashboard/components/Amount';
-import { ChevronDown } from '@/app/dashboard/components/icons';
+import { ChevronDown, Kebab } from '@/app/dashboard/components/icons';
 import { buildBuckets, type Bucket } from '@/lib/dashboard/buckets';
 import type { NormalizedActual } from '@/lib/riseup/envelopes';
 import { formatAmount } from '@/lib/money';
@@ -86,9 +86,7 @@ export function EnvelopeCard({
       <div className="card-body">
         <div className="card-head">
           <h2 className="card-title">{title}</h2>
-          <button className="kebab" type="button" aria-label={`אפשרויות ל${title}`}>
-            ⋮
-          </button>
+          <Kebab label={`אפשרויות ל${title}`} />
         </div>
 
         <div className="envelope-figures">
@@ -211,10 +209,10 @@ function BucketRow({
         <span className="actual">
           <Amount value={bucket.actual} />
         </span>
-        <span>
+        <span className="expected">
           <Amount value={bucket.expected ?? 0} />
         </span>
-        <span className="chev">{expandable ? <ChevronDown size={18} /> : null}</span>
+        <span className="chev">{expandable ? <ChevronDown size={14} /> : null}</span>
       </button>
 
       {open
@@ -230,7 +228,9 @@ function BucketRow({
                 <Amount value={item.amountIls} />
               </span>
               <span className="kebab" aria-hidden="true">
-                ⋮
+                <span />
+                <span />
+                <span />
               </span>
               <span className="merchant">{merchantLine(item)}</span>
             </button>
