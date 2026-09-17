@@ -40,10 +40,7 @@ export function WalletCard({
           <ul className="wallet-list">
             {wallet.wallets.map((w) => (
               <li key={w.id}>
-                <span className="wallet-list-name">
-                  {w.name}
-                  {w.memberName ? <span className="pill">{w.memberName}</span> : null}
-                </span>
+                <span className="wallet-list-name">{w.name}</span>
                 <Amount value={w.balance} className={w.balance < 0 ? 'wallet-list-balance is-negative' : 'wallet-list-balance'} />
               </li>
             ))}
