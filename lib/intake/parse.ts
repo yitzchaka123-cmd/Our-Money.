@@ -15,6 +15,7 @@ const MODEL = 'claude-opus-5';
 const MAX_TOKENS = 4000;
 
 export interface ParsedEntry {
+  direction: 'expense' | 'income';
   amountIls: number;
   category: string;
   note: string;
@@ -42,10 +43,10 @@ function anthropic(): Anthropic {
  */
 function buildSystemPrompt(categories: string[]): string {
   return [
-    'You extract cash expenses from short messages sent by a married couple to their household expense bot.',
+    'You extract cash movements — money spent in cash, and cash received — from short messages sent by a married couple to their household cash bot.',
     'They write in Hebrew, English, or a mix, casually, often mid-errand. Voice notes arrive as transcripts, so expect filler words, false starts, and transcription noise.',
     '',
-    'Your job: turn the message into zero or more expense entries.',
+    'Your job: turn the message into zero or more entries, each an expense or an income.',
     '',
     'Rules:',
     '- All amounts are Israeli shekels (ILS). Numbers may be written as digits ("50", "50 ש\\"ח", "₪50") or words ("חמישים שקל", "fifty shekels"). Convert to a plain number.',
@@ -55,9 +56,11 @@ function buildSystemPrompt(categories: string[]): string {
     '- note: a short, human description of what was bought, in the language the user used. Keep the merchant name if one was given. No more than 60 characters.',
     '- category MUST be exactly one of the allowed categories listed below. Pick the closest fit; use the catch-all only when nothing fits.',
     '- confidence reflects how sure you are about the amount and category together: "high" when both are explicit, "medium" when you inferred the category, "low" when the amount itself was ambiguous.',
+    '- direction: "expense" when cash was paid out. "income" when cash came IN — a cash salary, a gift ("קיבלתי 200 מסבתא"), a refund, something sold. Money withdrawn from an ATM is NOT income; it is already tracked, so ignore withdrawals entirely.',
+    '- For an income entry, category is free text describing the source (e.g. "מתנה", "משכורת במזומן", "החזר") rather than one of the expense categories.',
     '',
     'Intent:',
-    '- "log_expense" when the message reports money that was spent. This is the common case.',
+    '- "log_expense" when the message reports cash spent or cash received. This is the common case.',
     '- "question" when they are asking about their spending rather than reporting it (e.g. "כמה הוצאנו החודש?"). Emit no entries.',
     '- "unclear" when you cannot find an amount, or the message is not about money. Emit no entries.',
     '',
@@ -78,7 +81,9 @@ function buildSchema(categories: string[]) {
     entries: z.array(
       z.object({
         amount_ils: z.number().positive(),
-        category: categoryEnum,
+        direction: z.enum(['expense', 'income']),
+        // Expense categories are constrained; an income source is free text.
+        category: z.union([categoryEnum, z.string()]),
         note: z.string(),
         spent_at: z.string(),
         confidence: z.enum(['high', 'medium', 'low']),
@@ -187,9 +192,15 @@ export async function parseIntake(
 
   const entries: ParsedEntry[] = parsed.entries.map((entry) => {
     const { date, adjusted } = sanitizeDate(entry.spent_at, today);
+    const isIncome = entry.direction === 'income';
     return {
+      direction: entry.direction,
       amountIls: normalizeAmount(entry.amount_ils),
-      category: categories.includes(entry.category) ? entry.category : CATCH_ALL_CATEGORY,
+      category: isIncome
+        ? entry.category.trim() || 'הכנסה במזומן'
+        : categories.includes(entry.category)
+          ? entry.category
+          : CATCH_ALL_CATEGORY,
       note: entry.note.slice(0, 60),
       spentAt: date,
       // A date we had to correct is a signal the parse was shaky overall.

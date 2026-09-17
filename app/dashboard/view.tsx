@@ -13,9 +13,12 @@ import { monthLabel } from '@/lib/money';
  */
 export function DashboardView({
   data,
+  sessionMemberId = null,
   expandAll = false,
 }: {
   data: DashboardData;
+  /** Who is signed in — the default "who" on a new cash entry. */
+  sessionMemberId?: string | null;
   /** Preview-only: renders every breakdown open so it can be screenshotted. */
   expandAll?: boolean;
 }) {
@@ -53,11 +56,15 @@ export function DashboardView({
         </div>
 
         <div className="section">
-          {data.envelopes.length === 0 ? (
+          {data.envelopes.length === 0 && data.wallet.movements.length === 0 ? (
             <EmptyState />
           ) : (
             <EnvelopeList
               envelopes={data.envelopes}
+              envelopeChoices={data.envelopeChoices}
+              wallet={data.wallet}
+              members={data.members}
+              sessionMemberId={sessionMemberId}
               month={data.month}
               today={today}
               totalActualExpenses={data.totalActualExpenses}

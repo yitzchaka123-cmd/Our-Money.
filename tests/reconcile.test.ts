@@ -13,6 +13,9 @@ function topup(amount: number, overrides: Partial<CashTopup> = {}): CashTopup {
     business_name: 'משיכת מזומן',
     note: null,
     is_dismissed: false,
+    member_id: null,
+    category: null,
+    input_kind: 'text',
     ...overrides,
   };
 }
@@ -34,6 +37,8 @@ function spend(amount: number, overrides: Partial<CashSpend> = {}): CashSpend {
     telegram_chat_id: null,
     telegram_message_id: null,
     bot_message_id: null,
+    envelope_id: null,
+    envelope_type: null,
     created_at: '2026-09-02T10:00:00Z',
     ...overrides,
   };
@@ -45,6 +50,15 @@ describe('walletState', () => {
 
     expect(state.toppedUp).toBe(800);
     expect(state.logged).toBe(200);
+    expect(state.unaccounted).toBe(600);
+  });
+
+  it('counts cash income as money in the wallet', () => {
+    const state = walletState(
+      [topup(500), topup(200, { source: 'cash_income', riseup_transaction_id: null })],
+      [spend(100)],
+    );
+    expect(state.toppedUp).toBe(700);
     expect(state.unaccounted).toBe(600);
   });
 

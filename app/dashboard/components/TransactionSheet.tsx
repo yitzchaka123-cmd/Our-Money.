@@ -2,14 +2,7 @@
 
 import { Amount } from '@/app/dashboard/components/Amount';
 import { Sheet } from '@/app/dashboard/components/Sheet';
-import {
-  Calendar,
-  Coins,
-  Move,
-  Note,
-  Scissors,
-  Tag,
-} from '@/app/dashboard/components/icons';
+import { Calendar, Coins, Move, Note, Scissors, Tag } from '@/app/dashboard/components/icons';
 import { merchantLine, shortDate } from '@/app/dashboard/components/EnvelopeCard';
 import type { NormalizedActual } from '@/lib/riseup/envelopes';
 import type { EnvelopeType } from '@/lib/types';
@@ -20,60 +13,65 @@ export interface OpenTransaction {
   envelopeType: EnvelopeType;
 }
 
-/** Yellow is the only envelope colour dark text reads well on. */
-function textOnAccent(type: EnvelopeType): boolean {
-  return type !== 'variable';
-}
-
-function sheetLabel(type: EnvelopeType, envelopeTitle: string): string {
+function sheetLabel(type: EnvelopeType, envelopeTitle: string, isCash: boolean): string {
+  const prefix = isCash ? 'מזומן · ' : '';
   switch (type) {
     case 'variable':
-      return 'הוצאה משתנה';
+      return `${prefix}הוצאה משתנה`;
     case 'variableIncome':
-      return 'הכנסות משתנות';
+      return `${prefix}הכנסות משתנות`;
+    case 'cashIncome':
+      return 'הכנסה במזומן';
     case 'fixed':
-      return `הוצאות קבועות · ${envelopeTitle}`;
-    case 'cash':
-    case 'cashUnlogged':
-      return `מזומן · ${envelopeTitle}`;
+      return `${prefix}הוצאות קבועות · ${envelopeTitle}`;
     default:
-      return envelopeTitle;
+      return `${prefix}${envelopeTitle}`;
   }
 }
 
 /**
- * The action sheet RiseUp opens when a charge is tapped: a full-bleed header in
- * the envelope's colour, then the actions.
+ * The sheet RiseUp opens when a charge is tapped: a full-bleed header in the
+ * envelope's colour, then the actions.
  *
- * The actions that would change RiseUp's own records are shown but disabled —
- * RiseUp's API is read-only, so offering them as if they worked would be a lie.
- * Cash entries are ours, so those actions are live.
+ * A cash entry is ours, so its actions are live. A RiseUp charge is not — the
+ * API is read-only — so those actions are shown as RiseUp shows them, but
+ * disabled, with a line saying why.
  */
 export function TransactionSheet({
   open,
   onClose,
   transaction,
+  onEditCash,
+  onDeleteCash,
 }: {
   open: boolean;
   onClose: () => void;
   transaction: OpenTransaction | null;
+  onEditCash?: (actual: NormalizedActual) => void;
+  onDeleteCash?: (actual: NormalizedActual) => void;
 }) {
   if (!transaction) return null;
 
   const { actual, envelopeTitle, envelopeType } = transaction;
-  const isCash = envelopeType === 'cash' || envelopeType === 'cashUnlogged';
-  const onDark = textOnAccent(envelopeType);
+  const isCash = Boolean(actual.cash);
+  const onDark = envelopeType !== 'variable';
 
   return (
     <Sheet open={open} onClose={onClose} labelledBy="txn-sheet-label">
       <div className="envelope" data-type={envelopeType}>
         <div className="sheet-head" data-on-dark={onDark}>
           <p className="label" id="txn-sheet-label">
-            {sheetLabel(envelopeType, envelopeTitle)}
+            {sheetLabel(envelopeType, envelopeTitle, isCash)}
           </p>
           <Amount value={actual.amountIls} className="figure" />
           <p className="meta">{actual.businessName}</p>
-          {merchantLine(actual) !== actual.businessName ? (
+          {isCash ? (
+            <p className="meta">
+              {actual.cash?.memberName ?? ''}
+              {actual.cash?.inputKind === 'voice' ? ' · הקלטה' : ''}
+              {actual.cash?.status === 'needs_review' ? ' · ממתין לאישור' : ''}
+            </p>
+          ) : merchantLine(actual) !== actual.businessName ? (
             <p className="meta">{merchantLine(actual).replace(actual.businessName, '').trim()}</p>
           ) : null}
           <p className="meta">{shortDate(actual.transactionDate)}</p>
@@ -83,10 +81,9 @@ export function TransactionSheet({
       <div className="sheet-body">
         {isCash ? (
           <>
-            <ActionRow icon={<Note />} label="לערוך את ההערה" />
-            <ActionRow icon={<Tag />} label="לשנות קטגוריה" />
-            <ActionRow icon={<Calendar />} label="לשנות תאריך" />
-            <ActionRow icon={<Scissors />} label="למחוק את הרישום" />
+            <ActionRow icon={<Tag />} label="לערוך — סכום, קטגוריה, הערה, תאריך" onClick={() => onEditCash?.(actual)} />
+            <ActionRow icon={<Move />} label="להזיז למעטפה אחרת" onClick={() => onEditCash?.(actual)} />
+            <ActionRow icon={<Scissors />} label="למחוק את הרישום" onClick={() => onDeleteCash?.(actual)} />
           </>
         ) : (
           <>
@@ -110,16 +107,19 @@ function ActionRow({
   icon,
   label,
   disabled,
+  onClick,
 }: {
   icon: React.ReactNode;
   label: string;
   disabled?: boolean;
+  onClick?: () => void;
 }) {
   return (
     <button
       className="action-row"
       type="button"
       disabled={disabled}
+      onClick={onClick}
       style={disabled ? { color: 'var(--muted)', borderColor: '#f1f1f1' } : undefined}
     >
       <span className="ico">{icon}</span>

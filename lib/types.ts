@@ -1,6 +1,6 @@
 export type Confidence = 'high' | 'medium' | 'low';
 export type SpendStatus = 'confirmed' | 'needs_review' | 'deleted';
-export type InputKind = 'text' | 'voice';
+export type InputKind = 'text' | 'voice' | 'web';
 
 export interface HouseholdMember {
   id: string;
@@ -25,6 +25,9 @@ export interface CashSpend {
   telegram_chat_id: number | null;
   telegram_message_id: number | null;
   bot_message_id: number | null;
+  /** RiseUp envelope this spend lives in; null means the month's variable envelope. */
+  envelope_id: string | null;
+  envelope_type: string | null;
   created_at: string;
 }
 
@@ -32,11 +35,14 @@ export interface CashTopup {
   id: string;
   amount_ils: number;
   occurred_at: string;
-  source: 'riseup_withdrawal' | 'manual';
+  source: 'riseup_withdrawal' | 'manual' | 'cash_income';
   riseup_transaction_id: string | null;
   business_name: string | null;
   note: string | null;
   is_dismissed: boolean;
+  member_id: string | null;
+  category: string | null;
+  input_kind: InputKind | null;
 }
 
 /** A single transaction as returned by RiseUp's read-only external API. */
@@ -65,9 +71,8 @@ export type EnvelopeType =
   | 'fixed'
   | 'trackingCategory'
   | 'riseupGoal'
-  /** Not a RiseUp type — the cash envelopes this app adds. */
-  | 'cash'
-  | 'cashUnlogged';
+  /** Not a RiseUp type — the cash income envelope this app adds. */
+  | 'cashIncome';
 
 export interface RiseupEnvelopeActual {
   transactionId: string;

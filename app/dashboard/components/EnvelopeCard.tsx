@@ -3,7 +3,7 @@
 import { useState } from 'react';
 
 import { Amount } from '@/app/dashboard/components/Amount';
-import { ChevronDown, Kebab } from '@/app/dashboard/components/icons';
+import { ChevronDown, Kebab, Mic } from '@/app/dashboard/components/icons';
 import { buildBuckets, type Bucket } from '@/lib/dashboard/buckets';
 import type { NormalizedActual } from '@/lib/riseup/envelopes';
 import { formatAmount } from '@/lib/money';
@@ -22,6 +22,8 @@ export interface EnvelopeCardProps {
   /** Renders the breakdown open — used by the preview so it can be screenshotted. */
   defaultOpen?: boolean;
   onOpenTransaction?: (actual: NormalizedActual, envelopeTitle: string) => void;
+  /** When set, the card offers to add a cash entry filed into this envelope. */
+  onAddCash?: () => void;
 }
 
 /** Column wording differs per envelope type, exactly as RiseUp words it. */
@@ -42,6 +44,13 @@ function labels(type: EnvelopeType): Labels {
         expected: 'צפוי להיכנס',
         expectedInTable: 'צפוי להיכנס',
         expander: 'פירוט הכנסות משתנות',
+      };
+    case 'cashIncome':
+      return {
+        actual: 'נכנס',
+        expected: 'סה״כ החודש',
+        expectedInTable: 'סה״כ',
+        expander: 'פירוט הכנסות במזומן',
       };
     case 'variable':
       return {
@@ -71,6 +80,7 @@ export function EnvelopeCard({
   showRemaining = false,
   defaultOpen = false,
   onOpenTransaction,
+  onAddCash,
 }: EnvelopeCardProps) {
   const [open, setOpen] = useState(defaultOpen);
   const text = labels(type);
@@ -137,6 +147,13 @@ export function EnvelopeCard({
           expandFirst={defaultOpen}
           onOpenTransaction={onOpenTransaction}
         />
+      ) : null}
+
+      {open && onAddCash ? (
+        <button className="add-row add-row--inline" type="button" onClick={onAddCash}>
+          <span className="add-plus" aria-hidden="true">+</span>
+          <span>{type === 'cashIncome' ? 'הוספת הכנסה במזומן' : 'הוספת הוצאה במזומן כאן'}</span>
+        </button>
       ) : null}
     </article>
   );
@@ -232,7 +249,17 @@ function BucketRow({
                 <span />
                 <span />
               </span>
-              <span className="merchant">{merchantLine(item)}</span>
+              <span className="merchant">
+                {item.cash ? (
+                  <span className="cash-mark" aria-label="מזומן">
+                    {item.cash.inputKind === 'voice' ? <Mic /> : '₪'}
+                  </span>
+                ) : null}
+                {merchantLine(item)}
+                {item.cash?.status === 'needs_review' ? (
+                  <span className="pill">לאישור</span>
+                ) : null}
+              </span>
             </button>
           ))
         : null}
@@ -249,6 +276,9 @@ export function shortDate(iso: string | null): string {
 }
 
 export function merchantLine(actual: NormalizedActual): string {
+  if (actual.cash) {
+    return [actual.businessName, actual.cash.memberName].filter(Boolean).join(' · ');
+  }
   const account = actual.accountNickname ?? actual.accountNumberHash;
   return [actual.businessName, account ? `כרטיס ${account}` : null]
     .filter(Boolean)

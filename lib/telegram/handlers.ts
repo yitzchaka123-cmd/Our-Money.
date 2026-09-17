@@ -28,10 +28,13 @@ import {
   spendLine,
 } from '@/lib/telegram/format';
 import type { TelegramMessage, TelegramUpdate } from '@/lib/telegram/types';
+import { resolveEnvelopeForCategory } from '@/lib/cash/envelopes';
 import {
   activeTopups,
   allLiveSpends,
   attachBotMessage,
+  envelopeRefsForMonth,
+  insertCashIncomes,
   getSpend,
   insertSpends,
   lastSpendForMember,
@@ -51,6 +54,7 @@ const HELP = [
   '• <i>"80 שקל בסופר"</i>',
   '• <i>"שילמתי 45 על מונית אתמול"</i>',
   '• <i>"120 במכולת ועוד 30 על קפה"</i>',
+  '• <i>"קיבלתי 200 שקל מסבתא"</i> — הכנסה במזומן',
   '',
   '<b>פקודות</b>',
   '/balance — כמה מזומן אמור להיות בארנק',
@@ -278,34 +282,81 @@ async function logFromNaturalLanguage(
     return;
   }
 
-  const rows: NewSpend[] = parsed.entries.map((entry, index) => ({
-    member_id: member.id,
-    amount_ils: entry.amountIls,
-    category: entry.category,
-    note: entry.note || null,
-    spent_at: entry.spentAt,
-    status: entry.confidence === 'low' ? 'needs_review' : 'confirmed',
-    confidence: entry.confidence,
-    input_kind: inputKind,
-    raw_input: input,
-    transcript,
-    // The unique constraint lives on one row, so only the first entry of a
-    // multi-expense message carries the update id.
-    telegram_update_id: index === 0 ? update.update_id : null,
-    telegram_chat_id: chatId,
-    telegram_message_id: message.message_id,
-  }));
+  const expenses = parsed.entries.filter((e) => e.direction === 'expense');
+  const incomes = parsed.entries.filter((e) => e.direction === 'income');
 
-  const saved = await insertSpends(rows);
-  const sent = await sendMessage(
-    chatId,
-    savedMessage(saved, today, member.display_name),
-    spendKeyboard(saved),
-  );
-  await attachBotMessage(
-    saved.map((s) => s.id),
-    sent.message_id,
-  );
+  // Cash is filed into RiseUp's own envelopes, so it shows up in the same card
+  // a card spend would. The pin is resolved now, against this month's
+  // envelopes, the same way RiseUp files an uncategorised charge.
+  const refs = expenses.length > 0 ? await envelopeRefsForMonth(today.slice(0, 7)) : [];
+
+  const rows: NewSpend[] = expenses.map((entry, index) => {
+    const target = resolveEnvelopeForCategory(refs, entry.category);
+    return {
+      member_id: member.id,
+      amount_ils: entry.amountIls,
+      category: entry.category,
+      note: entry.note || null,
+      spent_at: entry.spentAt,
+      status: entry.confidence === 'low' ? 'needs_review' : 'confirmed',
+      confidence: entry.confidence,
+      input_kind: inputKind,
+      raw_input: input,
+      transcript,
+      // The unique constraint lives on one row, so only the first entry of a
+      // multi-expense message carries the update id.
+      telegram_update_id: index === 0 ? update.update_id : null,
+      telegram_chat_id: chatId,
+      telegram_message_id: message.message_id,
+      envelope_id: target?.envelopeId ?? null,
+      envelope_type: target?.type ?? null,
+    };
+  });
+
+  const [saved, savedIncomes] = await Promise.all([
+    insertSpends(rows),
+    insertCashIncomes(
+      incomes.map((entry) => ({
+        member_id: member.id,
+        amount_ils: entry.amountIls,
+        category: entry.category,
+        note: entry.note || null,
+        occurred_at: entry.spentAt,
+        input_kind: inputKind,
+      })),
+    ),
+  ]);
+
+  if (saved.length > 0) {
+    const sent = await sendMessage(
+      chatId,
+      savedMessage(saved, today, member.display_name),
+      spendKeyboard(saved),
+    );
+    await attachBotMessage(
+      saved.map((s) => s.id),
+      sent.message_id,
+    );
+  }
+
+  if (savedIncomes.length > 0) {
+    const lines = savedIncomes.map(
+      (t) =>
+        `• <b>${formatIls(Number(t.amount_ils))}</b> · ${escapeHtml(t.category ?? '')}${
+          t.note ? ` — ${escapeHtml(t.note)}` : ''
+        } · ${friendlyDate(t.occurred_at, today)}`,
+    );
+    await sendMessage(
+      chatId,
+      [
+        `💵 ${savedIncomes.length === 1 ? 'נרשמה הכנסה במזומן' : `נרשמו ${savedIncomes.length} הכנסות במזומן`} · ${escapeHtml(member.display_name)}`,
+        '',
+        ...lines,
+        '',
+        'נוסף לארנק. /balance כדי לראות את המצב.',
+      ].join('\n'),
+    );
+  }
 }
 
 async function handleCallback(update: TelegramUpdate): Promise<void> {

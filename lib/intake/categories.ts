@@ -31,14 +31,24 @@ export async function activeCategories(): Promise<string[]> {
   if (cache && Date.now() - cache.at < CACHE_TTL_MS) return cache.labels;
 
   try {
-    const { data, error } = await db()
-      .from('categories')
-      .select('label')
-      .eq('is_active', true)
-      .order('label');
+    const supabase = db();
+    const [{ data: rows, error }, { data: trackers }] = await Promise.all([
+      supabase.from('categories').select('label').eq('is_active', true).order('label'),
+      // RiseUp's tracking categories come first: naming one files the spend
+      // straight into that envelope on the dashboard.
+      supabase
+        .from('riseup_envelopes')
+        .select('name, month')
+        .eq('envelope_type', 'trackingCategory')
+        .order('month', { ascending: false })
+        .limit(60),
+    ]);
     if (error) throw new Error(error.message);
 
-    const labels = (data ?? []).map((row) => row.label as string);
+    const trackerNames = (trackers ?? []).map((t) => t.name as string).filter(Boolean);
+    const labels = [
+      ...new Set([...trackerNames, ...(rows ?? []).map((row) => row.label as string)]),
+    ];
     if (labels.length === 0) return [...FALLBACK_CATEGORIES];
 
     cache = { labels, at: Date.now() };

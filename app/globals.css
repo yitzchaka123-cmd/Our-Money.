@@ -313,7 +313,8 @@ a {
   --track: var(--tracking-track);
 }
 
-.envelope[data-type='variableIncome'] {
+.envelope[data-type='variableIncome'],
+.envelope[data-type='cashIncome'] {
   --accent: var(--income);
   --track: var(--income-track);
 }
@@ -328,10 +329,6 @@ a {
 .envelope[data-type='riseupGoal'] {
   --accent: var(--goal);
   --track: var(--goal-track);
-}
-.envelope[data-type='cashUnlogged'] {
-  --accent: var(--alert);
-  --track: #ffe0d8;
 }
 
 .envelope-figures {
@@ -1000,4 +997,314 @@ a {
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+}
+
+/* --- cash entry --------------------------------------------------------- */
+.add-row-pair {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 22px;
+}
+
+.add-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  border: 2px dashed #cfd6f5;
+  border-radius: var(--radius-card);
+  padding: 16px;
+  color: var(--primary);
+  font-size: 17px;
+  font-weight: 600;
+  background: var(--surface);
+}
+
+.add-row--inline {
+  border-width: 0;
+  border-top: 1px solid var(--hairline);
+  border-radius: 0;
+  padding: 14px var(--card-pad);
+  justify-content: flex-start;
+  font-size: 15px;
+}
+
+.add-plus {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+
+.add-plus--income {
+  background: var(--income);
+}
+
+.entry-head-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.entry-close {
+  color: inherit;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin-inline-start: auto;
+}
+
+.kind-toggle {
+  display: inline-flex;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 999px;
+  padding: 3px;
+  margin: 6px 0 14px;
+}
+
+.kind-toggle button {
+  padding: 5px 14px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 700;
+  color: inherit;
+}
+
+.kind-toggle button[aria-selected='true'] {
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.amount-input {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  direction: ltr;
+  justify-content: flex-end;
+}
+
+.amount-input input {
+  width: 60%;
+  font: inherit;
+  font-size: 40px;
+  font-weight: 700;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid currentColor;
+  text-align: right;
+  outline: none;
+  padding: 0;
+  direction: ltr;
+}
+
+.amount-input input::placeholder {
+  color: inherit;
+  opacity: 0.45;
+}
+
+.amount-input .cur {
+  font-size: 30px;
+  font-weight: 700;
+}
+
+.picker-title {
+  font-size: 17px;
+  font-weight: 700;
+  margin: 8px 8px 12px;
+}
+
+.picker {
+  border: 1px solid var(--primary);
+  border-radius: 12px;
+  overflow: hidden;
+  max-height: 300px;
+  overflow-y: auto;
+  margin-bottom: 18px;
+}
+
+.picker-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 10px 14px;
+  text-align: start;
+  font-size: 17px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.picker-row:last-child {
+  border-bottom: 0;
+}
+
+.picker-row[data-selected='true'] {
+  background: #e8ecfd;
+}
+
+.picker-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  color: #ffffff;
+  font-size: 18px;
+  flex: 0 0 auto;
+  background: var(--tracking);
+}
+
+.picker-icon[data-type='variable'] {
+  background: var(--variable);
+  color: var(--ink);
+}
+
+.picker-icon[data-type='fixed'] {
+  background: var(--fixed);
+}
+
+.picker-label {
+  flex: 1;
+}
+
+.picker-check {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  visibility: hidden;
+}
+
+.picker-row[data-selected='true'] .picker-check {
+  visibility: visible;
+}
+
+.picker-empty {
+  padding: 14px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.field {
+  display: block;
+  margin-bottom: 14px;
+}
+
+.field > span {
+  display: block;
+  font-size: 13px;
+  color: var(--ink-2);
+  margin-bottom: 6px;
+}
+
+.field input {
+  width: 100%;
+  font: inherit;
+  font-size: 16px;
+  padding: 12px 14px;
+  border: 1px solid #d9d9d9;
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.chip {
+  border: 1px solid #d9d9d9;
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.chip[data-selected='true'] {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #ffffff;
+}
+
+.form-error {
+  color: var(--alert);
+  font-weight: 600;
+  margin: 0 0 12px;
+}
+
+.btn-ghost {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  padding: 13px;
+  color: var(--alert);
+  font-size: 15px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.cash-mark {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  background: var(--income-track);
+  color: #0b7a32;
+  font-size: 11px;
+  font-weight: 700;
+  margin-inline-end: 6px;
+  vertical-align: middle;
+}
+
+/* --- wallet ------------------------------------------------------------- */
+.wallet .account-figure {
+  margin-top: 2px;
+  margin-bottom: 14px;
+}
+
+.wallet-flows {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.wallet-flows .figure-expected {
+  font-size: 15px;
+}
+
+.wallet-warning {
+  margin: 12px 0 0;
+  color: var(--alert);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.wallet-row[data-kind='withdrawal'] {
+  color: var(--ink-2);
+}
+
+.wallet-row[data-kind='income'] .amount {
+  color: var(--income);
+}
+
+.flow-sign {
+  margin-inline-end: 3px;
 }

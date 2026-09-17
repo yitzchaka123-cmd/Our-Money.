@@ -19,6 +19,14 @@ export interface NormalizedActual {
   paymentNumber: number | null;
   totalPayments: number | null;
   categoryLabel: string | null;
+  /** Set when the row is a cash entry of ours rather than a RiseUp charge. */
+  cash?: {
+    id: string;
+    kind: 'spend' | 'income';
+    memberName: string | null;
+    inputKind: 'text' | 'voice' | 'web';
+    status: 'confirmed' | 'needs_review';
+  };
 }
 
 export interface NormalizedEnvelope {
@@ -36,9 +44,8 @@ export const ENVELOPE_ORDER: EnvelopeType[] = [
   'variable',
   'fixed',
   'variableIncome',
+  'cashIncome',
   'trackingCategory',
-  'cash',
-  'cashUnlogged',
   'riseupGoal',
 ];
 
@@ -47,8 +54,7 @@ export const ENVELOPE_TITLES: Partial<Record<EnvelopeType, string>> = {
   variable: 'הוצאות משתנות',
   fixed: 'הוצאות קבועות',
   riseupGoal: 'הפקדות לחיסכון',
-  cash: 'מזומן',
-  cashUnlogged: 'מזומן שטרם נרשם',
+  cashIncome: 'הכנסות במזומן',
 };
 
 const KNOWN_TYPES = new Set<string>([

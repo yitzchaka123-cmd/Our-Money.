@@ -86,17 +86,33 @@ new RiseUp screenshots arrive.
 
 ### Where cash appears
 
-Cash is not a separate section; it is two more envelopes in the same language:
+Cash is not a separate section. **A cash spend is filed into the RiseUp envelope
+it belongs to** — the tracking category with that name, or the fixed envelope if
+RiseUp already uses that label there, or the variable envelope otherwise (which is
+exactly what RiseUp does with an uncategorised charge). It shows in the same card,
+counts in the same total, and sits in the same breakdown row as a card spend would,
+with a small ₪ (or microphone, for a voice note) marking it as cash.
 
-- **`מזומן`** — logged cash for the month, against cash withdrawn, with
-  `נשאר להוציא` showing the wallet balance. It expands into your entries, each
-  marked with who logged it and whether it came by voice.
-- **`מזומן שטרם נרשם`** — appears only when withdrawn exceeds logged.
+- **`הכנסות במזומן`** — a green income envelope beside RiseUp's own, for cash
+  received: a cash salary, a gift, a refund.
+- **`ארנק מזומן`** — the cash bank, right under the hero: what should physically be
+  in the wallet (withdrawals + cash income − cash spends, all-time), this month's
+  flows, and the month's movements when expanded.
+- **Adding and editing in the app** — the two dashed rows under the wallet, or the
+  "add here" row at the bottom of any expanded envelope. Tap any cash row to edit,
+  move it to another envelope, or delete it. RiseUp's own charges open the same
+  sheet RiseUp would, with its actions shown but disabled: the API is read-only.
+
+The workflow this is built for: do the card and bank side in RiseUp, then open this
+and do the cash. **Opening the dashboard refreshes from RiseUp first** if the
+mirror is more than ten minutes old, so the page is current when it loads. We can
+only be as fresh as RiseUp's own pull from your bank; the "last synced" line at the
+bottom says how old the data is.
 
 The one deliberate difference from RiseUp: **an ATM withdrawal is not counted as
 spending.** RiseUp has to count it, having no visibility past the cash machine.
-Here it drops out of the fixed and variable envelopes and is replaced by what the
-cash actually bought, so the envelopes add up to real spending.
+Here it drops out of the envelopes — the wallet accounts for that money and the
+cash entries say what it bought — so nothing is counted twice.
 
 ### The other screens
 

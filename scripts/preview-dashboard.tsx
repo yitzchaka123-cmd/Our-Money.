@@ -45,19 +45,33 @@ function actual(
 const envelopes: EnvelopeView[] = [
   {
     key: 'variable',
+    envelopeId: 'variable',
     type: 'variable',
     title: 'הוצאות משתנות',
-    actual: 161.7,
-    expected: 161.7,
+    actual: 291.7,
+    expected: 291.7,
     showRemaining: false,
     actuals: [
       actual('v1', '2026-09-02', 40, 'BIT', { accountNumberHash: '0848' }),
       actual('v2', '2026-09-09', 92.1, 'שופרסל דיל', { accountNumberHash: '0848' }),
       actual('v3', '2026-09-15', 29.6, 'ארומה', { accountNumberHash: '0848' }),
+      actual('cash:c1', '2026-09-15', 85, 'מכולת בפינה', {
+        accountNickname: 'מזומן',
+        source: 'cash',
+        categoryLabel: 'מזון וצריכה',
+        cash: { id: 'c1', kind: 'spend', memberName: 'יצחק', inputKind: 'voice', status: 'confirmed' },
+      }),
+      actual('cash:c2', '2026-09-14', 45, 'מונית הביתה', {
+        accountNickname: 'מזומן',
+        source: 'cash',
+        categoryLabel: 'תחבורה',
+        cash: { id: 'c2', kind: 'spend', memberName: 'שרה', inputKind: 'text', status: 'needs_review' },
+      }),
     ],
   },
   {
     key: 'fixed',
+    envelopeId: 'fixed',
     type: 'fixed',
     title: 'הוצאות קבועות',
     actual: 3077,
@@ -75,6 +89,7 @@ const envelopes: EnvelopeView[] = [
   },
   {
     key: 'income',
+    envelopeId: 'income',
     type: 'variableIncome',
     title: 'הכנסות',
     actual: 7635,
@@ -88,48 +103,43 @@ const envelopes: EnvelopeView[] = [
   },
   {
     key: 'track-food',
+    envelopeId: 'track-food',
     type: 'trackingCategory',
     title: 'אוכל בחוץ',
-    actual: 74,
+    actual: 194,
     expected: 500,
     showRemaining: true,
-    actuals: [actual('t1', '2026-09-11', 74, 'מסעדת הגליל')],
-  },
-  {
-    key: 'cash',
-    type: 'cash',
-    title: 'מזומן',
-    actual: 1685,
-    expected: 2200,
-    showRemaining: true,
     actuals: [
-      actual('c1', '2026-09-15', 85, 'מכולת בפינה', {
-        accountNickname: 'יצחק',
-        source: 'voice',
-        categoryLabel: 'מזון וצריכה',
-      }),
-      actual('c2', '2026-09-14', 45, 'מונית הביתה', {
-        accountNickname: 'שרה',
-        categoryLabel: 'תחבורה ורכב',
-      }),
-      actual('c3', '2026-09-12', 120, 'ארוחת צהריים', {
-        accountNickname: 'יצחק',
-        source: 'voice',
-        categoryLabel: 'מסעדות',
+      actual('t1', '2026-09-11', 74, 'מסעדת הגליל'),
+      actual('cash:c3', '2026-09-12', 120, 'ארוחת צהריים', {
+        accountNickname: 'מזומן',
+        source: 'cash',
+        categoryLabel: 'אוכל בחוץ',
+        cash: { id: 'c3', kind: 'spend', memberName: 'יצחק', inputKind: 'voice', status: 'confirmed' },
       }),
     ],
   },
   {
-    key: 'cash-unlogged',
-    type: 'cashUnlogged',
-    title: 'מזומן שטרם נרשם',
-    actual: 515,
-    expected: 515,
+    key: 'cash-income',
+    envelopeId: 'cash-income',
+    type: 'cashIncome',
+    title: 'הכנסות במזומן',
+    actual: 350,
+    expected: 350,
     showRemaining: false,
-    actuals: [],
+    actuals: [
+      actual('ci1', '2026-09-10', 350, 'מתנה מסבתא', {
+        isIncome: true,
+        accountNickname: 'מזומן',
+        source: 'cash',
+        categoryLabel: 'מתנה',
+        cash: { id: 'ci1', kind: 'income', memberName: 'שרה', inputKind: 'web', status: 'confirmed' },
+      }),
+    ],
   },
   {
     key: 'goal',
+    envelopeId: 'goal',
     type: 'riseupGoal',
     title: 'הפקדות לחיסכון',
     actual: 0,
@@ -145,18 +155,32 @@ const fixture: DashboardData = {
   userName: 'יצחק אברגל',
   greeting: 'יצחק',
   lastUpdated: '15.09 7:36',
+  lastSyncAt: '2026-09-15T04:36:00Z',
   forecast: -8478,
   variableRemaining: 0,
   totalActualExpenses: 4608,
   totalExpectedExpenses: 16114,
   envelopes,
+  envelopeChoices: [
+    { envelopeId: 'variable', type: 'variable', name: 'הוצאות משתנות' },
+    { envelopeId: 'fixed', type: 'fixed', name: 'הוצאות קבועות', categoryLabels: ['ביטוח', 'הלוואה'] },
+    { envelopeId: 'track-food', type: 'trackingCategory', name: 'אוכל בחוץ' },
+  ],
   wallet: {
-    toppedUp: 5400,
-    logged: 4885,
-    unaccounted: 515,
-    topupCount: 7,
-    spendCount: 41,
+    balance: 515,
+    withdrawn: 2200,
+    income: 350,
+    spent: 250,
+    movements: [
+      { id: 'w1', kind: 'withdrawal', amountIls: 1200, date: '2026-09-14', label: 'משיכת מזומן', memberName: null, category: null },
+      { id: 'c1', kind: 'spend', amountIls: 85, date: '2026-09-15', label: 'מכולת בפינה', memberName: 'יצחק', category: 'מזון וצריכה' },
+      { id: 'ci1', kind: 'income', amountIls: 350, date: '2026-09-10', label: 'מתנה מסבתא', memberName: 'שרה', category: 'מתנה' },
+    ],
   },
+  members: [
+    { id: 'm1', display_name: 'יצחק' },
+    { id: 'm2', display_name: 'שרה' },
+  ],
   briefCount: 8,
 };
 
@@ -172,7 +196,7 @@ const html = `<!doctype html>
 <title>Our Money — preview</title>
 <style>${css}</style>
 </head>
-<body>${renderToStaticMarkup(<DashboardView data={fixture} expandAll={expandAll} />)}</body>
+<body>${renderToStaticMarkup(<DashboardView data={fixture} sessionMemberId="m1" expandAll={expandAll} />)}</body>
 </html>`;
 
 writeFileSync(target, html);
