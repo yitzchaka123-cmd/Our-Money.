@@ -58,6 +58,7 @@ function spend(overrides: Partial<CashSpend>): CashSpend {
     bot_message_id: null,
     envelope_id: null,
     envelope_type: null,
+    wallet_id: null,
     created_at: '2026-09-15T10:00:00Z',
     ...overrides,
   };

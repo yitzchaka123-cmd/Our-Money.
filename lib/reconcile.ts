@@ -1,4 +1,4 @@
-import type { CashSpend, CashTopup } from '@/lib/types';
+import type { CashSpend, CashTopup, CashTransfer, CashWallet } from '@/lib/types';
 
 export interface WalletState {
   toppedUp: number;
@@ -74,4 +74,59 @@ export function monthBounds(month: string): { from: string; to: string } {
 
 function round(value: number): number {
   return Math.round(value * 100) / 100;
+}
+
+export interface WalletBalance {
+  walletId: string;
+  balance: number;
+  in: number;
+  out: number;
+}
+
+/**
+ * Per-wallet balances. A wallet holds what went into it (withdrawals, cash
+ * income, transfers in) minus what left it (spends, transfers out). Rows
+ * written before wallets existed have no wallet and count toward the default,
+ * so the total across wallets always equals the single-wallet figure.
+ */
+export function walletBalances(
+  wallets: CashWallet[],
+  topups: CashTopup[],
+  spends: CashSpend[],
+  transfers: CashTransfer[],
+): WalletBalance[] {
+  const fallback = wallets.find((w) => w.is_default)?.id ?? wallets[0]?.id ?? null;
+  const totals = new Map<string, { in: number; out: number }>(
+    wallets.map((w) => [w.id, { in: 0, out: 0 }]),
+  );
+  const bucket = (id: string | null): { in: number; out: number } | undefined =>
+    totals.get(id ?? fallback ?? '') ?? (fallback ? totals.get(fallback) : undefined);
+
+  for (const t of topups) {
+    if (t.is_dismissed) continue;
+    const b = bucket(t.wallet_id);
+    if (b) b.in += Number(t.amount_ils);
+  }
+  for (const s of spends) {
+    if (s.status === 'deleted') continue;
+    const b = bucket(s.wallet_id);
+    if (b) b.out += Number(s.amount_ils);
+  }
+  for (const x of transfers) {
+    if (x.is_dismissed) continue;
+    const from = totals.get(x.from_wallet_id);
+    const to = totals.get(x.to_wallet_id);
+    if (from) from.out += Number(x.amount_ils);
+    if (to) to.in += Number(x.amount_ils);
+  }
+
+  return wallets.map((w) => {
+    const t = totals.get(w.id) ?? { in: 0, out: 0 };
+    return {
+      walletId: w.id,
+      in: round(t.in),
+      out: round(t.out),
+      balance: round(t.in - t.out),
+    };
+  });
 }

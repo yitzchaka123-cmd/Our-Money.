@@ -26,6 +26,7 @@ export interface NormalizedActual {
     memberName: string | null;
     inputKind: 'text' | 'voice' | 'web';
     status: 'confirmed' | 'needs_review';
+    walletId: string | null;
   };
 }
 

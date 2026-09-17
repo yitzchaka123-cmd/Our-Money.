@@ -28,6 +28,8 @@ export interface CashSpend {
   /** RiseUp envelope this spend lives in; null means the month's variable envelope. */
   envelope_id: string | null;
   envelope_type: string | null;
+  /** Which wallet the cash came out of; null counts toward the default wallet. */
+  wallet_id: string | null;
   created_at: string;
 }
 
@@ -43,6 +45,28 @@ export interface CashTopup {
   member_id: string | null;
   category: string | null;
   input_kind: InputKind | null;
+  /** Which wallet the cash went into; null counts toward the default wallet. */
+  wallet_id: string | null;
+}
+
+export interface CashWallet {
+  id: string;
+  name: string;
+  member_id: string | null;
+  is_default: boolean;
+  is_archived: boolean;
+  position: number;
+}
+
+export interface CashTransfer {
+  id: string;
+  from_wallet_id: string;
+  to_wallet_id: string;
+  amount_ils: number;
+  occurred_at: string;
+  member_id: string | null;
+  note: string | null;
+  is_dismissed: boolean;
 }
 
 /** A single transaction as returned by RiseUp's read-only external API. */

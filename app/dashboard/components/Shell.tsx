@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from 'react';
 
+import { RefreshButton } from '@/app/dashboard/components/RefreshButton';
 import { Sheet } from '@/app/dashboard/components/Sheet';
 import {
   Bank,
@@ -172,6 +173,10 @@ function DrawerContent({
         <Coins />
         <span>תזרים חודשי</span>
       </a>
+      <div className="drawer-link">
+        <Chart />
+        <RefreshButton className="drawer-refresh" />
+      </div>
       <a className="drawer-link" href="/accounts">
         <Bank />
         <span>מצב העו״ש והאשראי</span>

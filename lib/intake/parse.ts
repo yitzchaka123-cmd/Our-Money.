@@ -16,6 +16,8 @@ const MAX_TOKENS = 4000;
 
 export interface ParsedEntry {
   direction: 'expense' | 'income';
+  /** A wallet name from the household's list, when the message named one. */
+  wallet: string | null;
   amountIls: number;
   category: string;
   note: string;
@@ -41,7 +43,7 @@ function anthropic(): Anthropic {
  * that ever changes, and it changes rarely. That keeps the cached prefix warm
  * across the dozens of short calls a day this bot makes.
  */
-function buildSystemPrompt(categories: string[]): string {
+function buildSystemPrompt(categories: string[], wallets: string[]): string {
   return [
     'You extract cash movements — money spent in cash, and cash received — from short messages sent by a married couple to their household cash bot.',
     'They write in Hebrew, English, or a mix, casually, often mid-errand. Voice notes arrive as transcripts, so expect filler words, false starts, and transcription noise.',
@@ -70,11 +72,17 @@ function buildSystemPrompt(categories: string[]): string {
     '',
     `Allowed categories (use the exact string): ${categories.join(' | ')}`,
     `Catch-all category: ${CATCH_ALL_CATEGORY}`,
+    '',
+    wallets.length > 1
+      ? `The household keeps cash in several wallets: ${wallets.join(' | ')}. If the message says which wallet the cash came from or went into ("מהארנק של שרה", "from the drawer"), set wallet to that exact name; otherwise null.`
+      : 'wallet: always null.',
   ].join('\n');
 }
 
-function buildSchema(categories: string[]) {
+function buildSchema(categories: string[], wallets: string[]) {
   const categoryEnum = z.enum(categories as [string, ...string[]]);
+  const walletSchema =
+    wallets.length > 1 ? z.enum(wallets as [string, ...string[]]).nullable() : z.null();
 
   return z.object({
     intent: z.enum(['log_expense', 'question', 'unclear']),
@@ -87,6 +95,7 @@ function buildSchema(categories: string[]) {
         note: z.string(),
         spent_at: z.string(),
         confidence: z.enum(['high', 'medium', 'low']),
+        wallet: walletSchema,
       }),
     ),
     reply_note: z.string().nullable(),
@@ -141,6 +150,8 @@ export interface ParseOptions {
   /** Overrides the current date — used by tests and by back-dated imports. */
   today?: string;
   speakerName?: string;
+  /** Names of the household's cash wallets, so a message can name one. */
+  wallets?: string[];
 }
 
 export async function parseIntake(
@@ -149,7 +160,8 @@ export async function parseIntake(
 ): Promise<IntakeResult> {
   const categories = await activeCategories();
   const today = options.today ?? isoDateInIsrael();
-  const schema = buildSchema(categories);
+  const wallets = options.wallets ?? [];
+  const schema = buildSchema(categories, wallets);
 
   const response = await anthropic().messages.parse({
     model: MODEL,
@@ -157,7 +169,7 @@ export async function parseIntake(
     system: [
       {
         type: 'text',
-        text: buildSystemPrompt(categories),
+        text: buildSystemPrompt(categories, wallets),
         cache_control: { type: 'ephemeral' },
       },
     ],
@@ -195,6 +207,7 @@ export async function parseIntake(
     const isIncome = entry.direction === 'income';
     return {
       direction: entry.direction,
+      wallet: entry.wallet ?? null,
       amountIls: normalizeAmount(entry.amount_ils),
       category: isIncome
         ? entry.category.trim() || 'הכנסה במזומן'

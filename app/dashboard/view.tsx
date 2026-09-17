@@ -1,6 +1,7 @@
 import { DailyBriefBlob } from '@/app/dashboard/components/Blob';
 import { EnvelopeList } from '@/app/dashboard/components/EnvelopeList';
 import { HeroCard } from '@/app/dashboard/components/HeroCard';
+import { RefreshButton } from '@/app/dashboard/components/RefreshButton';
 import { Shell } from '@/app/dashboard/components/Shell';
 import { ChevronLeft, Clover } from '@/app/dashboard/components/icons';
 import type { DashboardData } from '@/lib/dashboard/data';
@@ -62,8 +63,10 @@ export function DashboardView({
             <EnvelopeList
               envelopes={data.envelopes}
               envelopeChoices={data.envelopeChoices}
+              savingsEnvelopeId={data.savingsEnvelopeId}
               wallet={data.wallet}
               members={data.members}
+              months={data.months}
               sessionMemberId={sessionMemberId}
               month={data.month}
               today={today}

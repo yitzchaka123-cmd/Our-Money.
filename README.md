@@ -96,12 +96,27 @@ with a small ₪ (or microphone, for a voice note) marking it as cash.
 - **`הכנסות במזומן`** — a green income envelope beside RiseUp's own, for cash
   received: a cash salary, a gift, a refund.
 - **`ארנק מזומן`** — the cash bank, right under the hero: what should physically be
-  in the wallet (withdrawals + cash income − cash spends, all-time), this month's
-  flows, and the month's movements when expanded.
-- **Adding and editing in the app** — the two dashed rows under the wallet, or the
-  "add here" row at the bottom of any expanded envelope. Tap any cash row to edit,
-  move it to another envelope, or delete it. RiseUp's own charges open the same
-  sheet RiseUp would, with its actions shown but disabled: the API is read-only.
+  in cash (withdrawals + cash income − cash spends, all-time), per wallet when
+  there is more than one, this month's flows, and the month's movements when
+  expanded.
+- **Several wallets** — the one in a pocket, the other pocket, the drawer. A wallet
+  is *where* cash is; the envelopes stay *what it was for*, so every wallet's
+  spending rolls into the same RiseUp envelopes and every wallet's income into the
+  same cash income envelope. ATM withdrawals land in the default wallet. Transfers
+  between wallets move cash without touching any envelope. The ⋮ on the wallet
+  card manages wallets and transfers; the bot understands "מהארנק של שרה".
+- **The same controls RiseUp gives a charge, on a cash row** — tap one and the
+  sheet offers exactly RiseUp's actions, live: `להוסיף הערה`, `להזיז את ההוצאה`
+  (the "איזו הוצאה זו?" picker), `לפצל את ההוצאה` (parts must sum to the original,
+  so a split can never create or lose money), `להזיז את העסקה לחודש אחר`,
+  `זו הפקדה לחיסכון!` — plus edit and delete, which are ours to offer because the
+  rows are ours. RiseUp's own charges open the same sheet with the same actions
+  shown but disabled: the API is read-only.
+- **Adding in the app** — the two dashed rows under the wallet, or the "add here"
+  row at the bottom of any expanded envelope.
+- **Refresh** — `עדכון מרייזאפ` in the drawer and beside the "last synced" line
+  pulls from RiseUp now; opening the dashboard also refreshes if the mirror is
+  older than ten minutes.
 
 The workflow this is built for: do the card and bank side in RiseUp, then open this
 and do the cash. **Opening the dashboard refreshes from RiseUp first** if the

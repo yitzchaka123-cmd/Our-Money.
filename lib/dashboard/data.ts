@@ -1,7 +1,7 @@
 import { envelopeChoices, resolveEnvelopeForCategory, type EnvelopeRef } from '@/lib/cash/envelopes';
 import { db } from '@/lib/db/client';
 import { isoDateInIsrael } from '@/lib/intake/parse';
-import { monthBounds, walletState } from '@/lib/reconcile';
+import { monthBounds, walletBalances, walletState } from '@/lib/reconcile';
 import {
   ENVELOPE_TITLES,
   sortEnvelopes,
@@ -9,7 +9,7 @@ import {
   type NormalizedEnvelope,
 } from '@/lib/riseup/envelopes';
 import { matchesWithdrawalName } from '@/lib/riseup/withdrawals';
-import type { CashSpend, CashTopup, EnvelopeType, HouseholdMember } from '@/lib/types';
+import type { CashSpend, CashTopup, CashTransfer, CashWallet, EnvelopeType, HouseholdMember } from '@/lib/types';
 
 export interface EnvelopeView {
   key: string;
@@ -24,17 +24,28 @@ export interface EnvelopeView {
 
 export interface WalletMovement {
   id: string;
-  kind: 'withdrawal' | 'income' | 'spend';
+  kind: 'withdrawal' | 'income' | 'spend' | 'transfer';
   amountIls: number;
   date: string;
   label: string;
   memberName: string | null;
   category: string | null;
+  walletId: string | null;
+  walletName: string | null;
+}
+
+export interface WalletSummary {
+  id: string;
+  name: string;
+  balance: number;
+  isDefault: boolean;
+  memberName: string | null;
 }
 
 export interface WalletView {
-  /** All-time: withdrawals + cash income − cash spends. What should be in the wallet now. */
+  /** All-time, across every wallet: what should physically be in cash right now. */
   balance: number;
+  wallets: WalletSummary[];
   /** This month only. */
   withdrawn: number;
   income: number;
@@ -57,6 +68,8 @@ export interface DashboardData {
   envelopes: EnvelopeView[];
   /** What the cash-entry picker offers. */
   envelopeChoices: EnvelopeRef[];
+  /** RiseUp's savings envelope this month, for "זו הפקדה לחיסכון!". */
+  savingsEnvelopeId: string | null;
   wallet: WalletView;
   members: Pick<HouseholdMember, 'id' | 'display_name'>[];
   briefCount: number;
@@ -83,6 +96,9 @@ export async function loadDashboard(month: string): Promise<DashboardData> {
     { data: members },
     { data: syncRuns },
     { data: monthList },
+    { data: walletRows },
+    { data: allTransfers },
+    { data: monthTransfers },
   ] = await Promise.all([
     supabase.from('riseup_envelopes').select('*').eq('month', month).order('position'),
     supabase.from('riseup_envelope_actuals').select('*').eq('month', month),
@@ -110,8 +126,17 @@ export async function loadDashboard(month: string): Promise<DashboardData> {
       .order('finished_at', { ascending: false })
       .limit(1),
     supabase.from('riseup_envelopes').select('month'),
+    supabase.from('cash_wallets').select('*').eq('is_archived', false).order('position').order('created_at'),
+    supabase.from('cash_transfers').select('*').eq('is_dismissed', false),
+    supabase
+      .from('cash_transfers')
+      .select('*')
+      .eq('is_dismissed', false)
+      .gte('occurred_at', from)
+      .lte('occurred_at', to),
   ]);
 
+  const wallets = (walletRows ?? []) as CashWallet[];
   const memberList = (members ?? []) as Pick<HouseholdMember, 'id' | 'display_name'>[];
   const memberNames = new Map(memberList.map((m) => [m.id, m.display_name]));
 
@@ -148,13 +173,17 @@ export async function loadDashboard(month: string): Promise<DashboardData> {
     totalExpectedExpenses: round(expectedExpenses),
     envelopes,
     envelopeChoices: envelopeChoices(riseupEnvelopes.map(toRef)),
-    wallet: buildWallet(
-      (allTopups ?? []) as CashTopup[],
-      (allSpends ?? []) as CashSpend[],
-      topups,
-      spends,
+    savingsEnvelopeId: riseupEnvelopes.find((e) => e.type === 'riseupGoal')?.envelopeId ?? null,
+    wallet: buildWallet({
+      wallets,
+      allTopups: (allTopups ?? []) as CashTopup[],
+      allSpends: (allSpends ?? []) as CashSpend[],
+      allTransfers: (allTransfers ?? []) as CashTransfer[],
+      monthTopups: topups,
+      monthSpends: spends,
+      monthTransfers: (monthTransfers ?? []) as CashTransfer[],
       memberNames,
-    ),
+    }),
     members: memberList,
     briefCount: spends.filter((s) => s.status === 'needs_review').length,
   };
@@ -342,6 +371,7 @@ export function spendToActual(spend: CashSpend, memberNames: Map<string, string>
       memberName: memberNames.get(spend.member_id) ?? null,
       inputKind: spend.input_kind,
       status: spend.status === 'needs_review' ? 'needs_review' : 'confirmed',
+      walletId: spend.wallet_id,
     },
   };
 }
@@ -367,6 +397,7 @@ function incomeToActual(topup: CashTopup, memberNames: Map<string, string>): Nor
       memberName: topup.member_id ? (memberNames.get(topup.member_id) ?? null) : null,
       inputKind: topup.input_kind ?? 'text',
       status: 'confirmed',
+      walletId: topup.wallet_id,
     },
   };
 }
@@ -396,14 +427,38 @@ function cashIncomeEnvelope(
 // The cash bank
 // ---------------------------------------------------------------------------
 
-function buildWallet(
-  allTopups: CashTopup[],
-  allSpends: CashSpend[],
-  monthTopups: CashTopup[],
-  monthSpends: CashSpend[],
-  memberNames: Map<string, string>,
-): WalletView {
+function buildWallet({
+  wallets,
+  allTopups,
+  allSpends,
+  allTransfers,
+  monthTopups,
+  monthSpends,
+  monthTransfers,
+  memberNames,
+}: {
+  wallets: CashWallet[];
+  allTopups: CashTopup[];
+  allSpends: CashSpend[];
+  allTransfers: CashTransfer[];
+  monthTopups: CashTopup[];
+  monthSpends: CashSpend[];
+  monthTransfers: CashTransfer[];
+  memberNames: Map<string, string>;
+}): WalletView {
   const state = walletState(allTopups, allSpends);
+  const walletName = new Map(wallets.map((w) => [w.id, w.name]));
+  const fallbackId = wallets.find((w) => w.is_default)?.id ?? wallets[0]?.id ?? null;
+  const nameOf = (id: string | null): string | null => walletName.get(id ?? fallbackId ?? '') ?? null;
+
+  const balances = walletBalances(wallets, allTopups, allSpends, allTransfers);
+  const summaries: WalletSummary[] = wallets.map((w) => ({
+    id: w.id,
+    name: w.name,
+    balance: balances.find((b) => b.walletId === w.id)?.balance ?? 0,
+    isDefault: w.is_default,
+    memberName: w.member_id ? (memberNames.get(w.member_id) ?? null) : null,
+  }));
 
   const movements: WalletMovement[] = [
     ...monthTopups.map((t): WalletMovement => ({
@@ -411,12 +466,11 @@ function buildWallet(
       kind: t.source === 'cash_income' ? 'income' : 'withdrawal',
       amountIls: Number(t.amount_ils),
       date: t.occurred_at,
-      label:
-        t.source === 'cash_income'
-          ? t.note || t.category || 'הכנסה במזומן'
-          : t.business_name || 'משיכת מזומן',
+      label: t.source === 'cash_income' ? t.note || t.category || 'הכנסה במזומן' : t.business_name || 'משיכת מזומן',
       memberName: t.member_id ? (memberNames.get(t.member_id) ?? null) : null,
       category: t.category,
+      walletId: t.wallet_id ?? fallbackId,
+      walletName: nameOf(t.wallet_id),
     })),
     ...monthSpends.map((s): WalletMovement => ({
       id: s.id,
@@ -426,17 +480,27 @@ function buildWallet(
       label: s.note || s.category,
       memberName: memberNames.get(s.member_id) ?? null,
       category: s.category,
+      walletId: s.wallet_id ?? fallbackId,
+      walletName: nameOf(s.wallet_id),
+    })),
+    ...monthTransfers.map((x): WalletMovement => ({
+      id: x.id,
+      kind: 'transfer',
+      amountIls: Number(x.amount_ils),
+      date: x.occurred_at,
+      label: `${walletName.get(x.from_wallet_id) ?? '?'} ← ${walletName.get(x.to_wallet_id) ?? '?'}`,
+      memberName: x.member_id ? (memberNames.get(x.member_id) ?? null) : null,
+      category: x.note,
+      walletId: x.to_wallet_id,
+      walletName: walletName.get(x.to_wallet_id) ?? null,
     })),
   ].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
 
   return {
     balance: state.unaccounted,
-    withdrawn: round(
-      monthTopups.filter((t) => t.source !== 'cash_income').reduce((s, t) => s + Number(t.amount_ils), 0),
-    ),
-    income: round(
-      monthTopups.filter((t) => t.source === 'cash_income').reduce((s, t) => s + Number(t.amount_ils), 0),
-    ),
+    wallets: summaries,
+    withdrawn: round(monthTopups.filter((t) => t.source !== 'cash_income').reduce((s, t) => s + Number(t.amount_ils), 0)),
+    income: round(monthTopups.filter((t) => t.source === 'cash_income').reduce((s, t) => s + Number(t.amount_ils), 0)),
     spent: round(monthSpends.reduce((s, x) => s + Number(x.amount_ils), 0)),
     movements,
   };

@@ -6,8 +6,11 @@ import {
   monthBounds,
   totalsByCategory,
   totalsByMember,
+  walletBalances,
   walletState,
 } from '@/lib/reconcile';
+import { db } from '@/lib/db/client';
+import type { CashTransfer } from '@/lib/types';
 import { syncRiseup } from '@/lib/riseup/sync';
 import { transcribe } from '@/lib/stt';
 import {
@@ -35,6 +38,8 @@ import {
   attachBotMessage,
   envelopeRefsForMonth,
   insertCashIncomes,
+  listWallets,
+  matchWalletByName,
   getSpend,
   insertSpends,
   lastSpendForMember,
@@ -50,14 +55,14 @@ import type { HouseholdMember } from '@/lib/types';
 const HELP = [
   '<b>Our Money</b> — יומן המזומן שלנו 💸',
   '',
-  'פשוט תכתבו או תקליטו מה הוצאתם, בעברית או באנגלית:',
+  'פשוט תכתבו או תקליטו מה הוצאתם, בעברית או באנגלית. אפשר להגיד גם מאיזה ארנק ("מהארנק של שרה"):',
   '• <i>"80 שקל בסופר"</i>',
   '• <i>"שילמתי 45 על מונית אתמול"</i>',
   '• <i>"120 במכולת ועוד 30 על קפה"</i>',
   '• <i>"קיבלתי 200 שקל מסבתא"</i> — הכנסה במזומן',
   '',
   '<b>פקודות</b>',
-  '/balance — כמה מזומן אמור להיות בארנק',
+  '/balance — כמה מזומן אמור להיות בארנק, לפי ארנק',
   '/today — ההוצאות של היום',
   '/month — סיכום החודש לפי קטגוריה',
   '/undo — מחיקת הרישום האחרון',
@@ -257,9 +262,13 @@ async function logFromNaturalLanguage(
   const chatId = message.chat.id;
   const today = isoDateInIsrael();
 
+  const wallets = await listWallets();
   let parsed;
   try {
-    parsed = await parseIntake(input, { speakerName: member.display_name });
+    parsed = await parseIntake(input, {
+      speakerName: member.display_name,
+      wallets: wallets.map((w) => w.name),
+    });
   } catch (error) {
     await sendMessage(
       chatId,
@@ -290,6 +299,9 @@ async function logFromNaturalLanguage(
   // envelopes, the same way RiseUp files an uncategorised charge.
   const refs = expenses.length > 0 ? await envelopeRefsForMonth(today.slice(0, 7)) : [];
 
+  const defaultWallet = wallets.find((w) => w.is_default) ?? wallets[0] ?? null;
+  const walletFor = (name: string | null) => (matchWalletByName(wallets, name) ?? defaultWallet)?.id ?? null;
+
   const rows: NewSpend[] = expenses.map((entry, index) => {
     const target = resolveEnvelopeForCategory(refs, entry.category);
     return {
@@ -310,6 +322,7 @@ async function logFromNaturalLanguage(
       telegram_message_id: message.message_id,
       envelope_id: target?.envelopeId ?? null,
       envelope_type: target?.type ?? null,
+      wallet_id: walletFor(entry.wallet),
     };
   });
 
@@ -323,6 +336,7 @@ async function logFromNaturalLanguage(
         note: entry.note || null,
         occurred_at: entry.spentAt,
         input_kind: inputKind,
+        wallet_id: walletFor(entry.wallet),
       })),
     ),
   ]);
@@ -439,25 +453,44 @@ async function handleCallback(update: TelegramUpdate): Promise<void> {
 }
 
 async function sendBalance(chatId: number): Promise<void> {
-  const [topups, spends] = await Promise.all([activeTopups(), allLiveSpends()]);
+  const [topups, spends, wallets, { data: transfers }] = await Promise.all([
+    activeTopups(),
+    allLiveSpends(),
+    listWallets(),
+    db().from('cash_transfers').select('*').eq('is_dismissed', false),
+  ]);
   const state = walletState(topups, spends);
+  const perWallet = walletBalances(wallets, topups, spends, (transfers ?? []) as CashTransfer[]);
 
   const verdict =
     state.unaccounted > 0
-      ? `אמור להיות בארנק: <b>${formatIls(state.unaccounted)}</b>`
+      ? `אמור להיות במזומן: <b>${formatIls(state.unaccounted)}</b>`
       : state.unaccounted === 0
-        ? 'הארנק מאוזן בדיוק 🎯'
-        : `רשמתם <b>${formatIls(Math.abs(state.unaccounted))}</b> יותר ממה שנמשך — כנראה חסרה משיכה.`;
+        ? 'המזומן מאוזן בדיוק 🎯'
+        : `רשמתם <b>${formatIls(Math.abs(state.unaccounted))}</b> יותר ממה שנכנס — כנראה חסרה משיכה או הכנסה.`;
+
+  const walletLines =
+    wallets.length > 1
+      ? [
+          '',
+          '<b>לפי ארנק</b>',
+          ...perWallet.map((b) => {
+            const w = wallets.find((x) => x.id === b.walletId);
+            return `• ${escapeHtml(w?.name ?? '')}${w?.is_default ? ' (ברירת מחדל)' : ''}: ${formatIls(b.balance)}`;
+          }),
+        ]
+      : [];
 
   await sendMessage(
     chatId,
     [
       '<b>💰 מצב המזומן</b>',
       '',
-      `נמשך מהבנק: ${formatIls(state.toppedUp)} (${state.topupCount} משיכות)`,
-      `נרשם כהוצאה: ${formatIls(state.logged)} (${state.spendCount} רישומים)`,
+      `נמשך מהבנק ונכנס: ${formatIls(state.toppedUp)} (${state.topupCount})`,
+      `נרשם כהוצאה: ${formatIls(state.logged)} (${state.spendCount})`,
       '',
       verdict,
+      ...walletLines,
     ].join('\n'),
   );
 }

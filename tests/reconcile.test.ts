@@ -16,6 +16,7 @@ function topup(amount: number, overrides: Partial<CashTopup> = {}): CashTopup {
     member_id: null,
     category: null,
     input_kind: 'text',
+    wallet_id: null,
     ...overrides,
   };
 }
@@ -39,6 +40,7 @@ function spend(amount: number, overrides: Partial<CashSpend> = {}): CashSpend {
     bot_message_id: null,
     envelope_id: null,
     envelope_type: null,
+    wallet_id: null,
     created_at: '2026-09-02T10:00:00Z',
     ...overrides,
   };

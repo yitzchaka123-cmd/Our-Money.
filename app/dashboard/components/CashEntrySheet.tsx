@@ -7,6 +7,7 @@ import { Sheet } from '@/app/dashboard/components/Sheet';
 import { Close } from '@/app/dashboard/components/icons';
 import { addCashEntry, deleteCashEntry, updateCashEntry, type CashEntryInput } from '@/lib/cash/actions';
 import type { EnvelopeRef } from '@/lib/cash/envelopes';
+import type { WalletSummary } from '@/lib/dashboard/data';
 import { isoDateInIsrael } from '@/lib/intake/parse';
 import type { EnvelopeType, HouseholdMember } from '@/lib/types';
 
@@ -19,9 +20,14 @@ export interface CashEntryDraft {
   date: string;
   envelopeId: string | null;
   memberId: string | null;
+  walletId: string | null;
 }
 
-export function emptyDraft(kind: 'spend' | 'income', memberId: string | null): CashEntryDraft {
+export function emptyDraft(
+  kind: 'spend' | 'income',
+  memberId: string | null,
+  walletId: string | null = null,
+): CashEntryDraft {
   return {
     id: null,
     kind,
@@ -31,6 +37,7 @@ export function emptyDraft(kind: 'spend' | 'income', memberId: string | null): C
     date: isoDateInIsrael(),
     envelopeId: null,
     memberId,
+    walletId,
   };
 }
 
@@ -46,12 +53,14 @@ export function CashEntrySheet({
   draft,
   envelopes,
   members,
+  wallets,
   onClose,
 }: {
   open: boolean;
   draft: CashEntryDraft;
   envelopes: EnvelopeRef[];
   members: Pick<HouseholdMember, 'id' | 'display_name'>[];
+  wallets: WalletSummary[];
   onClose: () => void;
 }) {
   const [form, setForm] = useState<CashEntryDraft>(draft);
@@ -88,6 +97,7 @@ export function CashEntrySheet({
       date: form.date,
       envelopeId: form.kind === 'spend' ? form.envelopeId : null,
       memberId: form.memberId,
+      walletId: form.walletId,
     };
     start(async () => {
       const result = form.id ? await updateCashEntry(form.id, input) : await addCashEntry(input);
@@ -224,6 +234,25 @@ export function CashEntrySheet({
           <span>תאריך</span>
           <input type="date" value={form.date} onChange={(e) => patch({ date: e.target.value })} />
         </label>
+
+        {wallets.length > 1 ? (
+          <div className="field">
+            <span>{form.kind === 'income' ? 'לאיזה ארנק' : 'מאיזה ארנק'}</span>
+            <div className="chips">
+              {wallets.map((w) => (
+                <button
+                  key={w.id}
+                  type="button"
+                  className="chip"
+                  data-selected={(form.walletId ?? wallets.find((x) => x.isDefault)?.id) === w.id}
+                  onClick={() => patch({ walletId: w.id })}
+                >
+                  {w.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         {members.length > 1 ? (
           <div className="field">

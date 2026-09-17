@@ -1,7 +1,7 @@
 import { db } from '@/lib/db/client';
 import { env } from '@/lib/env';
 import type { EnvelopeRef } from '@/lib/cash/envelopes';
-import type { CashSpend, CashTopup, EnvelopeType, HouseholdMember } from '@/lib/types';
+import type { CashSpend, CashTopup, CashWallet, EnvelopeType, HouseholdMember } from '@/lib/types';
 
 /**
  * Resolve a Telegram user to a household member, creating the row on first
@@ -66,6 +66,7 @@ export interface NewSpend {
   telegram_message_id: number | null;
   envelope_id?: string | null;
   envelope_type?: string | null;
+  wallet_id?: string | null;
 }
 
 export async function insertSpends(rows: NewSpend[]): Promise<CashSpend[]> {
@@ -171,6 +172,7 @@ export interface NewCashIncome {
   note: string | null;
   occurred_at: string;
   input_kind: CashSpend['input_kind'];
+  wallet_id?: string | null;
 }
 
 /** Cash received: a wallet top-up with its own source, so the arithmetic stays one rule. */
@@ -196,4 +198,33 @@ export async function envelopeRefsForMonth(month: string): Promise<EnvelopeRef[]
     type: row.envelope_type as EnvelopeType,
     name: (row.name as string | null) ?? '',
   }));
+}
+
+export async function listWallets(): Promise<CashWallet[]> {
+  const { data, error } = await db()
+    .from('cash_wallets')
+    .select('*')
+    .eq('is_archived', false)
+    .order('position')
+    .order('created_at');
+  if (error) throw new Error(`Failed to load wallets: ${error.message}`);
+  return (data ?? []) as CashWallet[];
+}
+
+/** The wallet withdrawals land in and unassigned rows count toward. Null before the migration ran. */
+export async function defaultWalletId(): Promise<string | null> {
+  const wallets = await listWallets();
+  return wallets.find((w) => w.is_default)?.id ?? wallets[0]?.id ?? null;
+}
+
+/** Loose name match for a wallet mentioned in a message ("מהארנק של שרה"). */
+export function matchWalletByName(wallets: CashWallet[], mention: string | null | undefined): CashWallet | null {
+  if (!mention) return null;
+  const needle = mention.trim().replace(/\s+/g, ' ');
+  if (!needle) return null;
+  return (
+    wallets.find((w) => w.name.trim() === needle) ??
+    wallets.find((w) => w.name.includes(needle) || needle.includes(w.name)) ??
+    null
+  );
 }

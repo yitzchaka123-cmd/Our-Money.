@@ -1,4 +1,5 @@
 import { db } from '@/lib/db/client';
+import { defaultWalletId } from '@/lib/db/queries';
 import { recordRiseupCategories } from '@/lib/intake/categories';
 import {
   fetchBudget,
@@ -143,6 +144,8 @@ async function createTopupsForWithdrawals(
   const fresh = withdrawals.filter((w) => !seen.has(w.transactionId));
   if (fresh.length === 0) return [];
 
+  // Cash from the machine goes into whichever wallet is the default.
+  const walletId = await defaultWalletId();
   const { data: inserted, error: insertError } = await supabase
     .from('cash_topups')
     .insert(
@@ -152,6 +155,7 @@ async function createTopupsForWithdrawals(
         source: 'riseup_withdrawal' as const,
         riseup_transaction_id: w.transactionId,
         business_name: w.businessName ?? null,
+        wallet_id: walletId,
       })),
     )
     .select('*');
