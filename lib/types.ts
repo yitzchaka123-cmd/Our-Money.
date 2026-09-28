@@ -30,6 +30,8 @@ export interface CashSpend {
   envelope_type: string | null;
   /** Which wallet the cash came out of; null counts toward the default wallet. */
   wallet_id: string | null;
+  /** The expected-cash plan this spend settles, if any. */
+  plan_id?: string | null;
   created_at: string;
 }
 
@@ -47,6 +49,8 @@ export interface CashTopup {
   input_kind: InputKind | null;
   /** Which wallet the cash went into; null counts toward the default wallet. */
   wallet_id: string | null;
+  /** The expected-cash plan this income settles, if any. */
+  plan_id?: string | null;
   created_at?: string;
 }
 

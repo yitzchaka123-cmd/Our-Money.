@@ -1,4 +1,12 @@
 import { envelopeChoices, resolveEnvelopeForCategory, type EnvelopeRef } from '@/lib/cash/envelopes';
+import {
+  expectedWithCash,
+  planEnvelope,
+  planOccurrences,
+  type CashPlan,
+  type PlanOccurrence,
+  type PlanSettlement,
+} from '@/lib/cash/plans';
 import { db } from '@/lib/db/client';
 import { isoDateInIsrael } from '@/lib/intake/parse';
 import { monthBounds, walletBalances, walletState } from '@/lib/reconcile';
@@ -22,6 +30,25 @@ export interface EnvelopeView {
   expected: number;
   actuals: NormalizedActual[];
   showRemaining: boolean;
+  /** Expected cash not yet paid (or received) this month. */
+  pending: PendingPlanView[];
+  pendingTotal: number;
+}
+
+export interface PendingPlanView {
+  planId: string;
+  kind: 'spend' | 'income';
+  amountIls: number;
+  date: string;
+  label: string;
+  category: string;
+  note: string | null;
+  memberName: string | null;
+  memberId: string | null;
+  walletId: string | null;
+  recurrence: 'monthly' | 'once';
+  /** Where "paid" files the spend: this envelope, this month. */
+  envelopeId: string | null;
 }
 
 export interface WalletMovement {
@@ -77,6 +104,8 @@ export interface DashboardData {
   totalActualExpenses: number;
   totalExpectedExpenses: number;
   envelopes: EnvelopeView[];
+  /** Every active plan, for the plan management sheet. */
+  plans: CashPlan[];
   /** What the cash-entry picker offers. */
   envelopeChoices: EnvelopeRef[];
   /** RiseUp's savings envelope this month, for "זו הפקדה לחיסכון!". */
@@ -93,7 +122,69 @@ export function currentMonth(): string {
   return isoDateInIsrael().slice(0, 7);
 }
 
-export async function loadDashboard(month: string): Promise<DashboardData> {
+/** Raw rows for one month, as stored. */
+export interface MonthRows {
+  month: string;
+  envelopeRows: EnvelopeRow[];
+  actualRows: ActualRow[];
+  spends: CashSpend[];
+  topups: CashTopup[];
+  plans: CashPlan[];
+  skippedPlanIds: ReadonlySet<string>;
+  memberNames: Map<string, string>;
+}
+
+/**
+ * One month's envelopes exactly as the dashboard shows them: RiseUp's, with
+ * cash filed in, expected cash added, and every figure cash-aware. The
+ * dashboard and the envelope history both go through here.
+ */
+export function assembleMonth(rows: MonthRows): {
+  envelopes: EnvelopeView[];
+  riseupEnvelopes: NormalizedEnvelope[];
+} {
+  const actualsByEnvelope = groupActuals(rows.actualRows);
+  const riseupEnvelopes = rows.envelopeRows.map((row) => toNormalized(row, actualsByEnvelope));
+
+  const occurrences = planOccurrences(
+    rows.plans,
+    rows.month,
+    settlementsFrom(rows.spends, rows.topups),
+    rows.skippedPlanIds,
+  );
+
+  const merged = mergeCashIntoEnvelopes(riseupEnvelopes, rows.spends, rows.memberNames);
+  const cashIncome = cashIncomeEnvelope(
+    rows.topups,
+    rows.memberNames,
+    occurrences.some((o) => o.kind === 'income'),
+  );
+  const envelopes = applyCashFigures(
+    sortEnvelopes([...merged, ...(cashIncome ? [cashIncome] : [])]),
+    occurrences,
+    rows.plans,
+    rows.memberNames,
+  );
+  return { envelopes, riseupEnvelopes };
+}
+
+/** Income minus every expected expense — RiseUp's headline number. */
+export function monthTotals(envelopes: EnvelopeView[]) {
+  const income = sumBy(envelopes.filter((e) => INCOME_TYPES.has(e.type)), 'expected');
+  const expectedExpenses = sumBy(envelopes.filter((e) => EXPENSE_TYPES.has(e.type)), 'expected');
+  const actualExpenses = sumBy(envelopes.filter((e) => EXPENSE_TYPES.has(e.type)), 'actual');
+  return {
+    forecast: round(income - expectedExpenses),
+    expectedExpenses: round(expectedExpenses),
+    actualExpenses: round(actualExpenses),
+  };
+}
+
+export function toPlans(rows: CashPlan[] | null | undefined): CashPlan[] {
+  return (rows ?? []).map((p) => ({ ...p, amount_ils: Number(p.amount_ils) }));
+}
+
+export async function loadDashboard(month: string, sessionMemberId: string | null = null): Promise<DashboardData> {
   const supabase = db();
   const { from, to } = monthBounds(month);
 
@@ -110,6 +201,8 @@ export async function loadDashboard(month: string): Promise<DashboardData> {
     { data: walletRows },
     { data: allTransfers },
     { data: monthTransfers },
+    { data: planRows },
+    { data: skipRows },
   ] = await Promise.all([
     supabase.from('riseup_envelopes').select('*').eq('month', month).order('position'),
     supabase.from('riseup_envelope_actuals').select('*').eq('month', month),
@@ -140,26 +233,32 @@ export async function loadDashboard(month: string): Promise<DashboardData> {
       .eq('is_dismissed', false)
       .gte('occurred_at', from)
       .lte('occurred_at', to),
+    supabase.from('cash_plans').select('*').eq('is_active', true).order('day_of_month'),
+    supabase.from('cash_plan_skips').select('plan_id').eq('month', month),
   ]);
 
   const wallets = (walletRows ?? []) as CashWallet[];
   const memberList = (members ?? []) as Pick<HouseholdMember, 'id' | 'display_name'>[];
   const memberNames = new Map(memberList.map((m) => [m.id, m.display_name]));
 
-  const actualsByEnvelope = groupActuals(actualRows ?? []);
-  const riseupEnvelopes = (envelopeRows ?? []).map((row) => toNormalized(row, actualsByEnvelope));
-
   const spends = (monthSpends ?? []) as CashSpend[];
   const topups = (monthTopups ?? []) as CashTopup[];
+  const plans = toPlans(planRows as CashPlan[] | null);
 
-  const merged = mergeCashIntoEnvelopes(riseupEnvelopes, spends, memberNames);
-  const cashIncome = cashIncomeEnvelope(topups, memberNames);
-  const envelopes = sortEnvelopes([...merged, ...(cashIncome ? [cashIncome] : [])]).map(toView);
+  const { envelopes, riseupEnvelopes } = assembleMonth({
+    month,
+    envelopeRows: (envelopeRows ?? []) as EnvelopeRow[],
+    actualRows: (actualRows ?? []) as ActualRow[],
+    spends,
+    topups,
+    plans,
+    skippedPlanIds: new Set(((skipRows ?? []) as { plan_id: string }[]).map((r) => r.plan_id)),
+    memberNames,
+  });
 
-  const income = sumBy(envelopes.filter((e) => INCOME_TYPES.has(e.type)), 'expected');
-  const expectedExpenses = sumBy(envelopes.filter((e) => EXPENSE_TYPES.has(e.type)), 'expected');
-  const actualExpenses = sumBy(envelopes.filter((e) => EXPENSE_TYPES.has(e.type)), 'actual');
+  const totals = monthTotals(envelopes);
   const variable = envelopes.find((e) => e.type === 'variable');
+  const me = memberList.find((m) => m.id === sessionMemberId) ?? memberList[0];
 
   const lastSyncAt = syncState.lastSuccessAt;
 
@@ -169,16 +268,20 @@ export async function loadDashboard(month: string): Promise<DashboardData> {
       ((monthList ?? []) as { month: string }[]).map((row) => row.month),
       month,
     ),
-    userName: memberList[0]?.display_name ?? 'שלום',
-    greeting: (memberList[0]?.display_name ?? '').split(' ')[0] || 'שלום',
+    userName: me?.display_name ?? 'שלום',
+    greeting: (me?.display_name ?? '').split(' ')[0] || 'שלום',
     lastUpdated: formatUpdated(lastSyncAt),
     lastSyncAt,
     syncBanner: syncBanner(syncState),
-    forecast: round(income - expectedExpenses),
-    variableRemaining: variable ? round(Math.max(variable.expected - variable.actual, 0)) : 0,
-    totalActualExpenses: round(actualExpenses),
-    totalExpectedExpenses: round(expectedExpenses),
+    forecast: totals.forecast,
+    // Cash already promised is not free to spend, even before it goes out.
+    variableRemaining: variable
+      ? round(Math.max(variable.expected - variable.actual - variable.pendingTotal, 0))
+      : 0,
+    totalActualExpenses: totals.actualExpenses,
+    totalExpectedExpenses: totals.expectedExpenses,
     envelopes,
+    plans,
     envelopeChoices: envelopeChoices(riseupEnvelopes.map(toRef)),
     savingsEnvelopeId: riseupEnvelopes.find((e) => e.type === 'riseupGoal')?.envelopeId ?? null,
     wallet: buildWallet({
@@ -200,7 +303,7 @@ export async function loadDashboard(month: string): Promise<DashboardData> {
 // RiseUp rows → normalized envelopes
 // ---------------------------------------------------------------------------
 
-interface ActualRow {
+export interface ActualRow {
   envelope_id: string;
   transaction_id: string;
   transaction_date: string | null;
@@ -246,7 +349,7 @@ function groupActuals(rows: ActualRow[]): Map<string, NormalizedActual[]> {
   return grouped;
 }
 
-interface EnvelopeRow {
+export interface EnvelopeRow {
   envelope_id: string;
   envelope_type: string;
   name: string | null;
@@ -294,7 +397,100 @@ function toView(envelope: NormalizedEnvelope): EnvelopeView {
     expected: envelope.plannedIls,
     actuals: envelope.actuals,
     showRemaining: envelope.type === 'trackingCategory' || envelope.type === 'riseupGoal',
+    pending: [],
+    pendingTotal: 0,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Expected cash → the same envelopes, and the forecast
+// ---------------------------------------------------------------------------
+
+function settlementsFrom(spends: CashSpend[], topups: CashTopup[]): PlanSettlement[] {
+  return [
+    ...spends
+      .filter((s) => s.plan_id)
+      .map((s) => ({ planId: s.plan_id!, entryId: s.id, amountIls: Number(s.amount_ils), date: s.spent_at })),
+    ...topups
+      .filter((t) => t.plan_id && t.source === 'cash_income')
+      .map((t) => ({ planId: t.plan_id!, entryId: t.id, amountIls: Number(t.amount_ils), date: t.occurred_at })),
+  ];
+}
+
+/**
+ * File each plan occurrence into its envelope, list the pending ones in it,
+ * and recompute the envelope's expected figure with its cash included.
+ * Exported for the tests.
+ */
+export function applyCashFigures(
+  envelopes: NormalizedEnvelope[],
+  occurrences: PlanOccurrence[],
+  plans: CashPlan[],
+  memberNames: Map<string, string>,
+): EnvelopeView[] {
+  const list = [...envelopes];
+  const refs = list.filter((e) => e.type !== 'cashIncome').map(toRef);
+  const planById = new Map(plans.map((p) => [p.id, p]));
+  const byEnvelope = new Map<string, PlanOccurrence[]>();
+
+  for (const occurrence of occurrences) {
+    const plan = planById.get(occurrence.planId);
+    if (!plan) continue;
+
+    let envelopeId: string | undefined;
+    if (occurrence.kind === 'income') {
+      envelopeId = list.find((e) => e.type === 'cashIncome')?.envelopeId;
+    } else {
+      envelopeId = planEnvelope(plan, refs)?.envelopeId;
+      if (!envelopeId) {
+        // Nothing synced yet: stand up the variable envelope, as for a spend.
+        let fallback = list.find((e) => e.envelopeId === FALLBACK_VARIABLE_ID);
+        if (!fallback) {
+          fallback = emptyVariableEnvelope();
+          list.push(fallback);
+        }
+        envelopeId = fallback.envelopeId;
+      }
+    }
+    if (!envelopeId) continue;
+    byEnvelope.set(envelopeId, [...(byEnvelope.get(envelopeId) ?? []), occurrence]);
+  }
+
+  return sortEnvelopes(list).map((envelope) => {
+    const view = toView(envelope);
+    const own = byEnvelope.get(envelope.envelopeId) ?? [];
+    const pending = own.filter((o) => o.status === 'pending');
+    const cashActual = round(envelope.actuals.filter((a) => a.cash).reduce((s, a) => s + a.amountIls, 0));
+    const riseupActual = round(envelope.actualIls - cashActual);
+    const pendingTotal = round(pending.reduce((s, o) => s + o.amountIls, 0));
+
+    return {
+      ...view,
+      expected: expectedWithCash({
+        type: envelope.type,
+        riseupPlanned: envelope.plannedIls,
+        riseupActual,
+        cashActual,
+        planCommitted: round(own.reduce((s, o) => s + o.amountIls, 0)),
+        pending: pendingTotal,
+      }),
+      pending: pending.map((o) => ({
+        planId: o.planId,
+        kind: o.kind,
+        amountIls: o.amountIls,
+        date: o.date,
+        label: o.note || o.category,
+        category: o.category,
+        note: o.note,
+        memberName: o.memberId ? (memberNames.get(o.memberId) ?? null) : null,
+        memberId: o.memberId,
+        walletId: o.walletId,
+        recurrence: o.recurrence,
+        envelopeId: envelope.type === 'cashIncome' ? null : envelope.envelopeId,
+      })),
+      pendingTotal,
+    };
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -325,15 +521,7 @@ export function mergeCashIntoEnvelopes(
     // Before the first sync there is nothing to file into. Rather than lose the
     // entry, stand up the variable envelope RiseUp would have given it.
     if (!target) {
-      target = byId.get(FALLBACK_VARIABLE_ID) ?? {
-        envelopeId: FALLBACK_VARIABLE_ID,
-        type: 'variable',
-        name: ENVELOPE_TITLES.variable ?? 'הוצאות משתנות',
-        plannedIls: 0,
-        actualIls: 0,
-        position: 0,
-        actuals: [],
-      };
+      target = byId.get(FALLBACK_VARIABLE_ID) ?? emptyVariableEnvelope();
       byId.set(FALLBACK_VARIABLE_ID, target);
     }
 
@@ -344,6 +532,18 @@ export function mergeCashIntoEnvelopes(
     ...e,
     actualIls: round(e.actuals.reduce((sum, a) => sum + a.amountIls, 0)),
   }));
+}
+
+function emptyVariableEnvelope(): NormalizedEnvelope {
+  return {
+    envelopeId: FALLBACK_VARIABLE_ID,
+    type: 'variable',
+    name: ENVELOPE_TITLES.variable ?? 'הוצאות משתנות',
+    plannedIls: 0,
+    actualIls: 0,
+    position: 0,
+    actuals: [],
+  };
 }
 
 function pickById(
@@ -413,9 +613,10 @@ function incomeToActual(topup: CashTopup, memberNames: Map<string, string>): Nor
 function cashIncomeEnvelope(
   topups: CashTopup[],
   memberNames: Map<string, string>,
+  hasPlans: boolean,
 ): NormalizedEnvelope | null {
   const incomes = topups.filter((t) => t.source === 'cash_income');
-  if (incomes.length === 0) return null;
+  if (incomes.length === 0 && !hasPlans) return null;
   const actuals = incomes.map((t) => incomeToActual(t, memberNames));
   const total = round(actuals.reduce((sum, a) => sum + a.amountIls, 0));
   return {

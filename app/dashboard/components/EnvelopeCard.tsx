@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { Amount } from '@/app/dashboard/components/Amount';
 import { ChevronDown, Kebab, Mic } from '@/app/dashboard/components/icons';
 import { buildBuckets, type Bucket } from '@/lib/dashboard/buckets';
+import type { PendingPlanView } from '@/lib/dashboard/data';
 import type { NormalizedActual } from '@/lib/riseup/envelopes';
 import { formatAmount } from '@/lib/money';
 import type { EnvelopeType } from '@/lib/types';
@@ -24,6 +25,13 @@ export interface EnvelopeCardProps {
   onOpenTransaction?: (actual: NormalizedActual, envelopeTitle: string) => void;
   /** When set, the card offers to add a cash entry filed into this envelope. */
   onAddCash?: () => void;
+  /** Expected cash still to come in this envelope this month. */
+  pending?: PendingPlanView[];
+  pendingTotal?: number;
+  onOpenPlan?: (plan: PendingPlanView) => void;
+  onSettlePlan?: (plan: PendingPlanView) => void;
+  /** The card's ⋮. */
+  onMenu?: () => void;
 }
 
 /** Column wording differs per envelope type, exactly as RiseUp words it. */
@@ -81,6 +89,11 @@ export function EnvelopeCard({
   defaultOpen = false,
   onOpenTransaction,
   onAddCash,
+  pending = [],
+  pendingTotal = 0,
+  onOpenPlan,
+  onSettlePlan,
+  onMenu,
 }: EnvelopeCardProps) {
   const [open, setOpen] = useState(defaultOpen);
   const text = labels(type);
@@ -88,7 +101,8 @@ export function EnvelopeCard({
   // A bar with nothing planned still reads as "spent everything planned",
   // which is how RiseUp renders a fully-consumed variable envelope.
   const ratio = expected > 0 ? Math.min(actual / expected, 1) : 1;
-  const remaining = Math.max(expected - actual, 0);
+  // Cash already promised is not free to spend, even before it goes out.
+  const remaining = Math.max(expected - actual - pendingTotal, 0);
   const buckets = buildBuckets(type, actuals, { today, month });
 
   return (
@@ -96,7 +110,7 @@ export function EnvelopeCard({
       <div className="card-body">
         <div className="card-head">
           <h2 className="card-title">{title}</h2>
-          <Kebab label={`אפשרויות ל${title}`} />
+          <Kebab label={`אפשרויות ל${title}`} onClick={onMenu} />
         </div>
 
         <div className="envelope-figures">
@@ -146,6 +160,15 @@ export function EnvelopeCard({
           envelopeTitle={title}
           expandFirst={defaultOpen}
           onOpenTransaction={onOpenTransaction}
+        />
+      ) : null}
+
+      {open && pending.length > 0 ? (
+        <PendingRows
+          pending={pending}
+          income={type === 'cashIncome'}
+          onOpenPlan={onOpenPlan}
+          onSettlePlan={onSettlePlan}
         />
       ) : null}
 
@@ -264,6 +287,46 @@ function BucketRow({
           ))
         : null}
     </>
+  );
+}
+
+/**
+ * Expected cash still to come, under the month's real rows: greyed like
+ * RiseUp's predicted charges, with a one-tap "paid" on each.
+ */
+function PendingRows({
+  pending,
+  income,
+  onOpenPlan,
+  onSettlePlan,
+}: {
+  pending: PendingPlanView[];
+  income: boolean;
+  onOpenPlan?: (plan: PendingPlanView) => void;
+  onSettlePlan?: (plan: PendingPlanView) => void;
+}) {
+  return (
+    <div className="pending-block">
+      <p className="pending-title">{income ? 'צפוי להיכנס במזומן' : 'צפוי לצאת במזומן'}</p>
+      {pending.map((plan) => (
+        <div key={plan.planId} className="txn-row pending-row">
+          <button type="button" className="pending-open" onClick={() => onOpenPlan?.(plan)}>
+            <span className="date">{shortDate(plan.date)}</span>
+            <span className="amount">
+              <Amount value={plan.amountIls} />
+            </span>
+            <span className="merchant">
+              <span className="cash-mark" aria-label="מזומן">₪</span>
+              {[plan.label, plan.memberName].filter(Boolean).join(' · ')}
+              {plan.recurrence === 'monthly' ? <span className="pending-repeat"> · כל חודש</span> : null}
+            </span>
+          </button>
+          <button type="button" className="settle-pill" onClick={() => onSettlePlan?.(plan)}>
+            {income ? 'התקבל' : 'שולם'}
+          </button>
+        </div>
+      ))}
+    </div>
   );
 }
 

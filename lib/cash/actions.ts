@@ -1,9 +1,8 @@
 'use server';
 
-import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 
-import { SESSION_COOKIE, verifySessionToken } from '@/lib/auth/session';
+import { SESSION_EXPIRED_MESSAGE, sessionMember } from '@/lib/auth/member';
 import { resolveEnvelopeForCategory, type EnvelopeRef } from '@/lib/cash/envelopes';
 import { db } from '@/lib/db/client';
 import { syncIfStale } from '@/lib/riseup/sync';
@@ -52,15 +51,18 @@ export type ActionResult = { ok: true; id: string } | { ok: false; error: string
 
 const DASHBOARD = '/dashboard';
 
-async function requireMember(): Promise<string> {
-  const token = (await cookies()).get(SESSION_COOKIE)?.value;
-  const session = token ? verifySessionToken(token) : null;
-  if (!session) throw new Error('not signed in');
-  return session.memberId;
-}
-
 function fail(error: string): ActionResult {
   return { ok: false, error };
+}
+
+/** A database failure: logged in full, shown to the couple as one calm sentence. */
+function dbFail(error: { message: string }): ActionResult {
+  console.error('Cash action failed:', error.message);
+  return fail('משהו השתבש בשמירה. נסו שוב בעוד רגע.');
+}
+
+function expired(): ActionResult {
+  return fail(SESSION_EXPIRED_MESSAGE);
 }
 
 function validate(input: CashEntryInput): string | null {
@@ -112,11 +114,12 @@ async function walletOrDefault(walletId: string | null): Promise<string | null> 
 // ---------------------------------------------------------------------------
 
 export async function addCashEntry(input: CashEntryInput): Promise<ActionResult> {
-  const sessionMember = await requireMember();
+  const signedIn = await sessionMember();
+  if (!signedIn) return expired();
   const problem = validate(input);
   if (problem) return fail(problem);
 
-  const memberId = input.memberId ?? sessionMember;
+  const memberId = input.memberId ?? signedIn;
   const walletId = await walletOrDefault(input.walletId);
   const supabase = db();
 
@@ -137,7 +140,7 @@ export async function addCashEntry(input: CashEntryInput): Promise<ActionResult>
       })
       .select('id')
       .single();
-    if (error) return fail(error.message);
+    if (error) return dbFail(error);
     revalidatePath(DASHBOARD);
     return { ok: true, id: data.id as string };
   }
@@ -159,13 +162,13 @@ export async function addCashEntry(input: CashEntryInput): Promise<ActionResult>
     })
     .select('id')
     .single();
-  if (error) return fail(error.message);
+  if (error) return dbFail(error);
   revalidatePath(DASHBOARD);
   return { ok: true, id: data.id as string };
 }
 
 export async function updateCashEntry(id: string, input: CashEntryInput): Promise<ActionResult> {
-  await requireMember();
+  if (!(await sessionMember())) return expired();
   const problem = validate(input);
   if (problem) return fail(problem);
 
@@ -186,7 +189,7 @@ export async function updateCashEntry(id: string, input: CashEntryInput): Promis
       })
       .eq('id', id)
       .eq('source', 'cash_income');
-    if (error) return fail(error.message);
+    if (error) return dbFail(error);
   } else if (input.kind === 'withdrawal') {
     const { data: row } = await supabase.from('cash_topups').select('source').eq('id', id).maybeSingle();
     if (!row || row.source === 'cash_income') return fail('הרישום לא נמצא.');
@@ -203,7 +206,7 @@ export async function updateCashEntry(id: string, input: CashEntryInput): Promis
         updated_at: now,
       })
       .eq('id', id);
-    if (error) return fail(error.message);
+    if (error) return dbFail(error);
   } else {
     const pin = await resolvePin(input.date.slice(0, 7), input.envelopeId, input.category);
     const { error } = await supabase
@@ -221,7 +224,7 @@ export async function updateCashEntry(id: string, input: CashEntryInput): Promis
         updated_at: now,
       })
       .eq('id', id);
-    if (error) return fail(error.message);
+    if (error) return dbFail(error);
   }
 
   revalidatePath(DASHBOARD);
@@ -229,7 +232,7 @@ export async function updateCashEntry(id: string, input: CashEntryInput): Promis
 }
 
 export async function deleteCashEntry(id: string, kind: CashKind): Promise<ActionResult> {
-  await requireMember();
+  if (!(await sessionMember())) return expired();
   const supabase = db();
   // Soft on both sides, so nothing is lost and the arithmetic just stops counting it.
   // A dismissed bank withdrawal stays dismissed across syncs: the sync skips
@@ -241,35 +244,35 @@ export async function deleteCashEntry(id: string, kind: CashKind): Promise<Actio
           .from('cash_spends')
           .update({ status: 'deleted', updated_at: new Date().toISOString() })
           .eq('id', id);
-  if (error) return fail(error.message);
+  if (error) return dbFail(error);
   revalidatePath(DASHBOARD);
   return { ok: true, id };
 }
 
 /** RiseUp's "להוסיף הערה". */
 export async function updateCashNote(id: string, kind: CashKind, note: string): Promise<ActionResult> {
-  await requireMember();
+  if (!(await sessionMember())) return expired();
   const supabase = db();
   const value = note.trim() || null;
   const { error } =
     isTopupKind(kind)
       ? await supabase.from('cash_topups').update({ note: value, updated_at: new Date().toISOString() }).eq('id', id)
       : await supabase.from('cash_spends').update({ note: value, updated_at: new Date().toISOString() }).eq('id', id);
-  if (error) return fail(error.message);
+  if (error) return dbFail(error);
   revalidatePath(DASHBOARD);
   return { ok: true, id };
 }
 
 /** RiseUp's "להזיז את ההוצאה": file the spend into a different envelope. */
 export async function moveCashSpendToEnvelope(id: string, envelopeId: string): Promise<ActionResult> {
-  await requireMember();
+  if (!(await sessionMember())) return expired();
   const supabase = db();
   const { data: spend, error: loadError } = await supabase
     .from('cash_spends')
     .select('spent_at, category')
     .eq('id', id)
     .maybeSingle();
-  if (loadError || !spend) return fail(loadError?.message ?? 'הרישום לא נמצא.');
+  if (loadError || !spend) return (loadError ? dbFail(loadError) : fail('הרישום לא נמצא.'));
 
   const refs = await envelopeRefs((spend.spent_at as string).slice(0, 7));
   const target = refs.find((r) => r.envelopeId === envelopeId);
@@ -285,14 +288,49 @@ export async function moveCashSpendToEnvelope(id: string, envelopeId: string): P
       updated_at: new Date().toISOString(),
     })
     .eq('id', id);
-  if (error) return fail(error.message);
+  if (error) return dbFail(error);
   revalidatePath(DASHBOARD);
   return { ok: true, id };
 }
 
+/** Several spends from one envelope into another, in one go. */
+export async function moveCashSpendsToEnvelope(ids: string[], envelopeId: string): Promise<ActionResult> {
+  if (!(await sessionMember())) return expired();
+  if (ids.length === 0) return fail('לא נבחרו הוצאות.');
+  if (ids.length > 200) return fail('יותר מדי הוצאות בבת אחת.');
+  const supabase = db();
+
+  const { data: spends, error: loadError } = await supabase
+    .from('cash_spends')
+    .select('id, spent_at')
+    .in('id', ids);
+  if (loadError) return dbFail(loadError);
+  if (!spends || spends.length !== ids.length) return fail('חלק מההוצאות לא נמצאו.');
+
+  // Envelope ids are per month, so every spend must share the target's month.
+  const months = new Set(spends.map((s) => (s.spent_at as string).slice(0, 7)));
+  if (months.size !== 1) return fail('אפשר להזיז יחד רק הוצאות מאותו חודש.');
+  const refs = await envelopeRefs([...months][0]!);
+  const target = refs.find((r) => r.envelopeId === envelopeId);
+  if (!target) return fail('המעטפה לא קיימת בחודש הזה.');
+
+  const { error } = await supabase
+    .from('cash_spends')
+    .update({
+      envelope_id: target.envelopeId,
+      envelope_type: target.type,
+      ...(target.type === 'trackingCategory' ? { category: target.name } : {}),
+      updated_at: new Date().toISOString(),
+    })
+    .in('id', ids);
+  if (error) return dbFail(error);
+  revalidatePath(DASHBOARD);
+  return { ok: true, id: envelopeId };
+}
+
 /** RiseUp's "זו הפקדה לחיסכון!": file the spend into the savings envelope. */
 export async function markCashSpendAsSavings(id: string): Promise<ActionResult> {
-  await requireMember();
+  if (!(await sessionMember())) return expired();
   const supabase = db();
   const { data: spend } = await supabase.from('cash_spends').select('spent_at').eq('id', id).maybeSingle();
   if (!spend) return fail('הרישום לא נמצא.');
@@ -307,7 +345,7 @@ export async function markCashSpendAsSavings(id: string): Promise<ActionResult> 
  * the original amount, so a split can never create or lose money.
  */
 export async function splitCashEntry(id: string, kind: CashKind, parts: SplitPart[]): Promise<ActionResult> {
-  await requireMember();
+  if (!(await sessionMember())) return expired();
   if (kind === 'withdrawal') return fail('משיכה לא מתפצלת — אפשר להעביר חלק ממנה לארנק אחר.');
   if (parts.length < 2) return fail('פיצול צריך לפחות שני חלקים.');
   if (parts.some((p) => !Number.isFinite(p.amountIls) || p.amountIls <= 0)) return fail('כל חלק צריך סכום גדול מאפס.');
@@ -316,7 +354,7 @@ export async function splitCashEntry(id: string, kind: CashKind, parts: SplitPar
   const supabase = db();
   const table = kind === 'income' ? 'cash_topups' : 'cash_spends';
   const { data: original, error: loadError } = await supabase.from(table).select('*').eq('id', id).maybeSingle();
-  if (loadError || !original) return fail(loadError?.message ?? 'הרישום לא נמצא.');
+  if (loadError || !original) return (loadError ? dbFail(loadError) : fail('הרישום לא נמצא.'));
 
   const total = Math.round(parts.reduce((s, p) => s + p.amountIls, 0) * 100) / 100;
   if (Math.abs(total - Number(original.amount_ils)) > 0.005) {
@@ -331,7 +369,7 @@ export async function splitCashEntry(id: string, kind: CashKind, parts: SplitPar
       .from('cash_topups')
       .update({ amount_ils: first!.amountIls, category: first!.category.trim(), note: first!.note?.trim() || null, updated_at: now })
       .eq('id', id);
-    if (error) return fail(error.message);
+    if (error) return dbFail(error);
     const { error: insertError } = await supabase.from('cash_topups').insert(
       rest.map((p) => ({
         amount_ils: p.amountIls,
@@ -344,7 +382,7 @@ export async function splitCashEntry(id: string, kind: CashKind, parts: SplitPar
         wallet_id: original.wallet_id,
       })),
     );
-    if (insertError) return fail(insertError.message);
+    if (insertError) return dbFail(insertError);
   } else {
     const month = (original.spent_at as string).slice(0, 7);
     const firstPin = await resolvePin(month, first!.envelopeId, first!.category);
@@ -352,7 +390,7 @@ export async function splitCashEntry(id: string, kind: CashKind, parts: SplitPar
       .from('cash_spends')
       .update({ amount_ils: first!.amountIls, category: first!.category.trim(), note: first!.note?.trim() || null, ...firstPin, updated_at: now })
       .eq('id', id);
-    if (error) return fail(error.message);
+    if (error) return dbFail(error);
     const rows = await Promise.all(
       rest.map(async (p) => ({
         member_id: original.member_id,
@@ -368,7 +406,7 @@ export async function splitCashEntry(id: string, kind: CashKind, parts: SplitPar
       })),
     );
     const { error: insertError } = await supabase.from('cash_spends').insert(rows);
-    if (insertError) return fail(insertError.message);
+    if (insertError) return dbFail(insertError);
   }
 
   revalidatePath(DASHBOARD);
@@ -381,14 +419,14 @@ export async function splitCashEntry(id: string, kind: CashKind, parts: SplitPar
  * against the new month, since envelope ids are per plan.
  */
 export async function moveCashEntryToMonth(id: string, kind: CashKind, month: string): Promise<ActionResult> {
-  await requireMember();
+  if (!(await sessionMember())) return expired();
   if (!/^\d{4}-\d{2}$/.test(month)) return fail('חודש לא תקין.');
 
   const supabase = db();
   const table = isTopupKind(kind) ? 'cash_topups' : 'cash_spends';
   const dateColumn = isTopupKind(kind) ? 'occurred_at' : 'spent_at';
   const { data: row, error: loadError } = await supabase.from(table).select('*').eq('id', id).maybeSingle();
-  if (loadError || !row) return fail(loadError?.message ?? 'הרישום לא נמצא.');
+  if (loadError || !row) return (loadError ? dbFail(loadError) : fail('הרישום לא נמצא.'));
   if (row.source === 'riseup_withdrawal') return fail('משיכה מהבנק נשארת בחודש שבו הבנק רשם אותה.');
 
   const day = Number((row[dateColumn] as string).slice(8, 10));
@@ -400,7 +438,7 @@ export async function moveCashEntryToMonth(id: string, kind: CashKind, month: st
   if (kind === 'spend') Object.assign(patch, await resolvePin(month, null, row.category as string));
 
   const { error } = await supabase.from(table).update(patch).eq('id', id);
-  if (error) return fail(error.message);
+  if (error) return dbFail(error);
   revalidatePath(DASHBOARD);
   return { ok: true, id };
 }
@@ -410,7 +448,7 @@ export async function moveCashEntryToMonth(id: string, kind: CashKind, month: st
 // ---------------------------------------------------------------------------
 
 export async function createWallet(name: string, memberId: string | null): Promise<ActionResult> {
-  await requireMember();
+  if (!(await sessionMember())) return expired();
   const trimmed = name.trim();
   if (!trimmed) return fail('צריך שם לארנק.');
   const supabase = db();
@@ -420,40 +458,40 @@ export async function createWallet(name: string, memberId: string | null): Promi
     .insert({ name: trimmed, member_id: memberId, is_default: (count ?? 0) === 0, position: count ?? 0 })
     .select('id')
     .single();
-  if (error) return fail(error.message);
+  if (error) return dbFail(error);
   revalidatePath(DASHBOARD);
   return { ok: true, id: data.id as string };
 }
 
 export async function renameWallet(id: string, name: string): Promise<ActionResult> {
-  await requireMember();
+  if (!(await sessionMember())) return expired();
   if (!name.trim()) return fail('צריך שם לארנק.');
   const { error } = await db().from('cash_wallets').update({ name: name.trim() }).eq('id', id);
-  if (error) return fail(error.message);
+  if (error) return dbFail(error);
   revalidatePath(DASHBOARD);
   return { ok: true, id };
 }
 
 /** Archive rather than delete: its history stays and its balance stays counted in the total. */
 export async function archiveWallet(id: string): Promise<ActionResult> {
-  await requireMember();
+  if (!(await sessionMember())) return expired();
   const supabase = db();
   const { data } = await supabase.from('cash_wallets').select('is_default').eq('id', id).maybeSingle();
   if (data?.is_default) return fail('אי אפשר לארכב את ארנק ברירת המחדל — קודם בחרו ארנק אחר כברירת מחדל.');
   const { error } = await supabase.from('cash_wallets').update({ is_archived: true }).eq('id', id);
-  if (error) return fail(error.message);
+  if (error) return dbFail(error);
   revalidatePath(DASHBOARD);
   return { ok: true, id };
 }
 
 export async function setDefaultWallet(id: string): Promise<ActionResult> {
-  await requireMember();
+  if (!(await sessionMember())) return expired();
   const supabase = db();
   // The unique partial index allows one default; clear first, then set.
   const { error: clearError } = await supabase.from('cash_wallets').update({ is_default: false }).eq('is_default', true);
-  if (clearError) return fail(clearError.message);
+  if (clearError) return dbFail(clearError);
   const { error } = await supabase.from('cash_wallets').update({ is_default: true }).eq('id', id);
-  if (error) return fail(error.message);
+  if (error) return dbFail(error);
   revalidatePath(DASHBOARD);
   return { ok: true, id };
 }
@@ -467,7 +505,8 @@ export interface TransferInput {
 }
 
 export async function transferBetweenWallets(input: TransferInput): Promise<ActionResult> {
-  const memberId = await requireMember();
+  const memberId = await sessionMember();
+  if (!memberId) return expired();
   if (input.fromWalletId === input.toWalletId) return fail('צריך שני ארנקים שונים.');
   if (!Number.isFinite(input.amountIls) || input.amountIls <= 0) return fail('צריך סכום גדול מאפס.');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) return fail('תאריך לא תקין.');
@@ -483,15 +522,35 @@ export async function transferBetweenWallets(input: TransferInput): Promise<Acti
     })
     .select('id')
     .single();
-  if (error) return fail(error.message);
+  if (error) return dbFail(error);
   revalidatePath(DASHBOARD);
   return { ok: true, id: data.id as string };
 }
 
+export async function updateTransfer(id: string, input: TransferInput): Promise<ActionResult> {
+  if (!(await sessionMember())) return expired();
+  if (input.fromWalletId === input.toWalletId) return fail('צריך שני ארנקים שונים.');
+  if (!Number.isFinite(input.amountIls) || input.amountIls <= 0) return fail('צריך סכום גדול מאפס.');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) return fail('תאריך לא תקין.');
+  const { error } = await db()
+    .from('cash_transfers')
+    .update({
+      from_wallet_id: input.fromWalletId,
+      to_wallet_id: input.toWalletId,
+      amount_ils: input.amountIls,
+      occurred_at: input.date,
+      note: input.note?.trim() || null,
+    })
+    .eq('id', id);
+  if (error) return dbFail(error);
+  revalidatePath(DASHBOARD);
+  return { ok: true, id };
+}
+
 export async function deleteTransfer(id: string): Promise<ActionResult> {
-  await requireMember();
+  if (!(await sessionMember())) return expired();
   const { error } = await db().from('cash_transfers').update({ is_dismissed: true }).eq('id', id);
-  if (error) return fail(error.message);
+  if (error) return dbFail(error);
   revalidatePath(DASHBOARD);
   return { ok: true, id };
 }
@@ -502,7 +561,7 @@ export async function deleteTransfer(id: string): Promise<ActionResult> {
 const MANUAL_REFRESH_FLOOR_MS = 30 * 1000;
 
 export async function refreshFromRiseup(): Promise<{ ok: boolean; error: string | null; envelopes: number }> {
-  await requireMember();
+  if (!(await sessionMember())) return { ok: false, error: SESSION_EXPIRED_MESSAGE, envelopes: 0 };
   const outcome = await syncIfStale(MANUAL_REFRESH_FLOOR_MS);
   revalidatePath(DASHBOARD);
   if (outcome.skipped) return { ok: true, error: null, envelopes: 0 };

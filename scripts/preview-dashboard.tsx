@@ -51,6 +51,8 @@ const envelopes: EnvelopeView[] = [
     actual: 291.7,
     expected: 291.7,
     showRemaining: false,
+    pending: [],
+    pendingTotal: 0,
     actuals: [
       actual('v1', '2026-09-02', 40, 'BIT', { accountNumberHash: '0848' }),
       actual('v2', '2026-09-09', 92.1, 'שופרסל דיל', { accountNumberHash: '0848' }),
@@ -75,8 +77,25 @@ const envelopes: EnvelopeView[] = [
     type: 'fixed',
     title: 'הוצאות קבועות',
     actual: 3077,
-    expected: 4968.3,
+    expected: 5768.3,
     showRemaining: false,
+    pending: [
+      {
+        planId: 'p-cleaner',
+        kind: 'spend',
+        amountIls: 800,
+        date: '2026-09-20',
+        label: 'עוזרת בית',
+        category: 'ניקיון',
+        note: 'עוזרת בית',
+        memberName: null,
+        memberId: null,
+        walletId: 'w-main',
+        recurrence: 'monthly',
+        envelopeId: 'fixed',
+      },
+    ],
+    pendingTotal: 800,
     actuals: [
       actual('f1', '2026-09-03', 74.8, 'הראל חיים', {
         accountNumberHash: '7722',
@@ -95,6 +114,8 @@ const envelopes: EnvelopeView[] = [
     actual: 7635,
     expected: 7635,
     showRemaining: false,
+    pending: [],
+    pendingTotal: 0,
     actuals: [
       actual('i1', '2026-09-04', 7635, 'בנק הפועלים חשבון 674-1908922', {
         isIncome: true,
@@ -109,6 +130,8 @@ const envelopes: EnvelopeView[] = [
     actual: 194,
     expected: 500,
     showRemaining: true,
+    pending: [],
+    pendingTotal: 0,
     actuals: [
       actual('t1', '2026-09-11', 74, 'מסעדת הגליל'),
       actual('cash:c3', '2026-09-12', 120, 'ארוחת צהריים', {
@@ -125,8 +148,25 @@ const envelopes: EnvelopeView[] = [
     type: 'cashIncome',
     title: 'הכנסות במזומן',
     actual: 350,
-    expected: 350,
+    expected: 1550,
     showRemaining: false,
+    pending: [
+      {
+        planId: 'p-tutoring',
+        kind: 'income',
+        amountIls: 1200,
+        date: '2026-09-25',
+        label: 'שיעורים פרטיים',
+        category: 'משכורת במזומן',
+        note: 'שיעורים פרטיים',
+        memberName: 'שרה',
+        memberId: 'm2',
+        walletId: 'w-sara',
+        recurrence: 'monthly',
+        envelopeId: null,
+      },
+    ],
+    pendingTotal: 1200,
     actuals: [
       actual('ci1', '2026-09-10', 350, 'מתנה מסבתא', {
         isIncome: true,
@@ -145,6 +185,8 @@ const envelopes: EnvelopeView[] = [
     actual: 0,
     expected: 1000,
     showRemaining: true,
+    pending: [],
+    pendingTotal: 0,
     actuals: [],
   },
 ];
@@ -164,6 +206,7 @@ const fixture: DashboardData = {
   totalActualExpenses: 4608,
   totalExpectedExpenses: 16114,
   envelopes,
+  plans: [],
   envelopeChoices: [
     { envelopeId: 'variable', type: 'variable', name: 'הוצאות משתנות' },
     { envelopeId: 'fixed', type: 'fixed', name: 'הוצאות קבועות', categoryLabels: ['ביטוח', 'הלוואה'] },

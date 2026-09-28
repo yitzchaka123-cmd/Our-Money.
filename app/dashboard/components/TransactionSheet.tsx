@@ -121,7 +121,7 @@ export function TransactionSheet({
   );
 }
 
-function ActionRow({
+export function ActionRow({
   icon, label, disabled, danger, onClick,
 }: { icon: React.ReactNode; label: string; disabled?: boolean; danger?: boolean; onClick?: () => void }) {
   return (

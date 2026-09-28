@@ -199,9 +199,9 @@ export function Mic({ size = 14 }: Props) {
 }
 
 /** The card overflow control: three solid dots, not a "⋮" text glyph. */
-export function Kebab({ label }: { label: string }) {
+export function Kebab({ label, onClick }: { label: string; onClick?: () => void }) {
   return (
-    <button className="kebab" type="button" aria-label={label}>
+    <button className="kebab" type="button" aria-label={label} onClick={onClick}>
       <span />
       <span />
       <span />

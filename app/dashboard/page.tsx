@@ -29,7 +29,7 @@ export default async function DashboardPage({
 
   await refreshIfStale();
 
-  return <DashboardView data={await loadDashboard(month)} sessionMemberId={session.memberId} />;
+  return <DashboardView data={await loadDashboard(month, session.memberId)} sessionMemberId={session.memberId} />;
 }
 
 /**

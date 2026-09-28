@@ -68,6 +68,7 @@ export function DashboardView({
           ) : (
             <EnvelopeList
               envelopes={data.envelopes}
+              plans={data.plans}
               envelopeChoices={data.envelopeChoices}
               savingsEnvelopeId={data.savingsEnvelopeId}
               wallet={data.wallet}

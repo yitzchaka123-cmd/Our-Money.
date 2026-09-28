@@ -12,12 +12,18 @@ import {
 } from '@/app/dashboard/components/CashActionSheets';
 import { CashEntrySheet, emptyDraft, type CashEntryDraft } from '@/app/dashboard/components/CashEntrySheet';
 import { EnvelopeCard } from '@/app/dashboard/components/EnvelopeCard';
+import { EnvelopeMenu, type EnvelopeMenuAction } from '@/app/dashboard/components/EnvelopeMenu';
+import { BulkMoveSheet, HistorySheet, PlansListSheet } from '@/app/dashboard/components/EnvelopeSheets';
+import { newPlanDraft, PlanSheet, planToDraft, type PlanDraft } from '@/app/dashboard/components/PlanSheet';
+import { TransferSheet } from '@/app/dashboard/components/TransferSheet';
 import { TransactionSheet, type OpenTransaction } from '@/app/dashboard/components/TransactionSheet';
 import { WalletCard } from '@/app/dashboard/components/WalletCard';
 import { WalletsSheet } from '@/app/dashboard/components/WalletsSheet';
-import { deleteCashEntry, deleteTransfer, markCashSpendAsSavings, type CashKind } from '@/lib/cash/actions';
+import { deleteCashEntry, markCashSpendAsSavings, type CashKind } from '@/lib/cash/actions';
 import type { EnvelopeRef } from '@/lib/cash/envelopes';
-import type { EnvelopeView, WalletMovement, WalletView } from '@/lib/dashboard/data';
+import { settlePlan } from '@/lib/cash/plan-actions';
+import type { CashPlan } from '@/lib/cash/plans';
+import type { EnvelopeView, PendingPlanView, WalletMovement, WalletView } from '@/lib/dashboard/data';
 import type { NormalizedActual } from '@/lib/riseup/envelopes';
 import type { HouseholdMember } from '@/lib/types';
 
@@ -28,6 +34,7 @@ import type { HouseholdMember } from '@/lib/types';
  */
 export function EnvelopeList({
   envelopes,
+  plans = [],
   envelopeChoices,
   savingsEnvelopeId,
   wallet,
@@ -41,6 +48,7 @@ export function EnvelopeList({
   expandAll = false,
 }: {
   envelopes: EnvelopeView[];
+  plans?: CashPlan[];
   envelopeChoices: EnvelopeRef[];
   savingsEnvelopeId: string | null;
   wallet: WalletView;
@@ -57,7 +65,40 @@ export function EnvelopeList({
   const [action, setAction] = useState<CashAction | null>(null);
   const [draft, setDraft] = useState<CashEntryDraft | null>(null);
   const [walletsOpen, setWalletsOpen] = useState(false);
+  const [transfer, setTransfer] = useState<WalletMovement | null>(null);
+  const [planDraft, setPlanDraft] = useState<PlanDraft | null>(null);
+  const [menuFor, setMenuFor] = useState<EnvelopeView | null>(null);
+  const [historyFor, setHistoryFor] = useState<EnvelopeView | null>(null);
+  const [bulkFor, setBulkFor] = useState<EnvelopeView | null>(null);
+  const [plansOpen, setPlansOpen] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const [, start] = useTransition();
+
+  const pendingPlanIds = new Set(envelopes.flatMap((e) => e.pending.map((p) => p.planId)));
+
+  const openPlan = (plan: CashPlan) => setPlanDraft(planToDraft(plan, envelopeChoices, pendingPlanIds.has(plan.id)));
+
+  const openPending = (pending: PendingPlanView) => {
+    const plan = plans.find((p) => p.id === pending.planId);
+    if (plan) openPlan(plan);
+  };
+
+  const settle = (pending: PendingPlanView) =>
+    start(async () => {
+      const result = await settlePlan(pending.planId, month);
+      setNotice(result.ok ? null : result.error);
+    });
+
+  const onMenuPick = (envelope: EnvelopeView, pick: EnvelopeMenuAction) => {
+    setMenuFor(null);
+    const income = envelope.type === 'cashIncome';
+    const envelopeId = income ? null : envelope.envelopeId;
+    if (pick === 'add-cash') openNew(income ? 'income' : 'spend', envelopeId);
+    if (pick === 'add-plan') setPlanDraft(newPlanDraft(income ? 'income' : 'spend', month, today, sessionMemberId, envelopeId));
+    if (pick === 'history') setHistoryFor(envelope);
+    if (pick === 'bulk-move') setBulkFor(envelope);
+    if (pick === 'plans') setPlansOpen(true);
+  };
 
   const walletName = (id: string | null | undefined): string | null =>
     wallet.wallets.find((w) => w.id === (id ?? wallet.wallets.find((x) => x.isDefault)?.id))?.name ?? null;
@@ -87,7 +128,7 @@ export function EnvelopeList({
 
   const openMovement = (m: WalletMovement) => {
     if (m.kind === 'transfer') {
-      if (window.confirm(`למחוק את ההעברה ${m.label}?`)) start(async () => { await deleteTransfer(m.id); });
+      setTransfer(m);
       return;
     }
     setDraft({
@@ -149,6 +190,11 @@ export function EnvelopeList({
                   ? undefined
                   : () => openNew('spend', envelope.envelopeId)
             }
+            pending={envelope.pending}
+            pendingTotal={envelope.pendingTotal}
+            onOpenPlan={openPending}
+            onSettlePlan={settle}
+            onMenu={() => setMenuFor(envelope)}
           />
           {envelope.type === 'fixed' ? (
             <SpendSummary actual={totalActualExpenses} expected={totalExpectedExpenses} />
@@ -200,6 +246,43 @@ export function EnvelopeList({
       ) : null}
 
       {walletsOpen ? <WalletsSheet wallets={wallet.wallets} members={members} onClose={() => setWalletsOpen(false)} /> : null}
+
+      {transfer ? <TransferSheet transfer={transfer} wallets={wallet.wallets} onClose={() => setTransfer(null)} /> : null}
+
+      {menuFor ? (
+        <EnvelopeMenu envelope={menuFor} onPick={(pick) => onMenuPick(menuFor, pick)} onClose={() => setMenuFor(null)} />
+      ) : null}
+      {historyFor ? <HistorySheet envelope={historyFor} month={month} onClose={() => setHistoryFor(null)} /> : null}
+      {bulkFor ? <BulkMoveSheet envelope={bulkFor} envelopes={envelopeChoices} onClose={() => setBulkFor(null)} /> : null}
+      {plansOpen ? (
+        <PlansListSheet
+          plans={plans}
+          onOpen={(plan) => {
+            setPlansOpen(false);
+            openPlan(plan);
+          }}
+          onAdd={(kind) => {
+            setPlansOpen(false);
+            setPlanDraft(newPlanDraft(kind, month, today, sessionMemberId));
+          }}
+          onClose={() => setPlansOpen(false)}
+        />
+      ) : null}
+      {planDraft ? (
+        <PlanSheet
+          draft={planDraft}
+          month={month}
+          envelopes={envelopeChoices}
+          members={members}
+          wallets={wallet.wallets}
+          onClose={() => setPlanDraft(null)}
+        />
+      ) : null}
+      {notice ? (
+        <div className="toast" role="alert" onClick={() => setNotice(null)}>
+          {notice}
+        </div>
+      ) : null}
     </>
   );
 }
