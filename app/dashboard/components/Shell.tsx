@@ -25,6 +25,8 @@ export function Shell({
   userName,
   lastUpdated,
   briefCount,
+  onSearch,
+  onFilter,
   children,
 }: {
   month: string;
@@ -32,6 +34,8 @@ export function Shell({
   userName: string;
   lastUpdated: string | null;
   briefCount: number;
+  onSearch?: () => void;
+  onFilter?: () => void;
   children: ReactNode;
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -54,10 +58,10 @@ export function Shell({
           >
             <Menu />
           </button>
-          <button className="icon-btn" type="button" aria-label="סינון">
+          <button className="icon-btn" type="button" aria-label="סינון" onClick={onFilter}>
             <Filter />
           </button>
-          <button className="icon-btn" type="button" aria-label="חיפוש">
+          <button className="icon-btn" type="button" aria-label="חיפוש" onClick={onSearch}>
             <Search />
           </button>
         </div>

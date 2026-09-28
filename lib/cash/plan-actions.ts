@@ -6,7 +6,7 @@ import { SESSION_EXPIRED_MESSAGE, sessionMember } from '@/lib/auth/member';
 import type { EnvelopeRef } from '@/lib/cash/envelopes';
 import { occurrenceDate, occursIn, planEnvelope, type CashPlan, type PlanKind } from '@/lib/cash/plans';
 import { db } from '@/lib/db/client';
-import { isoDateInIsrael } from '@/lib/intake/parse';
+import { isoDateInIsrael } from '@/lib/dates';
 import type { EnvelopeType } from '@/lib/types';
 
 /**

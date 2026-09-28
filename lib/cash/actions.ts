@@ -51,6 +51,12 @@ export type ActionResult = { ok: true; id: string } | { ok: false; error: string
 
 const DASHBOARD = '/dashboard';
 
+/** Every page that shows cash rows. */
+function refreshPages(): void {
+  revalidatePath(DASHBOARD);
+  revalidatePath('/daily');
+}
+
 function fail(error: string): ActionResult {
   return { ok: false, error };
 }
@@ -141,7 +147,7 @@ export async function addCashEntry(input: CashEntryInput): Promise<ActionResult>
       .select('id')
       .single();
     if (error) return dbFail(error);
-    revalidatePath(DASHBOARD);
+    refreshPages();
     return { ok: true, id: data.id as string };
   }
 
@@ -163,7 +169,7 @@ export async function addCashEntry(input: CashEntryInput): Promise<ActionResult>
     .select('id')
     .single();
   if (error) return dbFail(error);
-  revalidatePath(DASHBOARD);
+  refreshPages();
   return { ok: true, id: data.id as string };
 }
 
@@ -227,7 +233,7 @@ export async function updateCashEntry(id: string, input: CashEntryInput): Promis
     if (error) return dbFail(error);
   }
 
-  revalidatePath(DASHBOARD);
+  refreshPages();
   return { ok: true, id };
 }
 
@@ -245,8 +251,22 @@ export async function deleteCashEntry(id: string, kind: CashKind): Promise<Actio
           .update({ status: 'deleted', updated_at: new Date().toISOString() })
           .eq('id', id);
   if (error) return dbFail(error);
-  revalidatePath(DASHBOARD);
+  refreshPages();
   return { ok: true, id };
+}
+
+/** "Yes, that's right" for entries the AI intake was unsure about. */
+export async function confirmCashSpends(ids: string[]): Promise<ActionResult> {
+  if (!(await sessionMember())) return expired();
+  if (ids.length === 0) return fail('לא נבחרו רישומים.');
+  const { error } = await db()
+    .from('cash_spends')
+    .update({ status: 'confirmed', updated_at: new Date().toISOString() })
+    .in('id', ids)
+    .eq('status', 'needs_review');
+  if (error) return dbFail(error);
+  refreshPages();
+  return { ok: true, id: ids[0]! };
 }
 
 /** RiseUp's "להוסיף הערה". */
@@ -259,7 +279,7 @@ export async function updateCashNote(id: string, kind: CashKind, note: string): 
       ? await supabase.from('cash_topups').update({ note: value, updated_at: new Date().toISOString() }).eq('id', id)
       : await supabase.from('cash_spends').update({ note: value, updated_at: new Date().toISOString() }).eq('id', id);
   if (error) return dbFail(error);
-  revalidatePath(DASHBOARD);
+  refreshPages();
   return { ok: true, id };
 }
 
@@ -289,7 +309,7 @@ export async function moveCashSpendToEnvelope(id: string, envelopeId: string): P
     })
     .eq('id', id);
   if (error) return dbFail(error);
-  revalidatePath(DASHBOARD);
+  refreshPages();
   return { ok: true, id };
 }
 
@@ -324,7 +344,7 @@ export async function moveCashSpendsToEnvelope(ids: string[], envelopeId: string
     })
     .in('id', ids);
   if (error) return dbFail(error);
-  revalidatePath(DASHBOARD);
+  refreshPages();
   return { ok: true, id: envelopeId };
 }
 
@@ -409,7 +429,7 @@ export async function splitCashEntry(id: string, kind: CashKind, parts: SplitPar
     if (insertError) return dbFail(insertError);
   }
 
-  revalidatePath(DASHBOARD);
+  refreshPages();
   return { ok: true, id };
 }
 
@@ -439,7 +459,7 @@ export async function moveCashEntryToMonth(id: string, kind: CashKind, month: st
 
   const { error } = await supabase.from(table).update(patch).eq('id', id);
   if (error) return dbFail(error);
-  revalidatePath(DASHBOARD);
+  refreshPages();
   return { ok: true, id };
 }
 
@@ -459,7 +479,7 @@ export async function createWallet(name: string, memberId: string | null): Promi
     .select('id')
     .single();
   if (error) return dbFail(error);
-  revalidatePath(DASHBOARD);
+  refreshPages();
   return { ok: true, id: data.id as string };
 }
 
@@ -468,7 +488,7 @@ export async function renameWallet(id: string, name: string): Promise<ActionResu
   if (!name.trim()) return fail('צריך שם לארנק.');
   const { error } = await db().from('cash_wallets').update({ name: name.trim() }).eq('id', id);
   if (error) return dbFail(error);
-  revalidatePath(DASHBOARD);
+  refreshPages();
   return { ok: true, id };
 }
 
@@ -480,7 +500,7 @@ export async function archiveWallet(id: string): Promise<ActionResult> {
   if (data?.is_default) return fail('אי אפשר לארכב את ארנק ברירת המחדל — קודם בחרו ארנק אחר כברירת מחדל.');
   const { error } = await supabase.from('cash_wallets').update({ is_archived: true }).eq('id', id);
   if (error) return dbFail(error);
-  revalidatePath(DASHBOARD);
+  refreshPages();
   return { ok: true, id };
 }
 
@@ -492,7 +512,7 @@ export async function setDefaultWallet(id: string): Promise<ActionResult> {
   if (clearError) return dbFail(clearError);
   const { error } = await supabase.from('cash_wallets').update({ is_default: true }).eq('id', id);
   if (error) return dbFail(error);
-  revalidatePath(DASHBOARD);
+  refreshPages();
   return { ok: true, id };
 }
 
@@ -523,7 +543,7 @@ export async function transferBetweenWallets(input: TransferInput): Promise<Acti
     .select('id')
     .single();
   if (error) return dbFail(error);
-  revalidatePath(DASHBOARD);
+  refreshPages();
   return { ok: true, id: data.id as string };
 }
 
@@ -543,7 +563,7 @@ export async function updateTransfer(id: string, input: TransferInput): Promise<
     })
     .eq('id', id);
   if (error) return dbFail(error);
-  revalidatePath(DASHBOARD);
+  refreshPages();
   return { ok: true, id };
 }
 
@@ -551,7 +571,7 @@ export async function deleteTransfer(id: string): Promise<ActionResult> {
   if (!(await sessionMember())) return expired();
   const { error } = await db().from('cash_transfers').update({ is_dismissed: true }).eq('id', id);
   if (error) return dbFail(error);
-  revalidatePath(DASHBOARD);
+  refreshPages();
   return { ok: true, id };
 }
 
@@ -563,7 +583,7 @@ const MANUAL_REFRESH_FLOOR_MS = 30 * 1000;
 export async function refreshFromRiseup(): Promise<{ ok: boolean; error: string | null; envelopes: number }> {
   if (!(await sessionMember())) return { ok: false, error: SESSION_EXPIRED_MESSAGE, envelopes: 0 };
   const outcome = await syncIfStale(MANUAL_REFRESH_FLOOR_MS);
-  revalidatePath(DASHBOARD);
+  refreshPages();
   if (outcome.skipped) return { ok: true, error: null, envelopes: 0 };
   const { result } = outcome;
   if (!result.error) return { ok: true, error: null, envelopes: result.envelopesUpserted };

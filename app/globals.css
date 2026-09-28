@@ -1471,6 +1471,98 @@ a {
   color: var(--ink-2);
 }
 
+/* --- daily review ---------------------------------------------------------- */
+.daily-meta {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 14px;
+}
+
+.daily-transcript {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.daily-date {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.daily-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 14px;
+}
+
+.daily-link {
+  color: var(--primary);
+  font-weight: 700;
+  font-size: 14px;
+  padding: 4px 0;
+}
+
+.daily-link--danger {
+  color: var(--alert);
+  margin-inline-start: auto;
+}
+
+/* --- search ---------------------------------------------------------------- */
+.search-sheet {
+  min-height: 70vh;
+}
+
+.search-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.search-input {
+  flex: 1;
+  font: inherit;
+  font-size: 16px;
+  padding: 12px 16px;
+  border: 1px solid #d9d9d9;
+  border-radius: 999px;
+  background: var(--surface-sunken);
+  color: var(--ink);
+}
+
+.search-filters {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.search-summary {
+  margin: 4px 0 8px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.search-group {
+  margin: 0 calc(-1 * var(--card-pad));
+}
+
+.search-month {
+  margin: 14px var(--card-pad) 6px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.search-row:disabled {
+  color: inherit;
+  opacity: 1;
+}
+
+.search-detail {
+  color: var(--ink-2);
+}
+
 /* --- toast ----------------------------------------------------------------- */
 .toast {
   position: fixed;

@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { z } from 'zod';
 
+import { hebrewWeekday, isoDateInIsrael } from '@/lib/dates';
 import { env } from '@/lib/env';
 import { activeCategories, CATCH_ALL_CATEGORY } from '@/lib/intake/categories';
 import type { Confidence } from '@/lib/types';
@@ -102,24 +103,7 @@ function buildSchema(categories: string[], wallets: string[]) {
   });
 }
 
-/** ISO date for a Date, in the Israel timezone the couple actually lives in. */
-export function isoDateInIsrael(now: Date = new Date()): string {
-  // en-CA renders as YYYY-MM-DD, which is exactly the shape we store.
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Jerusalem',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(now);
-}
-
-/** Weekday for an ISO date, so "ביום ראשון" resolves against the right week. */
-export function hebrewWeekday(isoDate: string): string {
-  return new Intl.DateTimeFormat('he-IL', {
-    timeZone: 'UTC',
-    weekday: 'long',
-  }).format(new Date(`${isoDate}T12:00:00Z`));
-}
+export { hebrewWeekday, isoDateInIsrael } from '@/lib/dates';
 
 /**
  * Guard against a hallucinated or mis-resolved date. A future date is always

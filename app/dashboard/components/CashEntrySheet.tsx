@@ -8,7 +8,7 @@ import { Close } from '@/app/dashboard/components/icons';
 import { addCashEntry, deleteCashEntry, updateCashEntry, type CashEntryInput, type CashKind } from '@/lib/cash/actions';
 import type { EnvelopeRef } from '@/lib/cash/envelopes';
 import type { WalletSummary } from '@/lib/dashboard/data';
-import { isoDateInIsrael } from '@/lib/intake/parse';
+import { isoDateInIsrael } from '@/lib/dates';
 import type { EnvelopeType, HouseholdMember } from '@/lib/types';
 
 export interface CashEntryDraft {

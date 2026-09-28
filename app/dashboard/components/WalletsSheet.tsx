@@ -12,7 +12,7 @@ import {
   transferBetweenWallets,
 } from '@/lib/cash/actions';
 import type { WalletSummary } from '@/lib/dashboard/data';
-import { isoDateInIsrael } from '@/lib/intake/parse';
+import { isoDateInIsrael } from '@/lib/dates';
 import type { HouseholdMember } from '@/lib/types';
 
 /** Manage wallets, and move cash between them. */

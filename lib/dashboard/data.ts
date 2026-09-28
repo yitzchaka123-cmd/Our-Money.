@@ -8,7 +8,7 @@ import {
   type PlanSettlement,
 } from '@/lib/cash/plans';
 import { db } from '@/lib/db/client';
-import { isoDateInIsrael } from '@/lib/intake/parse';
+import { isoDateInIsrael } from '@/lib/dates';
 import { monthBounds, walletBalances, walletState } from '@/lib/reconcile';
 import {
   ENVELOPE_TITLES,

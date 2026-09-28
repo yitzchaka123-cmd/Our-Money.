@@ -1,13 +1,14 @@
 import { cookies } from 'next/headers';
 
-import { Amount } from '@/app/dashboard/components/Amount';
-import { shortDate } from '@/app/dashboard/components/EnvelopeCard';
-import { ChevronRight, Heart, Mic, SparkleBubble } from '@/app/dashboard/components/icons';
+import { DailyList } from '@/app/daily/DailyList';
+import { ChevronRight, Heart, SparkleBubble } from '@/app/dashboard/components/icons';
 import { SESSION_COOKIE, verifySessionToken } from '@/lib/auth/session';
+import { envelopeChoices, type EnvelopeRef } from '@/lib/cash/envelopes';
+import type { WalletSummary } from '@/lib/dashboard/data';
 import { db } from '@/lib/db/client';
-import { isoDateInIsrael } from '@/lib/intake/parse';
-import { friendlyDate } from '@/lib/money';
-import type { CashSpend } from '@/lib/types';
+import { isoDateInIsrael } from '@/lib/dates';
+import { ENVELOPE_TITLES } from '@/lib/riseup/envelopes';
+import type { CashSpend, CashWallet, EnvelopeType } from '@/lib/types';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -23,7 +24,8 @@ export default async function DailyPage() {
   if (!token || !verifySessionToken(token)) return <SignedOut />;
 
   const supabase = db();
-  const [{ data: pending }, { data: recent }, { data: members }] = await Promise.all([
+  const today = isoDateInIsrael();
+  const [{ data: pending }, { data: recent }, { data: members }, { data: envelopeRows }, { data: walletRows }] = await Promise.all([
     supabase
       .from('cash_spends')
       .select('*')
@@ -36,11 +38,24 @@ export default async function DailyPage() {
       .order('created_at', { ascending: false })
       .limit(15),
     supabase.from('household_members').select('id, display_name'),
+    supabase.from('riseup_envelopes').select('envelope_id, envelope_type, name').eq('month', today.slice(0, 7)),
+    supabase.from('cash_wallets').select('*').eq('is_archived', false).order('position'),
   ]);
 
-  const names = new Map((members ?? []).map((m) => [m.id as string, m.display_name as string]));
-  const today = isoDateInIsrael();
+  const memberList = (members ?? []) as { id: string; display_name: string }[];
   const toReview = (pending ?? []) as CashSpend[];
+  const refs: EnvelopeRef[] = (envelopeRows ?? []).map((row) => ({
+    envelopeId: row.envelope_id as string,
+    type: row.envelope_type as EnvelopeType,
+    name: (row.name as string | null) ?? ENVELOPE_TITLES[row.envelope_type as EnvelopeType] ?? '',
+  }));
+  const wallets: WalletSummary[] = ((walletRows ?? []) as CashWallet[]).map((w) => ({
+    id: w.id,
+    name: w.name,
+    balance: 0,
+    isDefault: w.is_default,
+    memberName: null,
+  }));
 
   return (
     <div className="app">
@@ -66,86 +81,26 @@ export default async function DailyPage() {
           <p style={{ margin: 0 }}>אין רישומים שממתינים לאישור. אפשר להמשיך לרשום בבוט.</p>
         </div>
       ) : (
-        <>
-          <div className="tip">
-            <p className="tip-title">
-              <span style={{ color: 'var(--primary)' }}>
-                <Heart />
-              </span>
-              {toReview.length} רישומים לאישור
-            </p>
-            <p style={{ margin: 0 }}>
-              לא הייתי בטוח בסכום או בקטגוריה. אישור או תיקון מהיר בבוט — <strong>/undo</strong>{' '}
-              מוחק את האחרון.
-            </p>
-          </div>
-
-          <div className="section">
-            {toReview.map((spend) => (
-              <SpendCard key={spend.id} spend={spend} names={names} today={today} pending />
-            ))}
-          </div>
-        </>
+        <div className="tip">
+          <p className="tip-title">
+            <span style={{ color: 'var(--primary)' }}>
+              <Heart />
+            </span>
+            {toReview.length} רישומים לאישור
+          </p>
+          <p style={{ margin: 0 }}>לא הייתי בטוח בסכום או בקטגוריה. אשרו, תקנו או מחקו — כאן או בבוט.</p>
+        </div>
       )}
 
-      <h2 className="page-title" style={{ fontSize: 20 }}>
-        נרשם לאחרונה
-      </h2>
-      <div className="section">
-        {((recent ?? []) as CashSpend[]).map((spend) => (
-          <SpendCard key={spend.id} spend={spend} names={names} today={today} />
-        ))}
-        {(recent ?? []).length === 0 ? (
-          <article className="card">
-            <div className="card-body notice">
-              <p>עוד לא נרשמו הוצאות מזומן.</p>
-            </div>
-          </article>
-        ) : null}
-      </div>
+      <DailyList
+        toReview={toReview}
+        recent={(recent ?? []) as CashSpend[]}
+        members={memberList}
+        envelopes={envelopeChoices(refs)}
+        wallets={wallets}
+        today={today}
+      />
     </div>
-  );
-}
-
-function SpendCard({
-  spend,
-  names,
-  today,
-  pending,
-}: {
-  spend: CashSpend;
-  names: Map<string, string>;
-  today: string;
-  pending?: boolean;
-}) {
-  return (
-    <article className="card envelope" data-type={pending ? 'cashUnlogged' : 'cash'}>
-      <div className="card-body">
-        <div className="card-head" style={{ marginBottom: 10 }}>
-          <h3 className="card-title" style={{ fontSize: 17 }}>
-            {spend.note || spend.category}
-          </h3>
-          <Amount value={Number(spend.amount_ils)} className="figure-actual" />
-        </div>
-        <p style={{ margin: 0, color: 'var(--ink-2)', fontSize: 14 }}>
-          {spend.input_kind === 'voice' ? (
-            <span style={{ marginInlineEnd: 6, verticalAlign: 'middle' }}>
-              <Mic />
-            </span>
-          ) : null}
-          {spend.category} · {names.get(spend.member_id) ?? '—'} ·{' '}
-          {friendlyDate(spend.spent_at, today)}
-        </p>
-        {spend.transcript ? (
-          <p style={{ margin: '8px 0 0', color: 'var(--muted)', fontSize: 14 }}>
-            “{spend.transcript}”
-          </p>
-        ) : null}
-        <p style={{ margin: '8px 0 0', color: 'var(--muted)', fontSize: 13 }}>
-          {shortDate(spend.spent_at)}
-        </p>
-      </div>
-    </article>
   );
 }
 

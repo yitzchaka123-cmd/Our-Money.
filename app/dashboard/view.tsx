@@ -1,11 +1,16 @@
+'use client';
+
+import { useState } from 'react';
+
 import { DailyBriefBlob } from '@/app/dashboard/components/Blob';
 import { EnvelopeList } from '@/app/dashboard/components/EnvelopeList';
 import { HeroCard } from '@/app/dashboard/components/HeroCard';
 import { RefreshButton } from '@/app/dashboard/components/RefreshButton';
+import { SearchSheet } from '@/app/dashboard/components/SearchSheet';
 import { Shell } from '@/app/dashboard/components/Shell';
 import { ChevronLeft, Clover } from '@/app/dashboard/components/icons';
 import type { DashboardData } from '@/lib/dashboard/data';
-import { isoDateInIsrael } from '@/lib/intake/parse';
+import { isoDateInIsrael } from '@/lib/dates';
 import { monthLabel } from '@/lib/money';
 
 /**
@@ -25,6 +30,7 @@ export function DashboardView({
 }) {
   const today = isoDateInIsrael();
   const monthName = monthLabel(data.month).split(' ')[0] ?? data.month;
+  const [search, setSearch] = useState<'search' | 'filter' | null>(null);
 
   return (
     <Shell
@@ -33,6 +39,8 @@ export function DashboardView({
       userName={data.userName}
       lastUpdated={data.lastUpdated}
       briefCount={data.briefCount}
+      onSearch={() => setSearch('search')}
+      onFilter={() => setSearch('filter')}
     >
       <div className="app">
         <div className="steps-section">
@@ -86,6 +94,18 @@ export function DashboardView({
       </div>
 
       <DailyBriefBlob count={data.briefCount} />
+
+      {search ? (
+        <SearchSheet
+          month={data.month}
+          focus={search}
+          envelopes={data.envelopeChoices}
+          members={data.members}
+          wallets={data.wallet.wallets}
+          sessionMemberId={sessionMemberId}
+          onClose={() => setSearch(null)}
+        />
+      ) : null}
     </Shell>
   );
 }
