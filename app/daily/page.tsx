@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 
+import { SignedOut } from '@/app/SignedOut';
 import { DailyList } from '@/app/daily/DailyList';
 import { ChevronRight, Heart, SparkleBubble } from '@/app/dashboard/components/icons';
 import { SESSION_COOKIE, verifySessionToken } from '@/lib/auth/session';
@@ -100,23 +101,6 @@ export default async function DailyPage() {
         wallets={wallets}
         today={today}
       />
-    </div>
-  );
-}
-
-function SignedOut() {
-  return (
-    <div className="app">
-      <div className="section">
-        <div className="card">
-          <div className="card-body notice">
-            <h1>צריך קישור כניסה</h1>
-            <p>
-              שלחו <strong>/dashboard</strong> לבוט בטלגרם.
-            </p>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

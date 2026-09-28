@@ -11,6 +11,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Coins,
+  Download,
   Filter,
   Gear,
   Menu,
@@ -113,6 +114,7 @@ export function Shell({
           <div className="scrim" onClick={() => setDrawerOpen(false)} aria-hidden="true" />
           <aside className="drawer" role="dialog" aria-modal="true" aria-label="תפריט">
             <DrawerContent
+              month={month}
               userName={userName}
               lastUpdated={lastUpdated}
               briefCount={briefCount}
@@ -152,11 +154,18 @@ function MonthPicker({ month, months }: { month: string; months: string[] }) {
   );
 }
 
+function yearBefore(month: string): string {
+  const [year, monthNumber] = month.split('-').map(Number);
+  return new Date(Date.UTC(year!, monthNumber! - 12, 1)).toISOString().slice(0, 7);
+}
+
 function DrawerContent({
+  month,
   userName,
   lastUpdated,
   briefCount,
 }: {
+  month: string;
   userName: string;
   lastUpdated: string | null;
   briefCount: number;
@@ -190,6 +199,14 @@ function DrawerContent({
         <span>המזומן היומי</span>
         <span className="drawer-chip">חדש!</span>
         {briefCount > 0 ? <span className="drawer-badge">{briefCount}</span> : null}
+      </a>
+      <a className="drawer-link" href={`/api/export?from=${month}&to=${month}`} download>
+        <Download />
+        <span>ייצוא {monthLabel(month).split(' ')[0]} לאקסל</span>
+      </a>
+      <a className="drawer-link" href={`/api/export?from=${yearBefore(month)}&to=${month}`} download>
+        <Download />
+        <span>ייצוא השנה האחרונה</span>
       </a>
     </>
   );

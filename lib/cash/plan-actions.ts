@@ -3,11 +3,9 @@
 import { revalidatePath } from 'next/cache';
 
 import { SESSION_EXPIRED_MESSAGE, sessionMember } from '@/lib/auth/member';
-import type { EnvelopeRef } from '@/lib/cash/envelopes';
-import { occurrenceDate, occursIn, planEnvelope, type CashPlan, type PlanKind } from '@/lib/cash/plans';
+import { monthEnvelopeRefs, settlePlanOccurrence, skipPlanOccurrence } from '@/lib/cash/plan-store';
+import type { PlanKind } from '@/lib/cash/plans';
 import { db } from '@/lib/db/client';
-import { isoDateInIsrael } from '@/lib/dates';
-import type { EnvelopeType } from '@/lib/types';
 
 /**
  * Expected cash from the dashboard: set up a plan, change it, stop it, skip a
@@ -55,23 +53,11 @@ function validate(input: PlanInput): string | null {
   return null;
 }
 
-async function monthRefs(month: string): Promise<EnvelopeRef[]> {
-  const { data } = await db()
-    .from('riseup_envelopes')
-    .select('envelope_id, envelope_type, name')
-    .eq('month', month);
-  return (data ?? []).map((row) => ({
-    envelopeId: row.envelope_id as string,
-    type: row.envelope_type as EnvelopeType,
-    name: (row.name as string | null) ?? '',
-  }));
-}
-
 async function toRow(input: PlanInput) {
   let envelopeType: string | null = null;
   let envelopeName: string | null = null;
   if (input.kind === 'spend' && input.envelopeId) {
-    const ref = (await monthRefs(input.startsMonth)).find((r) => r.envelopeId === input.envelopeId);
+    const ref = (await monthEnvelopeRefs(input.startsMonth)).find((r) => r.envelopeId === input.envelopeId);
     if (ref && ref.type !== 'variableIncome') {
       envelopeType = ref.type;
       envelopeName = ref.type === 'trackingCategory' ? ref.name : null;
@@ -150,10 +136,11 @@ export async function stopPlan(id: string, fromMonth: string): Promise<PlanResul
 export async function skipPlanMonth(id: string, month: string): Promise<PlanResult> {
   if (!(await sessionMember())) return fail(SESSION_EXPIRED_MESSAGE);
   if (!MONTH.test(month)) return fail('חודש לא תקין.');
-  const { error } = await db()
-    .from('cash_plan_skips')
-    .upsert({ plan_id: id, month }, { onConflict: 'plan_id,month' });
-  if (error) return dbFail(error);
+  try {
+    await skipPlanOccurrence(id, month);
+  } catch (error) {
+    return dbFail({ message: error instanceof Error ? error.message : String(error) });
+  }
   revalidatePath(DASHBOARD);
   return { ok: true, id };
 }
@@ -169,68 +156,18 @@ export async function unskipPlanMonth(id: string, month: string): Promise<PlanRe
 /**
  * "שולם" / "התקבל": record the real entry for this month's occurrence. The
  * amount defaults to the plan's; a different amount is the truth and replaces
- * it in the forecast. Dated today for the current month, otherwise on the
- * plan's day in that month.
+ * it in the forecast.
  */
 export async function settlePlan(id: string, month: string, amountIls?: number): Promise<PlanResult> {
   const signedIn = await sessionMember();
   if (!signedIn) return fail(SESSION_EXPIRED_MESSAGE);
   if (!MONTH.test(month)) return fail('חודש לא תקין.');
-
-  const supabase = db();
-  const { data: row } = await supabase.from('cash_plans').select('*').eq('id', id).maybeSingle();
-  if (!row) return fail('התכנון לא נמצא.');
-  const plan = { ...(row as CashPlan), amount_ils: Number(row.amount_ils) };
-  if (!occursIn(plan, month)) return fail('התכנון לא פעיל בחודש הזה.');
-
-  const amount = amountIls ?? plan.amount_ils;
-  if (!Number.isFinite(amount) || amount <= 0) return fail('צריך סכום גדול מאפס.');
-
-  const today = isoDateInIsrael();
-  const date = today.startsWith(month) ? today : occurrenceDate(plan.day_of_month, month);
-  const memberId = plan.member_id ?? signedIn;
-
-  if (plan.kind === 'income') {
-    const { data, error } = await supabase
-      .from('cash_topups')
-      .insert({
-        amount_ils: amount,
-        occurred_at: date,
-        source: 'cash_income',
-        category: plan.category,
-        note: plan.note,
-        member_id: memberId,
-        input_kind: 'web',
-        wallet_id: plan.wallet_id,
-        plan_id: plan.id,
-      })
-      .select('id')
-      .single();
-    if (error) return dbFail(error);
+  try {
+    const result = await settlePlanOccurrence(id, month, signedIn, amountIls);
+    if (!result.ok) return fail(result.error);
     revalidatePath(DASHBOARD);
-    return { ok: true, id: data.id as string };
+    return { ok: true, id: result.id };
+  } catch (error) {
+    return dbFail({ message: error instanceof Error ? error.message : String(error) });
   }
-
-  const target = planEnvelope(plan, await monthRefs(month));
-  const { data, error } = await supabase
-    .from('cash_spends')
-    .insert({
-      member_id: memberId,
-      amount_ils: amount,
-      category: target?.type === 'trackingCategory' ? target.name : plan.category,
-      note: plan.note,
-      spent_at: date,
-      status: 'confirmed',
-      confidence: 'high',
-      input_kind: 'web',
-      wallet_id: plan.wallet_id,
-      envelope_id: target?.envelopeId ?? null,
-      envelope_type: target?.type ?? null,
-      plan_id: plan.id,
-    })
-    .select('id')
-    .single();
-  if (error) return dbFail(error);
-  revalidatePath(DASHBOARD);
-  return { ok: true, id: data.id as string };
 }

@@ -23,6 +23,10 @@ describe('callback data', () => {
     { kind: 'pick_category', spendId: UUID },
     { kind: 'confirm', spendId: UUID },
     { kind: 'set_category', spendId: UUID, categoryIndex: 7 },
+    { kind: 'delete_income', spendId: UUID },
+    { kind: 'dismiss_topup', spendId: UUID },
+    { kind: 'settle_plan', spendId: UUID, month: '2026-09' },
+    { kind: 'skip_plan', spendId: UUID, month: '2026-12' },
   ] as const)('round-trips %j', (action) => {
     expect(decodeCallback(encodeCallback(action))).toEqual(action);
   });
@@ -40,6 +44,8 @@ describe('callback data', () => {
     expect(decodeCallback('')).toBeNull();
     expect(decodeCallback(`sc:${packUuid(UUID)}:-1`)).toBeNull();
     expect(decodeCallback(`sc:${packUuid(UUID)}:abc`)).toBeNull();
+    expect(decodeCallback(`sp:${packUuid(UUID)}`)).toBeNull();
+    expect(decodeCallback(`sp:${packUuid(UUID)}:2026-09`)).toBeNull();
   });
 
   it('rejects an unknown prefix', () => {

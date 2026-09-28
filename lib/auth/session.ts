@@ -3,7 +3,10 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import { env } from '@/lib/env';
 
 export const SESSION_COOKIE = 'om_session';
-const SESSION_DAYS = 7;
+/** A sign-in link travels through chat history, so it lives a week. */
+const LINK_DAYS = 7;
+/** The cookie is httpOnly and never leaves the device, so it can live longer. */
+const COOKIE_DAYS = 30;
 
 interface SessionPayload {
   memberId: string;
@@ -24,10 +27,10 @@ function sign(payload: string): string {
  * so possession of the link is the whole credential — hence the short life and
  * the member binding.
  */
-export function createSessionToken(memberId: string, now = Date.now()): string {
+export function createSessionToken(memberId: string, now = Date.now(), days = LINK_DAYS): string {
   const payload: SessionPayload = {
     memberId,
-    exp: Math.floor(now / 1000) + SESSION_DAYS * 24 * 60 * 60,
+    exp: Math.floor(now / 1000) + days * 24 * 60 * 60,
   };
   const encoded = base64url(JSON.stringify(payload));
   return `${encoded}.${sign(encoded)}`;
@@ -57,4 +60,17 @@ export function verifySessionToken(token: string, now = Date.now()): SessionPayl
   return payload;
 }
 
-export const SESSION_MAX_AGE = SESSION_DAYS * 24 * 60 * 60;
+export const SESSION_MAX_AGE = COOKIE_DAYS * 24 * 60 * 60;
+
+/** The token the cookie holds: fresh, and good for the cookie's whole life. */
+export function createCookieToken(memberId: string, now = Date.now()): string {
+  return createSessionToken(memberId, now, COOKIE_DAYS);
+}
+
+export const SESSION_COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: true,
+  sameSite: 'lax' as const,
+  path: '/',
+  maxAge: SESSION_MAX_AGE,
+};

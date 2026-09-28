@@ -92,6 +92,11 @@ export const env = {
     return required('APP_BASE_URL', 'e.g. https://our-money.vercel.app').replace(/\/$/, '');
   },
 
+  /** The evening "anything in cash today?" message. On unless set to "off". */
+  get eveningNudgeEnabled(): boolean {
+    return optional('EVENING_NUDGE', 'on').toLowerCase() !== 'off';
+  },
+
   get cronSecret(): string {
     return required('CRON_SECRET', 'Protects the RiseUp sync endpoint.');
   },

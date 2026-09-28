@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
 
-import { SESSION_COOKIE, SESSION_MAX_AGE, verifySessionToken } from '@/lib/auth/session';
+import {
+  createCookieToken,
+  SESSION_COOKIE,
+  SESSION_COOKIE_OPTIONS,
+  verifySessionToken,
+} from '@/lib/auth/session';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -14,17 +19,14 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(request: Request): Promise<NextResponse> {
   const token = new URL(request.url).searchParams.get('t');
-  if (!token || !verifySessionToken(token)) {
+  const session = token ? verifySessionToken(token) : null;
+  if (!session) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
+  // The cookie gets its own token rather than the one from the URL, so the
+  // link can expire on its own schedule without signing anyone out.
   const response = NextResponse.redirect(new URL('/dashboard', request.url));
-  response.cookies.set(SESSION_COOKIE, token, {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'lax',
-    path: '/',
-    maxAge: SESSION_MAX_AGE,
-  });
+  response.cookies.set(SESSION_COOKIE, createCookieToken(session.memberId), SESSION_COOKIE_OPTIONS);
   return response;
 }

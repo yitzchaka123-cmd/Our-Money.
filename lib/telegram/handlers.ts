@@ -1,4 +1,6 @@
+import { issueLoginCode } from '@/lib/auth/codes';
 import { createSessionToken } from '@/lib/auth/session';
+import { loadPlan, settlePlanOccurrence, skipPlanOccurrence } from '@/lib/cash/plan-store';
 import { env } from '@/lib/env';
 import { activeCategories } from '@/lib/intake/categories';
 import { isoDateInIsrael, parseIntake } from '@/lib/intake/parse';
@@ -172,17 +174,34 @@ async function handleCommand(
     }
 
     case '/dashboard': {
+      // A sign-in link is personal. In the group, send it privately instead.
+      const privateChat = message.chat.type === 'private' ? chatId : message.from?.id;
+      if (!privateChat) return;
       const token = createSessionToken(member.id);
-      await sendMessage(
-        chatId,
+      const code = await issueLoginCode(member.id);
+      const sent = await sendMessage(
+        privateChat,
         [
           '📊 <b>הדאשבורד שלכם</b>',
           '',
           `${env.appBaseUrl}/api/auth/telegram?t=${token}`,
           '',
-          'הקישור אישי ותקף לשבוע. אל תעבירו אותו הלאה.',
+          `קוד לאפליקציה שעל מסך הבית: <code>${code}</code>`,
+          '',
+          'הקישור אישי ותקף לשבוע, הקוד לעשר דקות. אל תעבירו אותם הלאה.',
         ].join('\n'),
+      ).then(
+        () => true,
+        () => false,
       );
+      if (message.chat.type !== 'private') {
+        await sendMessage(
+          chatId,
+          sent
+            ? 'שלחתי לך קישור כניסה בהודעה פרטית 🔒'
+            : 'כדי לקבל קישור כניסה, פתחו איתי שיחה פרטית ושלחו שם /dashboard.',
+        );
+      }
       return;
     }
 
@@ -419,6 +438,35 @@ async function handleCallback(update: TelegramUpdate): Promise<void> {
   const action = decodeCallback(query.data);
   if (!action) {
     await answerCallbackQuery(query.id);
+    return;
+  }
+
+  // Expected-cash buttons from the evening nudge act on a plan's month.
+  if (action.kind === 'settle_plan' || action.kind === 'skip_plan') {
+    const chat = query.message.chat.id;
+    const messageId = query.message.message_id;
+    if (action.kind === 'settle_plan') {
+      const result = await settlePlanOccurrence(action.spendId, action.month, member.id);
+      if (!result.ok) {
+        await answerCallbackQuery(query.id, result.error);
+        return;
+      }
+      await editMessageText(
+        chat,
+        messageId,
+        `✅ נרשם: ${formatIls(result.amountIls)} · ${escapeHtml(result.plan.note || result.plan.category)}`,
+      );
+      await answerCallbackQuery(query.id, 'נרשם');
+      return;
+    }
+    const plan = await loadPlan(action.spendId);
+    if (!plan) {
+      await answerCallbackQuery(query.id, 'התכנון כבר לא קיים');
+      return;
+    }
+    await skipPlanOccurrence(plan.id, action.month);
+    await editMessageText(chat, messageId, `⏭ לא החודש: ${escapeHtml(plan.note || plan.category)}`);
+    await answerCallbackQuery(query.id, 'דילגתי');
     return;
   }
 

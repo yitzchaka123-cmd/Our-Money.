@@ -198,6 +198,16 @@ export function Mic({ size = 14 }: Props) {
   );
 }
 
+export function Download({ size = 22 }: Props) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 4v11" />
+      <path d="m7 10 5 5 5-5" />
+      <path d="M5 19h14" />
+    </svg>
+  );
+}
+
 /** The card overflow control: three solid dots, not a "⋮" text glyph. */
 export function Kebab({ label, onClick }: { label: string; onClick?: () => void }) {
   return (

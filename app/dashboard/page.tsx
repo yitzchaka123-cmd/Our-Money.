@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 
+import { SignedOut } from '@/app/SignedOut';
 import { SESSION_COOKIE, verifySessionToken } from '@/lib/auth/session';
 import { currentMonth, loadDashboard } from '@/lib/dashboard/data';
 import { syncIfStale } from '@/lib/riseup/sync';
@@ -16,14 +17,14 @@ const FRESH_FOR_MS = 10 * 60 * 1000;
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string }>;
+  searchParams: Promise<{ month?: string; login?: string }>;
 }) {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
   const session = token ? verifySessionToken(token) : null;
-  if (!session) return <SignedOut />;
-
   const params = await searchParams;
+  if (!session) return <SignedOut login={params.login} />;
+
   const month =
     params.month && /^\d{4}-\d{2}$/.test(params.month) ? params.month : currentMonth();
 
@@ -44,17 +45,4 @@ async function refreshIfStale(): Promise<void> {
   } catch (error) {
     console.error('Refresh on open failed', error);
   }
-}
-
-function SignedOut() {
-  return (
-    <div className="shell">
-      <div className="card notice">
-        <h1>צריך קישור כניסה</h1>
-        <p>
-          שלחו <strong>/dashboard</strong> לבוט בטלגרם והוא ישלח לכם קישור אישי שתקף לשבוע.
-        </p>
-      </div>
-    </div>
-  );
 }

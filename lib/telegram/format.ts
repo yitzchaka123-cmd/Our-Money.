@@ -18,7 +18,10 @@ export type CallbackAction =
   /** Delete a cash income (a cash_topups row); spendId carries the top-up id. */
   | { kind: 'delete_income'; spendId: string }
   /** "Not a withdrawal": dismiss a detected withdrawal top-up. */
-  | { kind: 'dismiss_topup'; spendId: string };
+  | { kind: 'dismiss_topup'; spendId: string }
+  /** For these two, spendId carries the plan id and month the occurrence. */
+  | { kind: 'settle_plan'; spendId: string; month: string }
+  | { kind: 'skip_plan'; spendId: string; month: string };
 
 const PREFIX = {
   delete: 'del',
@@ -27,6 +30,8 @@ const PREFIX = {
   confirm: 'ok',
   delete_income: 'di',
   dismiss_topup: 'dt',
+  settle_plan: 'sp',
+  skip_plan: 'kp',
 } as const;
 
 export function packUuid(uuid: string): string {
@@ -61,6 +66,10 @@ export function encodeCallback(action: CallbackAction): string {
       return `${PREFIX.dismiss_topup}:${id}`;
     case 'set_category':
       return `${PREFIX.set_category}:${id}:${action.categoryIndex}`;
+    case 'settle_plan':
+      return `${PREFIX.settle_plan}:${id}:${action.month.replace('-', '')}`;
+    case 'skip_plan':
+      return `${PREFIX.skip_plan}:${id}:${action.month.replace('-', '')}`;
   }
 }
 
@@ -87,6 +96,14 @@ export function decodeCallback(data: string): CallbackAction | null {
       return { kind: 'delete_income', spendId };
     case PREFIX.dismiss_topup:
       return { kind: 'dismiss_topup', spendId };
+    case PREFIX.settle_plan:
+    case PREFIX.skip_plan: {
+      if (!extra || !/^\d{6}$/.test(extra)) return null;
+      const month = `${extra.slice(0, 4)}-${extra.slice(4)}`;
+      return prefix === PREFIX.settle_plan
+        ? { kind: 'settle_plan', spendId, month }
+        : { kind: 'skip_plan', spendId, month };
+    }
     case PREFIX.set_category: {
       const index = Number(extra);
       if (!Number.isInteger(index) || index < 0) return null;
