@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server';
 
 import { env } from '@/lib/env';
-import { formatIls, friendlyDate } from '@/lib/telegram/format';
 import { escapeHtml, sendMessage } from '@/lib/telegram/client';
-import { isoDateInIsrael } from '@/lib/intake/parse';
 import { syncRiseup } from '@/lib/riseup/sync';
+import { announceWithdrawals } from '@/lib/telegram/handlers';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -42,22 +41,7 @@ export async function GET(request: Request): Promise<NextResponse> {
       `⚠️ סנכרון רייזאפ נכשל:\n<code>${escapeHtml(result.error)}</code>`,
     );
   } else if (result.newTopups.length > 0 && groupChatId) {
-    const today = isoDateInIsrael();
-    await sendMessage(
-      groupChatId,
-      [
-        '🏧 <b>זוהו משיכות מזומן חדשות</b>',
-        '',
-        ...result.newTopups.map(
-          (topup) =>
-            `• ${formatIls(Number(topup.amount_ils))} · ${escapeHtml(
-              topup.business_name ?? 'משיכה',
-            )} · ${friendlyDate(topup.occurred_at, today)}`,
-        ),
-        '',
-        'הוספתי אותן לארנק. /balance כדי לראות את המצב.',
-      ].join('\n'),
-    );
+    await announceWithdrawals(groupChatId, result.newTopups);
   }
 
   return NextResponse.json({

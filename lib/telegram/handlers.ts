@@ -24,6 +24,7 @@ import {
 import {
   categoryKeyboard,
   decodeCallback,
+  encodeCallback,
   formatIls,
   friendlyDate,
   savedMessage,
@@ -36,13 +37,16 @@ import {
   activeTopups,
   allLiveSpends,
   attachBotMessage,
+  dismissTopup,
   envelopeRefsForMonth,
+  getTopup,
   insertCashIncomes,
+  insertManualWithdrawals,
+  lastCashRowForMember,
   listWallets,
   matchWalletByName,
   getSpend,
   insertSpends,
-  lastSpendForMember,
   membersById,
   resolveMember,
   spendsBetween,
@@ -293,17 +297,21 @@ async function logFromNaturalLanguage(
 
   const expenses = parsed.entries.filter((e) => e.direction === 'expense');
   const incomes = parsed.entries.filter((e) => e.direction === 'income');
+  const withdrawals = parsed.entries.filter((e) => e.direction === 'withdrawal');
 
   // Cash is filed into RiseUp's own envelopes, so it shows up in the same card
-  // a card spend would. The pin is resolved now, against this month's
-  // envelopes, the same way RiseUp files an uncategorised charge.
-  const refs = expenses.length > 0 ? await envelopeRefsForMonth(today.slice(0, 7)) : [];
+  // a card spend would. The pin is resolved now, against the entry's month,
+  // the same way RiseUp files an uncategorised charge.
+  const monthsNeeded = [...new Set(expenses.map((e) => e.spentAt.slice(0, 7)))];
+  const refsByMonth = new Map(
+    await Promise.all(monthsNeeded.map(async (m) => [m, await envelopeRefsForMonth(m)] as const)),
+  );
 
   const defaultWallet = wallets.find((w) => w.is_default) ?? wallets[0] ?? null;
   const walletFor = (name: string | null) => (matchWalletByName(wallets, name) ?? defaultWallet)?.id ?? null;
 
   const rows: NewSpend[] = expenses.map((entry, index) => {
-    const target = resolveEnvelopeForCategory(refs, entry.category);
+    const target = resolveEnvelopeForCategory(refsByMonth.get(entry.spentAt.slice(0, 7)) ?? [], entry.category);
     return {
       member_id: member.id,
       amount_ils: entry.amountIls,
@@ -326,7 +334,7 @@ async function logFromNaturalLanguage(
     };
   });
 
-  const [saved, savedIncomes] = await Promise.all([
+  const [saved, savedIncomes, savedWithdrawals] = await Promise.all([
     insertSpends(rows),
     insertCashIncomes(
       incomes.map((entry) => ({
@@ -335,6 +343,16 @@ async function logFromNaturalLanguage(
         category: entry.category,
         note: entry.note || null,
         occurred_at: entry.spentAt,
+        input_kind: inputKind,
+        wallet_id: walletFor(entry.wallet),
+      })),
+    ),
+    insertManualWithdrawals(
+      withdrawals.map((entry) => ({
+        member_id: member.id,
+        amount_ils: entry.amountIls,
+        occurred_at: entry.spentAt,
+        note: entry.note || null,
         input_kind: inputKind,
         wallet_id: walletFor(entry.wallet),
       })),
@@ -353,22 +371,34 @@ async function logFromNaturalLanguage(
     );
   }
 
-  if (savedIncomes.length > 0) {
-    const lines = savedIncomes.map(
-      (t) =>
-        `• <b>${formatIls(Number(t.amount_ils))}</b> · ${escapeHtml(t.category ?? '')}${
-          t.note ? ` — ${escapeHtml(t.note)}` : ''
-        } · ${friendlyDate(t.occurred_at, today)}`,
-    );
+  const walletName = (id: string | null) =>
+    wallets.length > 1 ? ` · ${escapeHtml(wallets.find((w) => w.id === id)?.name ?? '')}` : '';
+
+  for (const t of savedIncomes) {
     await sendMessage(
       chatId,
       [
-        `💵 ${savedIncomes.length === 1 ? 'נרשמה הכנסה במזומן' : `נרשמו ${savedIncomes.length} הכנסות במזומן`} · ${escapeHtml(member.display_name)}`,
+        `💵 נרשמה הכנסה במזומן · ${escapeHtml(member.display_name)}`,
         '',
-        ...lines,
-        '',
-        'נוסף לארנק. /balance כדי לראות את המצב.',
+        `• <b>${formatIls(Number(t.amount_ils))}</b> · ${escapeHtml(t.category ?? '')}${
+          t.note ? ` — ${escapeHtml(t.note)}` : ''
+        } · ${friendlyDate(t.occurred_at, today)}${walletName(t.wallet_id)}`,
       ].join('\n'),
+      [[{ text: '🗑 מחיקה', callback_data: encodeCallback({ kind: 'delete_income', spendId: t.id }) }]],
+    );
+  }
+
+  for (const t of savedWithdrawals) {
+    await sendMessage(
+      chatId,
+      [
+        `🏧 נרשמה משיכה · ${escapeHtml(member.display_name)}`,
+        '',
+        `• <b>${formatIls(Number(t.amount_ils))}</b> · ${friendlyDate(t.occurred_at, today)}${walletName(t.wallet_id)}`,
+        '',
+        'כשהמשיכה תופיע ברייזאפ היא תותאם לרישום הזה — היא לא תיספר פעמיים.',
+      ].join('\n'),
+      [[{ text: '🗑 מחיקה', callback_data: encodeCallback({ kind: 'delete_income', spendId: t.id }) }]],
     );
   }
 }
@@ -389,6 +419,26 @@ async function handleCallback(update: TelegramUpdate): Promise<void> {
   const action = decodeCallback(query.data);
   if (!action) {
     await answerCallbackQuery(query.id);
+    return;
+  }
+
+  // Top-up actions (cash income, manual or detected withdrawals) act on
+  // cash_topups, not on a spend.
+  if (action.kind === 'delete_income' || action.kind === 'dismiss_topup') {
+    const topup = await getTopup(action.spendId);
+    if (!topup || topup.is_dismissed) {
+      await answerCallbackQuery(query.id, 'הרישום כבר לא קיים');
+      return;
+    }
+    await dismissTopup(topup.id);
+    await editMessageText(
+      query.message.chat.id,
+      query.message.message_id,
+      action.kind === 'dismiss_topup'
+        ? `↩️ הוסר — ${formatIls(Number(topup.amount_ils))} ${escapeHtml(topup.business_name ?? '')} לא נספר כמשיכה.`
+        : `🗑 נמחק: ${formatIls(Number(topup.amount_ils))}${topup.category ? ` · ${escapeHtml(topup.category)}` : ''}`,
+    );
+    await answerCallbackQuery(query.id, 'עודכן');
     return;
   }
 
@@ -440,10 +490,18 @@ async function handleCallback(update: TelegramUpdate): Promise<void> {
         await answerCallbackQuery(query.id, 'קטגוריה לא נמצאה');
         return;
       }
+      // A new category can mean a new envelope: re-resolve the pin against the
+      // spend's own month, or the dashboard would keep it in the old card.
+      const target = resolveEnvelopeForCategory(
+        await envelopeRefsForMonth(spend.spent_at.slice(0, 7)),
+        category,
+      );
       const updated = await updateSpend(spend.id, {
         category,
         status: 'confirmed',
         confidence: 'high',
+        envelope_id: target?.envelopeId ?? null,
+        envelope_type: target?.type ?? null,
       });
       await editMessageText(chatId, messageId, `✅ עודכן\n\n• ${spendLine(updated, today)}`);
       await answerCallbackQuery(query.id, category);
@@ -552,19 +610,27 @@ async function sendMonth(chatId: number, requested?: string): Promise<void> {
 }
 
 async function undoLast(chatId: number, member: HouseholdMember): Promise<void> {
-  const last = await lastSpendForMember(member.id);
+  const last = await lastCashRowForMember(member.id);
   if (!last) {
     await sendMessage(chatId, 'אין מה לבטל.');
     return;
   }
 
-  await updateSpend(last.id, { status: 'deleted' });
+  const today = isoDateInIsrael();
+  if (last.kind === 'spend') {
+    await updateSpend(last.row.id, { status: 'deleted' });
+    await sendMessage(
+      chatId,
+      `🗑 בוטל: ${formatIls(last.row.amount_ils)} · ${escapeHtml(last.row.category)} · ${friendlyDate(last.row.spent_at, today)}`,
+    );
+    return;
+  }
+
+  await dismissTopup(last.row.id);
+  const what = last.row.source === 'manual' ? 'משיכה' : (last.row.category ?? 'הכנסה במזומן');
   await sendMessage(
     chatId,
-    `🗑 בוטל: ${formatIls(last.amount_ils)} · ${escapeHtml(last.category)} · ${friendlyDate(
-      last.spent_at,
-      isoDateInIsrael(),
-    )}`,
+    `🗑 בוטל: ${formatIls(Number(last.row.amount_ils))} · ${escapeHtml(what)} · ${friendlyDate(last.row.occurred_at, today)}`,
   );
 }
 
@@ -596,16 +662,27 @@ async function runSync(chatId: number): Promise<void> {
     `מעטפות: ${result.envelopesUpserted}`,
   ];
 
-  if (result.newTopups.length > 0) {
-    lines.push('', '<b>משיכות מזומן חדשות</b>');
-    for (const topup of result.newTopups) {
-      lines.push(
-        `• ${formatIls(Number(topup.amount_ils))} · ${escapeHtml(
-          topup.business_name ?? 'משיכה',
-        )} · ${friendlyDate(topup.occurred_at, isoDateInIsrael())}`,
-      );
-    }
-  }
-
   await sendMessage(chatId, lines.join('\n'));
+  await announceWithdrawals(chatId, result.newTopups);
+}
+
+/**
+ * One message per newly detected withdrawal, each with a "not a withdrawal"
+ * button: the detector matches on wording, and a false positive would
+ * otherwise inflate the wallet forever.
+ */
+export async function announceWithdrawals(
+  chatId: number,
+  topups: { id: string; amount_ils: number | string; business_name: string | null; occurred_at: string }[],
+): Promise<void> {
+  const today = isoDateInIsrael();
+  for (const topup of topups) {
+    await sendMessage(
+      chatId,
+      `🏧 משיכה חדשה נוספה לארנק: <b>${formatIls(Number(topup.amount_ils))}</b> · ${escapeHtml(
+        topup.business_name ?? 'משיכה',
+      )} · ${friendlyDate(topup.occurred_at, today)}`,
+      [[{ text: '↩️ זו לא משיכה', callback_data: encodeCallback({ kind: 'dismiss_topup', spendId: topup.id }) }]],
+    );
+  }
 }

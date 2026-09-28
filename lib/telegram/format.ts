@@ -14,13 +14,19 @@ export type CallbackAction =
   | { kind: 'delete'; spendId: string }
   | { kind: 'pick_category'; spendId: string }
   | { kind: 'set_category'; spendId: string; categoryIndex: number }
-  | { kind: 'confirm'; spendId: string };
+  | { kind: 'confirm'; spendId: string }
+  /** Delete a cash income (a cash_topups row); spendId carries the top-up id. */
+  | { kind: 'delete_income'; spendId: string }
+  /** "Not a withdrawal": dismiss a detected withdrawal top-up. */
+  | { kind: 'dismiss_topup'; spendId: string };
 
 const PREFIX = {
   delete: 'del',
   pick_category: 'cat',
   set_category: 'sc',
   confirm: 'ok',
+  delete_income: 'di',
+  dismiss_topup: 'dt',
 } as const;
 
 export function packUuid(uuid: string): string {
@@ -49,6 +55,10 @@ export function encodeCallback(action: CallbackAction): string {
       return `${PREFIX.pick_category}:${id}`;
     case 'confirm':
       return `${PREFIX.confirm}:${id}`;
+    case 'delete_income':
+      return `${PREFIX.delete_income}:${id}`;
+    case 'dismiss_topup':
+      return `${PREFIX.dismiss_topup}:${id}`;
     case 'set_category':
       return `${PREFIX.set_category}:${id}:${action.categoryIndex}`;
   }
@@ -73,6 +83,10 @@ export function decodeCallback(data: string): CallbackAction | null {
       return { kind: 'pick_category', spendId };
     case PREFIX.confirm:
       return { kind: 'confirm', spendId };
+    case PREFIX.delete_income:
+      return { kind: 'delete_income', spendId };
+    case PREFIX.dismiss_topup:
+      return { kind: 'dismiss_topup', spendId };
     case PREFIX.set_category: {
       const index = Number(extra);
       if (!Number.isInteger(index) || index < 0) return null;

@@ -101,7 +101,12 @@ export async function getSpend(id: string): Promise<CashSpend | null> {
 
 export async function updateSpend(
   id: string,
-  patch: Partial<Pick<CashSpend, 'amount_ils' | 'category' | 'note' | 'spent_at' | 'status' | 'confidence'>>,
+  patch: Partial<
+    Pick<
+      CashSpend,
+      'amount_ils' | 'category' | 'note' | 'spent_at' | 'status' | 'confidence' | 'envelope_id' | 'envelope_type'
+    >
+  >,
 ): Promise<CashSpend> {
   const { data, error } = await db()
     .from('cash_spends')
@@ -227,4 +232,73 @@ export function matchWalletByName(wallets: CashWallet[], mention: string | null 
     wallets.find((w) => w.name.includes(needle) || needle.includes(w.name)) ??
     null
   );
+}
+
+export async function getTopup(id: string): Promise<CashTopup | null> {
+  const { data, error } = await db().from('cash_topups').select('*').eq('id', id).maybeSingle();
+  if (error) throw new Error(`Failed to load top-up: ${error.message}`);
+  return (data as CashTopup) ?? null;
+}
+
+export async function dismissTopup(id: string): Promise<void> {
+  const { error } = await db()
+    .from('cash_topups')
+    .update({ is_dismissed: true, updated_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) throw new Error(`Failed to dismiss top-up: ${error.message}`);
+}
+
+export interface NewManualWithdrawal {
+  member_id: string;
+  amount_ils: number;
+  occurred_at: string;
+  note: string | null;
+  input_kind: CashSpend['input_kind'];
+  wallet_id: string | null;
+}
+
+/**
+ * A withdrawal logged by hand — for when the detector misses the bank's
+ * wording. The next sync matches it to the bank record instead of adding a
+ * second top-up (see linkOrCreateWithdrawals in the sync).
+ */
+export async function insertManualWithdrawals(rows: NewManualWithdrawal[]): Promise<CashTopup[]> {
+  if (rows.length === 0) return [];
+  const { data, error } = await db()
+    .from('cash_topups')
+    .insert(rows.map((row) => ({ ...row, source: 'manual' })))
+    .select('*');
+  if (error) throw new Error(`Failed to save withdrawal: ${error.message}`);
+  return (data ?? []) as CashTopup[];
+}
+
+/** The member's most recent live cash row of any kind — what /undo removes. */
+export async function lastCashRowForMember(
+  memberId: string,
+): Promise<{ kind: 'spend'; row: CashSpend } | { kind: 'topup'; row: CashTopup } | null> {
+  const supabase = db();
+  const [{ data: spend }, { data: topup }] = await Promise.all([
+    supabase
+      .from('cash_spends')
+      .select('*')
+      .eq('member_id', memberId)
+      .neq('status', 'deleted')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from('cash_topups')
+      .select('*')
+      .eq('member_id', memberId)
+      .eq('is_dismissed', false)
+      .in('source', ['cash_income', 'manual'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+  const s = spend as (CashSpend & { created_at: string }) | null;
+  const t = topup as (CashTopup & { created_at: string }) | null;
+  if (!s && !t) return null;
+  if (s && (!t || s.created_at >= t.created_at)) return { kind: 'spend', row: s };
+  return { kind: 'topup', row: t! };
 }

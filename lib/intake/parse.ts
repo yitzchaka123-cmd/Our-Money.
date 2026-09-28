@@ -15,7 +15,7 @@ const MODEL = 'claude-opus-5';
 const MAX_TOKENS = 4000;
 
 export interface ParsedEntry {
-  direction: 'expense' | 'income';
+  direction: 'expense' | 'income' | 'withdrawal';
   /** A wallet name from the household's list, when the message named one. */
   wallet: string | null;
   amountIls: number;
@@ -58,7 +58,7 @@ function buildSystemPrompt(categories: string[], wallets: string[]): string {
     '- note: a short, human description of what was bought, in the language the user used. Keep the merchant name if one was given. No more than 60 characters.',
     '- category MUST be exactly one of the allowed categories listed below. Pick the closest fit; use the catch-all only when nothing fits.',
     '- confidence reflects how sure you are about the amount and category together: "high" when both are explicit, "medium" when you inferred the category, "low" when the amount itself was ambiguous.',
-    '- direction: "expense" when cash was paid out. "income" when cash came IN — a cash salary, a gift ("קיבלתי 200 מסבתא"), a refund, something sold. Money withdrawn from an ATM is NOT income; it is already tracked, so ignore withdrawals entirely.',
+    '- direction: "expense" when cash was paid out. "income" when cash came IN from outside — a cash salary, a gift ("קיבלתי 200 מסבתא"), a refund, something sold. "withdrawal" when they took cash out of the bank ("משכתי 500", "took 300 from the ATM") — that is cash moving from the bank into a wallet, not income; set category to "משיכה".',
     '- For an income entry, category is free text describing the source (e.g. "מתנה", "משכורת במזומן", "החזר") rather than one of the expense categories.',
     '',
     'Intent:',
@@ -89,7 +89,7 @@ function buildSchema(categories: string[], wallets: string[]) {
     entries: z.array(
       z.object({
         amount_ils: z.number().positive(),
-        direction: z.enum(['expense', 'income']),
+        direction: z.enum(['expense', 'income', 'withdrawal']),
         // Expense categories are constrained; an income source is free text.
         category: z.union([categoryEnum, z.string()]),
         note: z.string(),
@@ -209,7 +209,9 @@ export async function parseIntake(
       direction: entry.direction,
       wallet: entry.wallet ?? null,
       amountIls: normalizeAmount(entry.amount_ils),
-      category: isIncome
+      category: entry.direction === 'withdrawal'
+        ? 'משיכה'
+        : isIncome
         ? entry.category.trim() || 'הכנסה במזומן'
         : categories.includes(entry.category)
           ? entry.category

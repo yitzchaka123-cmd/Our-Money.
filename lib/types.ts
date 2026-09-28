@@ -47,6 +47,7 @@ export interface CashTopup {
   input_kind: InputKind | null;
   /** Which wallet the cash went into; null counts toward the default wallet. */
   wallet_id: string | null;
+  created_at?: string;
 }
 
 export interface CashWallet {
