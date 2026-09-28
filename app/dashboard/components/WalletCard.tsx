@@ -16,10 +16,12 @@ export function WalletCard({
   wallet,
   onOpenMovement,
   onManage,
+  onAddWithdrawal,
 }: {
   wallet: WalletView;
   onOpenMovement?: (movement: WalletMovement) => void;
   onManage?: () => void;
+  onAddWithdrawal?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const several = wallet.wallets.length > 1;
@@ -71,7 +73,6 @@ export function WalletCard({
               type="button"
               className="txn-row wallet-row-mv"
               data-kind={m.kind}
-              disabled={m.kind === 'withdrawal'}
               onClick={() => onOpenMovement?.(m)}
             >
               <span className="date">{shortDate(m.date)}</span>
@@ -91,6 +92,12 @@ export function WalletCard({
         </div>
       ) : null}
 
+      {onAddWithdrawal ? (
+        <button className="add-row add-row--inline" type="button" onClick={onAddWithdrawal}>
+          <span className="add-plus" aria-hidden="true">+</span>
+          <span>רישום משיכה מהכספומט</span>
+        </button>
+      ) : null}
       {onManage ? (
         <button className="add-row add-row--inline" type="button" onClick={onManage}>
           <span className="add-plus" aria-hidden="true">⇄</span>

@@ -15,7 +15,7 @@ import { EnvelopeCard } from '@/app/dashboard/components/EnvelopeCard';
 import { TransactionSheet, type OpenTransaction } from '@/app/dashboard/components/TransactionSheet';
 import { WalletCard } from '@/app/dashboard/components/WalletCard';
 import { WalletsSheet } from '@/app/dashboard/components/WalletsSheet';
-import { deleteCashEntry, deleteTransfer, markCashSpendAsSavings } from '@/lib/cash/actions';
+import { deleteCashEntry, deleteTransfer, markCashSpendAsSavings, type CashKind } from '@/lib/cash/actions';
 import type { EnvelopeRef } from '@/lib/cash/envelopes';
 import type { EnvelopeView, WalletMovement, WalletView } from '@/lib/dashboard/data';
 import type { NormalizedActual } from '@/lib/riseup/envelopes';
@@ -62,7 +62,7 @@ export function EnvelopeList({
   const walletName = (id: string | null | undefined): string | null =>
     wallet.wallets.find((w) => w.id === (id ?? wallet.wallets.find((x) => x.isDefault)?.id))?.name ?? null;
 
-  const openNew = (kind: 'spend' | 'income', envelopeId: string | null = null) =>
+  const openNew = (kind: CashKind, envelopeId: string | null = null) =>
     setDraft({ ...emptyDraft(kind, sessionMemberId), envelopeId });
 
   const toDraft = (actual: NormalizedActual, envelopeId: string | null): CashEntryDraft | null => {
@@ -86,17 +86,17 @@ export function EnvelopeList({
   };
 
   const openMovement = (m: WalletMovement) => {
-    if (m.kind === 'withdrawal') return;
     if (m.kind === 'transfer') {
       if (window.confirm(`למחוק את ההעברה ${m.label}?`)) start(async () => { await deleteTransfer(m.id); });
       return;
     }
     setDraft({
       id: m.id,
-      kind: m.kind === 'income' ? 'income' : 'spend',
+      kind: m.kind,
+      fromBank: m.fromBank,
       amountIls: m.amountIls,
       category: m.category ?? '',
-      note: m.label === m.category ? '' : m.label,
+      note: m.note ?? '',
       date: m.date,
       envelopeId: null,
       memberId: members.find((x) => x.display_name === m.memberName)?.id ?? sessionMemberId,
@@ -109,7 +109,12 @@ export function EnvelopeList({
 
   return (
     <>
-      <WalletCard wallet={wallet} onOpenMovement={openMovement} onManage={() => setWalletsOpen(true)} />
+      <WalletCard
+        wallet={wallet}
+        onOpenMovement={openMovement}
+        onManage={() => setWalletsOpen(true)}
+        onAddWithdrawal={() => openNew('withdrawal')}
+      />
 
       <div className="add-row-pair">
         <button className="add-row" type="button" onClick={() => openNew('spend')}>

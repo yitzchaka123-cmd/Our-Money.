@@ -5,11 +5,19 @@ import {
   fetchBudget,
   fetchTransactions,
   recentMonths,
+  RiseupApiError,
   RiseupAuthError,
 } from '@/lib/riseup/client';
 import { normalizeBudget, type NormalizedEnvelope } from '@/lib/riseup/envelopes';
-import { isWithdrawal, toDateOnly } from '@/lib/riseup/withdrawals';
+import {
+  isWithdrawal,
+  matchManualWithdrawals,
+  toDateOnly,
+  WITHDRAWAL_MATCH_WINDOW_DAYS,
+} from '@/lib/riseup/withdrawals';
 import type { CashTopup, RiseupTransaction } from '@/lib/types';
+
+export type SyncErrorKind = 'auth' | 'rate_limit' | 'network' | 'other';
 
 export interface SyncResult {
   months: string[];
@@ -110,7 +118,7 @@ export async function syncRiseup(monthsBack = 2): Promise<SyncResult> {
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    await finish({ status: 'failed', error: message });
+    await finish({ status: 'failed', error: message, error_kind: errorKind(error) });
 
     return {
       months,
@@ -121,6 +129,80 @@ export async function syncRiseup(monthsBack = 2): Promise<SyncResult> {
       error: message,
     };
   }
+}
+
+function errorKind(error: unknown): SyncErrorKind {
+  if (error instanceof RiseupAuthError) return 'auth';
+  if (error instanceof RiseupApiError) return error.kind;
+  return 'other';
+}
+
+/** A run still marked running after this long crashed without finishing. */
+const RUNNING_GIVES_UP_MS = 2 * 60 * 1000;
+
+/**
+ * Sync unless the mirror is already fresh or another sync is mid-flight.
+ * Both the dashboard's refresh-on-open and its refresh button go through here,
+ * so two phones opening the page at once cost RiseUp one pull, not two.
+ */
+export async function syncIfStale(
+  freshForMs: number,
+  monthsBack = 2,
+): Promise<{ skipped: true; reason: 'fresh' | 'running' } | { skipped: false; result: SyncResult }> {
+  const { data } = await db()
+    .from('sync_runs')
+    .select('started_at, status')
+    .order('started_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const last = data?.started_at ? Date.parse(data.started_at as string) : 0;
+  const age = Date.now() - last;
+  if (data?.status === 'running' && age < RUNNING_GIVES_UP_MS) return { skipped: true, reason: 'running' };
+  if (data?.status === 'succeeded' && age < freshForMs) return { skipped: true, reason: 'fresh' };
+
+  return { skipped: false, result: await syncRiseup(monthsBack) };
+}
+
+export interface SyncState {
+  lastSuccessAt: string | null;
+  lastFailure: { at: string; kind: SyncErrorKind; message: string } | null;
+}
+
+/** The latest success and, if it came after that, the latest failure. */
+export async function loadSyncState(): Promise<SyncState> {
+  const supabase = db();
+  const [{ data: success }, { data: failure }] = await Promise.all([
+    supabase
+      .from('sync_runs')
+      .select('finished_at')
+      .eq('status', 'succeeded')
+      .order('finished_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from('sync_runs')
+      .select('finished_at, error, error_kind')
+      .eq('status', 'failed')
+      .order('finished_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+
+  const lastSuccessAt = (success?.finished_at as string | undefined) ?? null;
+  const failedAt = (failure?.finished_at as string | undefined) ?? null;
+  const failureIsCurrent = failedAt && (!lastSuccessAt || failedAt > lastSuccessAt);
+
+  return {
+    lastSuccessAt,
+    lastFailure: failureIsCurrent
+      ? {
+          at: failedAt,
+          kind: ((failure?.error_kind as SyncErrorKind | null) ?? 'other'),
+          message: (failure?.error as string | null) ?? '',
+        }
+      : null,
+  };
 }
 
 async function createTopupsForWithdrawals(
@@ -144,12 +226,17 @@ async function createTopupsForWithdrawals(
   const fresh = withdrawals.filter((w) => !seen.has(w.transactionId));
   if (fresh.length === 0) return [];
 
+  // Someone may have already said "I withdrew 500" to the bot. That row is the
+  // same cash, so link it to the bank line instead of counting it twice.
+  const unmatched = await linkManualWithdrawals(fresh);
+  if (unmatched.length === 0) return [];
+
   // Cash from the machine goes into whichever wallet is the default.
   const walletId = await defaultWalletId();
   const { data: inserted, error: insertError } = await supabase
     .from('cash_topups')
     .insert(
-      fresh.map((w) => ({
+      unmatched.map((w) => ({
         amount_ils: w.amount,
         occurred_at: toDateOnly(w.transactionDate),
         source: 'riseup_withdrawal' as const,
@@ -162,6 +249,40 @@ async function createTopupsForWithdrawals(
   if (insertError) throw new Error(`Failed to create top-ups: ${insertError.message}`);
 
   return (inserted ?? []) as CashTopup[];
+}
+
+/** Returns the bank withdrawals that had no hand-entered twin. */
+async function linkManualWithdrawals(fresh: RiseupTransaction[]): Promise<RiseupTransaction[]> {
+  const supabase = db();
+  const dates = fresh.map((w) => toDateOnly(w.transactionDate)).filter((d): d is string => !!d).sort();
+  if (dates.length === 0) return fresh;
+
+  const shift = (date: string, days: number) =>
+    new Date(Date.parse(`${date}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
+
+  const { data: candidates, error } = await supabase
+    .from('cash_topups')
+    .select('id, amount_ils, occurred_at')
+    .eq('source', 'manual')
+    .eq('is_dismissed', false)
+    .is('riseup_transaction_id', null)
+    .gte('occurred_at', shift(dates[0]!, -WITHDRAWAL_MATCH_WINDOW_DAYS))
+    .lte('occurred_at', shift(dates[dates.length - 1]!, WITHDRAWAL_MATCH_WINDOW_DAYS));
+  if (error) throw new Error(`Failed to look for manual withdrawals: ${error.message}`);
+
+  const { links, unmatched } = matchManualWithdrawals(fresh, candidates ?? []);
+  for (const { transaction, manualId } of links) {
+    // The manual row keeps its wallet, note and date: those came from a person.
+    const { error: linkError } = await supabase
+      .from('cash_topups')
+      .update({
+        riseup_transaction_id: transaction.transactionId,
+        business_name: transaction.businessName ?? null,
+      })
+      .eq('id', manualId);
+    if (linkError) throw new Error(`Failed to link a manual withdrawal: ${linkError.message}`);
+  }
+  return unmatched;
 }
 
 /**

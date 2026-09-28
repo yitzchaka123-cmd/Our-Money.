@@ -156,6 +156,9 @@ const fixture: DashboardData = {
   greeting: 'יצחק',
   lastUpdated: '15.09 7:36',
   lastSyncAt: '2026-09-15T04:36:00Z',
+  syncBanner: process.env.PREVIEW_BANNER
+    ? { tone: 'error', text: 'החיבור ל-RiseUp פג תוקף. צריך ליצור טוקן חדש ב-RiseUp ולעדכן אותו בהגדרות, ועד אז הנתונים לא מתעדכנים.' }
+    : null,
   forecast: -8478,
   variableRemaining: 0,
   totalActualExpenses: 4608,
@@ -177,10 +180,10 @@ const fixture: DashboardData = {
     income: 350,
     spent: 250,
     movements: [
-      { id: 'w1', kind: 'withdrawal', amountIls: 1200, date: '2026-09-14', label: 'משיכת מזומן', memberName: null, category: null, walletId: 'w-main', walletName: 'ארנק ראשי' },
-      { id: 'x1', kind: 'transfer', amountIls: 200, date: '2026-09-14', label: 'ארנק ראשי ← הארנק של שרה', memberName: 'יצחק', category: null, walletId: 'w-sara', walletName: 'הארנק של שרה' },
-      { id: 'c1', kind: 'spend', amountIls: 85, date: '2026-09-15', label: 'מכולת בפינה', memberName: 'יצחק', category: 'מזון וצריכה', walletId: 'w-main', walletName: 'ארנק ראשי' },
-      { id: 'ci1', kind: 'income', amountIls: 350, date: '2026-09-10', label: 'מתנה מסבתא', memberName: 'שרה', category: 'מתנה', walletId: 'w-sara', walletName: 'הארנק של שרה' },
+      { id: 'w1', kind: 'withdrawal', amountIls: 1200, date: '2026-09-14', label: 'משיכת מזומן', memberName: null, category: null, walletId: 'w-main', walletName: 'ארנק ראשי', note: null, fromBank: true },
+      { id: 'x1', kind: 'transfer', amountIls: 200, date: '2026-09-14', label: 'ארנק ראשי ← הארנק של שרה', memberName: 'יצחק', category: null, walletId: 'w-sara', walletName: 'הארנק של שרה', note: null, fromBank: false, fromWalletId: 'w-main', toWalletId: 'w-sara' },
+      { id: 'c1', kind: 'spend', amountIls: 85, date: '2026-09-15', label: 'מכולת בפינה', memberName: 'יצחק', category: 'מזון וצריכה', walletId: 'w-main', walletName: 'ארנק ראשי', note: 'מכולת בפינה', fromBank: false },
+      { id: 'ci1', kind: 'income', amountIls: 350, date: '2026-09-10', label: 'מתנה מסבתא', memberName: 'שרה', category: 'מתנה', walletId: 'w-sara', walletName: 'הארנק של שרה', note: 'מתנה מסבתא', fromBank: false },
     ],
   },
   members: [

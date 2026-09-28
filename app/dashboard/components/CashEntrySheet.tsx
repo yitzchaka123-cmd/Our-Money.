@@ -5,7 +5,7 @@ import { useState, useTransition } from 'react';
 import { Amount } from '@/app/dashboard/components/Amount';
 import { Sheet } from '@/app/dashboard/components/Sheet';
 import { Close } from '@/app/dashboard/components/icons';
-import { addCashEntry, deleteCashEntry, updateCashEntry, type CashEntryInput } from '@/lib/cash/actions';
+import { addCashEntry, deleteCashEntry, updateCashEntry, type CashEntryInput, type CashKind } from '@/lib/cash/actions';
 import type { EnvelopeRef } from '@/lib/cash/envelopes';
 import type { WalletSummary } from '@/lib/dashboard/data';
 import { isoDateInIsrael } from '@/lib/intake/parse';
@@ -13,7 +13,9 @@ import type { EnvelopeType, HouseholdMember } from '@/lib/types';
 
 export interface CashEntryDraft {
   id: string | null;
-  kind: 'spend' | 'income';
+  kind: CashKind;
+  /** A withdrawal RiseUp reported: amount and date are the bank's, not ours. */
+  fromBank?: boolean;
   amountIls: number | null;
   category: string;
   note: string;
@@ -24,7 +26,7 @@ export interface CashEntryDraft {
 }
 
 export function emptyDraft(
-  kind: 'spend' | 'income',
+  kind: CashKind,
   memberId: string | null,
   walletId: string | null = null,
 ): CashEntryDraft {
@@ -42,6 +44,18 @@ export function emptyDraft(
 }
 
 const INCOME_SUGGESTIONS = ['משכורת במזומן', 'מתנה', 'החזר', 'מכירה', 'אחר'];
+
+const KIND_LABELS: Record<CashKind, string> = {
+  spend: 'הוצאה',
+  income: 'הכנסה',
+  withdrawal: 'משיכה',
+};
+
+const HEADER_LABELS: Record<CashKind, string> = {
+  spend: 'הוצאה במזומן',
+  income: 'הכנסה במזומן',
+  withdrawal: 'משיכת מזומן',
+};
 
 /**
  * RiseUp's "איזו הוצאה זו?" sheet, repurposed for entering cash: a coloured
@@ -76,8 +90,13 @@ export function CashEntrySheet({
   }
 
   const chosen = envelopes.find((e) => e.envelopeId === form.envelopeId) ?? null;
-  const headerType: EnvelopeType = form.kind === 'income' ? 'cashIncome' : (chosen?.type ?? 'variable');
-  const needsFreeCategory = form.kind === 'income' || !chosen || chosen.type !== 'trackingCategory';
+  const headerType: EnvelopeType =
+    form.kind === 'income' ? 'cashIncome' : form.kind === 'withdrawal' ? 'trackingCategory' : (chosen?.type ?? 'variable');
+  const needsFreeCategory =
+    form.kind === 'income' || (form.kind === 'spend' && (!chosen || chosen.type !== 'trackingCategory'));
+  // Switching kind moves a row between tables, so it is offered only for a new entry.
+  const canSwitchKind = form.id === null;
+  const locked = form.fromBank === true;
 
   const patch = (next: Partial<CashEntryDraft>) => setForm((f) => ({ ...f, ...next }));
 
@@ -121,32 +140,30 @@ export function CashEntrySheet({
         <div className="sheet-head" data-on-dark={headerType !== 'variable'}>
           <div className="entry-head-row">
             <p className="label" id="cash-entry-label">
-              {form.kind === 'income' ? 'הכנסה במזומן' : 'הוצאה במזומן'}
+              {HEADER_LABELS[form.kind]}
               {chosen && form.kind === 'spend' ? ` · ${chosen.name}` : ''}
+              {locked ? ' · מהבנק' : ''}
             </p>
             <button className="entry-close" type="button" aria-label="סגירה" onClick={onClose}>
               <Close />
             </button>
           </div>
 
-          <div className="kind-toggle" role="tablist" aria-label="סוג">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={form.kind === 'spend'}
-              onClick={() => patch({ kind: 'spend' })}
-            >
-              הוצאה
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={form.kind === 'income'}
-              onClick={() => patch({ kind: 'income', envelopeId: null })}
-            >
-              הכנסה
-            </button>
-          </div>
+          {canSwitchKind ? (
+            <div className="kind-toggle" role="tablist" aria-label="סוג">
+              {(['spend', 'income', 'withdrawal'] as const).map((kind) => (
+                <button
+                  key={kind}
+                  type="button"
+                  role="tab"
+                  aria-selected={form.kind === kind}
+                  onClick={() => patch({ kind, ...(kind === 'spend' ? {} : { envelopeId: null }) })}
+                >
+                  {KIND_LABELS[kind]}
+                </button>
+              ))}
+            </div>
+          ) : null}
 
           <label className="amount-input">
             <span className="visually-hidden">סכום</span>
@@ -156,6 +173,7 @@ export function CashEntrySheet({
               min="0"
               step="0.1"
               placeholder="0.0"
+              disabled={locked}
               value={form.amountIls ?? ''}
               onChange={(e) => patch({ amountIls: e.target.value === '' ? null : Number(e.target.value) })}
             />
@@ -232,12 +250,16 @@ export function CashEntrySheet({
 
         <label className="field">
           <span>תאריך</span>
-          <input type="date" value={form.date} onChange={(e) => patch({ date: e.target.value })} />
+          <input type="date" disabled={locked} value={form.date} onChange={(e) => patch({ date: e.target.value })} />
         </label>
+        {locked ? <p className="field-hint">הסכום והתאריך מגיעים מהבנק דרך RiseUp.</p> : null}
+        {form.kind === 'withdrawal' && !locked ? (
+          <p className="field-hint">כשהמשיכה תופיע ב-RiseUp היא תתחבר לרישום הזה ולא תיספר פעמיים.</p>
+        ) : null}
 
         {wallets.length > 1 ? (
           <div className="field">
-            <span>{form.kind === 'income' ? 'לאיזה ארנק' : 'מאיזה ארנק'}</span>
+            <span>{form.kind === 'spend' ? 'מאיזה ארנק' : 'לאיזה ארנק'}</span>
             <div className="chips">
               {wallets.map((w) => (
                 <button
@@ -280,7 +302,7 @@ export function CashEntrySheet({
         </button>
         {form.id ? (
           <button className="btn-ghost" type="button" disabled={pending} onClick={remove}>
-            מחיקה
+            {locked ? 'זו לא משיכה' : 'מחיקה'}
           </button>
         ) : null}
       </div>

@@ -13,7 +13,7 @@ export function RefreshButton({ className = 'btn-inline' }: { className?: string
     start(async () => {
       setMessage(null);
       const result = await refreshFromRiseup();
-      setMessage(result.ok ? 'עודכן מרייזאפ ✓' : `הסנכרון נכשל: ${result.error}`);
+      setMessage(result.ok ? 'עודכן מרייזאפ ✓' : result.error);
     });
 
   return (

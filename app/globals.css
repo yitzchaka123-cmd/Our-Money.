@@ -615,6 +615,31 @@ a {
   padding: 22px 0 24px;
 }
 
+.sync-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 var(--page-gutter) 12px;
+  padding: 12px 16px;
+  border-radius: var(--radius-row);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.sync-banner.error {
+  background: #ffe9e3;
+  color: #8a2a14;
+}
+
+.sync-banner.warning {
+  background: var(--variable-track);
+  color: #6b5200;
+}
+
+.sync-banner > span {
+  flex: 1;
+}
+
 .steps-banner {
   display: flex;
   align-items: center;
@@ -1221,6 +1246,21 @@ a {
   border-radius: 12px;
   background: var(--surface);
   color: var(--ink);
+}
+
+.field input:disabled {
+  background: var(--surface-sunken);
+  color: var(--ink-2);
+}
+
+.field-hint {
+  margin: -6px 0 14px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.amount-input input:disabled {
+  opacity: 0.85;
 }
 
 .chips {

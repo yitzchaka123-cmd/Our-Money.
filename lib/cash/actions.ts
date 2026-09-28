@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { SESSION_COOKIE, verifySessionToken } from '@/lib/auth/session';
 import { resolveEnvelopeForCategory, type EnvelopeRef } from '@/lib/cash/envelopes';
 import { db } from '@/lib/db/client';
-import { syncRiseup } from '@/lib/riseup/sync';
+import { syncIfStale } from '@/lib/riseup/sync';
 import type { EnvelopeType } from '@/lib/types';
 
 /**
@@ -19,7 +19,15 @@ import type { EnvelopeType } from '@/lib/types';
  * RiseUp does not offer but which are ours to offer because the rows are ours.
  */
 
-export type CashKind = 'spend' | 'income';
+/** A withdrawal is cash moving from the bank into a wallet — neither spent nor earned. */
+export type CashKind = 'spend' | 'income' | 'withdrawal';
+
+/** Every kind except a spend lives in cash_topups. */
+function isTopupKind(kind: CashKind): kind is 'income' | 'withdrawal' {
+  return kind !== 'spend';
+}
+
+const WITHDRAWAL_CATEGORY = 'משיכה';
 
 export interface CashEntryInput {
   kind: CashKind;
@@ -58,7 +66,7 @@ function fail(error: string): ActionResult {
 function validate(input: CashEntryInput): string | null {
   if (!Number.isFinite(input.amountIls) || input.amountIls <= 0) return 'צריך סכום גדול מאפס.';
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) return 'תאריך לא תקין.';
-  if (!input.category.trim()) return 'צריך קטגוריה.';
+  if (input.kind !== 'withdrawal' && !input.category.trim()) return 'צריך קטגוריה.';
   return null;
 }
 
@@ -112,14 +120,16 @@ export async function addCashEntry(input: CashEntryInput): Promise<ActionResult>
   const walletId = await walletOrDefault(input.walletId);
   const supabase = db();
 
-  if (input.kind === 'income') {
+  if (isTopupKind(input.kind)) {
     const { data, error } = await supabase
       .from('cash_topups')
       .insert({
         amount_ils: input.amountIls,
         occurred_at: input.date,
-        source: 'cash_income',
-        category: input.category.trim(),
+        // A hand-entered withdrawal is 'manual'; the next sync links it to the
+        // bank line rather than adding the same cash twice.
+        source: input.kind === 'income' ? 'cash_income' : 'manual',
+        category: input.kind === 'income' ? input.category.trim() : WITHDRAWAL_CATEGORY,
         note: input.note?.trim() || null,
         member_id: memberId,
         input_kind: 'web',
@@ -177,6 +187,23 @@ export async function updateCashEntry(id: string, input: CashEntryInput): Promis
       .eq('id', id)
       .eq('source', 'cash_income');
     if (error) return fail(error.message);
+  } else if (input.kind === 'withdrawal') {
+    const { data: row } = await supabase.from('cash_topups').select('source').eq('id', id).maybeSingle();
+    if (!row || row.source === 'cash_income') return fail('הרישום לא נמצא.');
+    // A withdrawal RiseUp saw keeps the bank's amount and date; only where the
+    // cash went, who took it and the note are ours to change.
+    const fromBank = row.source === 'riseup_withdrawal';
+    const { error } = await supabase
+      .from('cash_topups')
+      .update({
+        ...(fromBank ? {} : { amount_ils: input.amountIls, occurred_at: input.date }),
+        note: input.note?.trim() || null,
+        ...(input.memberId ? { member_id: input.memberId } : {}),
+        ...(input.walletId ? { wallet_id: input.walletId } : {}),
+        updated_at: now,
+      })
+      .eq('id', id);
+    if (error) return fail(error.message);
   } else {
     const pin = await resolvePin(input.date.slice(0, 7), input.envelopeId, input.category);
     const { error } = await supabase
@@ -205,8 +232,10 @@ export async function deleteCashEntry(id: string, kind: CashKind): Promise<Actio
   await requireMember();
   const supabase = db();
   // Soft on both sides, so nothing is lost and the arithmetic just stops counting it.
+  // A dismissed bank withdrawal stays dismissed across syncs: the sync skips
+  // any transaction id it has already seen, dismissed or not.
   const { error } =
-    kind === 'income'
+    isTopupKind(kind)
       ? await supabase.from('cash_topups').update({ is_dismissed: true }).eq('id', id)
       : await supabase
           .from('cash_spends')
@@ -223,7 +252,7 @@ export async function updateCashNote(id: string, kind: CashKind, note: string): 
   const supabase = db();
   const value = note.trim() || null;
   const { error } =
-    kind === 'income'
+    isTopupKind(kind)
       ? await supabase.from('cash_topups').update({ note: value, updated_at: new Date().toISOString() }).eq('id', id)
       : await supabase.from('cash_spends').update({ note: value, updated_at: new Date().toISOString() }).eq('id', id);
   if (error) return fail(error.message);
@@ -279,6 +308,7 @@ export async function markCashSpendAsSavings(id: string): Promise<ActionResult> 
  */
 export async function splitCashEntry(id: string, kind: CashKind, parts: SplitPart[]): Promise<ActionResult> {
   await requireMember();
+  if (kind === 'withdrawal') return fail('משיכה לא מתפצלת — אפשר להעביר חלק ממנה לארנק אחר.');
   if (parts.length < 2) return fail('פיצול צריך לפחות שני חלקים.');
   if (parts.some((p) => !Number.isFinite(p.amountIls) || p.amountIls <= 0)) return fail('כל חלק צריך סכום גדול מאפס.');
   if (parts.some((p) => !p.category.trim())) return fail('כל חלק צריך קטגוריה.');
@@ -355,10 +385,11 @@ export async function moveCashEntryToMonth(id: string, kind: CashKind, month: st
   if (!/^\d{4}-\d{2}$/.test(month)) return fail('חודש לא תקין.');
 
   const supabase = db();
-  const table = kind === 'income' ? 'cash_topups' : 'cash_spends';
-  const dateColumn = kind === 'income' ? 'occurred_at' : 'spent_at';
+  const table = isTopupKind(kind) ? 'cash_topups' : 'cash_spends';
+  const dateColumn = isTopupKind(kind) ? 'occurred_at' : 'spent_at';
   const { data: row, error: loadError } = await supabase.from(table).select('*').eq('id', id).maybeSingle();
   if (loadError || !row) return fail(loadError?.message ?? 'הרישום לא נמצא.');
+  if (row.source === 'riseup_withdrawal') return fail('משיכה מהבנק נשארת בחודש שבו הבנק רשם אותה.');
 
   const day = Number((row[dateColumn] as string).slice(8, 10));
   const [y, m] = month.split('-').map(Number);
@@ -467,10 +498,21 @@ export async function deleteTransfer(id: string): Promise<ActionResult> {
 
 // ---------------------------------------------------------------------------
 
-/** The "refresh from RiseUp" button. */
+/** The "refresh from RiseUp" button. A tap on refresh within this long of the last pull reuses it. */
+const MANUAL_REFRESH_FLOOR_MS = 30 * 1000;
+
 export async function refreshFromRiseup(): Promise<{ ok: boolean; error: string | null; envelopes: number }> {
   await requireMember();
-  const result = await syncRiseup();
+  const outcome = await syncIfStale(MANUAL_REFRESH_FLOOR_MS);
   revalidatePath(DASHBOARD);
-  return { ok: !result.error, error: result.error, envelopes: result.envelopesUpserted };
+  if (outcome.skipped) return { ok: true, error: null, envelopes: 0 };
+  const { result } = outcome;
+  if (!result.error) return { ok: true, error: null, envelopes: result.envelopesUpserted };
+  // The raw error is in the sync log; the couple gets a sentence they can act on.
+  const error = result.tokenExpired
+    ? 'הטוקן של RiseUp פג תוקף. צריך ליצור חדש ולעדכן אותו.'
+    : /429|rate limit/i.test(result.error)
+      ? 'RiseUp ביקשו להאט. נסו שוב בעוד כמה דקות.'
+      : 'לא הצלחנו להגיע ל-RiseUp כרגע. נסו שוב עוד מעט.';
+  return { ok: false, error, envelopes: 0 };
 }

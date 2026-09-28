@@ -36,6 +36,12 @@ export function DashboardView({
     >
       <div className="app">
         <div className="steps-section">
+          {data.syncBanner && (
+            <div className={`sync-banner ${data.syncBanner.tone}`} role="status">
+              <span>{data.syncBanner.text}</span>
+              <RefreshButton />
+            </div>
+          )}
           <div className="steps-banner">
             <Clover />
             <span>

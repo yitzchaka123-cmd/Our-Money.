@@ -4,7 +4,16 @@ import type { RiseupBudget, RiseupTransaction } from '@/lib/types';
 const TOKENS_URL = 'https://input.riseup.co.il/developer/tokens';
 
 export class RiseupAuthError extends Error {}
-export class RiseupApiError extends Error {}
+export type RiseupErrorKind = 'rate_limit' | 'network' | 'other';
+
+export class RiseupApiError extends Error {
+  constructor(
+    message: string,
+    readonly kind: RiseupErrorKind = 'other',
+  ) {
+    super(message);
+  }
+}
 
 /**
  * RiseUp's external API is read-only — there is no endpoint that writes a
@@ -25,6 +34,7 @@ async function riseupGet<T>(path: string): Promise<T> {
   } catch (error) {
     throw new RiseupApiError(
       `Network error calling RiseUp: ${error instanceof Error ? error.message : String(error)}`,
+      'network',
     );
   }
 
@@ -39,7 +49,7 @@ async function riseupGet<T>(path: string): Promise<T> {
     );
   }
   if (response.status === 429) {
-    throw new RiseupApiError('RiseUp rate limit hit (429). The next scheduled sync will retry.');
+    throw new RiseupApiError('RiseUp rate limit hit (429). The next scheduled sync will retry.', 'rate_limit');
   }
   if (!response.ok) {
     const body = await response.text();

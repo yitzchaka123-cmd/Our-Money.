@@ -2,8 +2,7 @@ import { cookies } from 'next/headers';
 
 import { SESSION_COOKIE, verifySessionToken } from '@/lib/auth/session';
 import { currentMonth, loadDashboard } from '@/lib/dashboard/data';
-import { db } from '@/lib/db/client';
-import { syncRiseup } from '@/lib/riseup/sync';
+import { syncIfStale } from '@/lib/riseup/sync';
 import { DashboardView } from '@/app/dashboard/view';
 
 export const runtime = 'nodejs';
@@ -41,18 +40,7 @@ export default async function DashboardPage({
  */
 async function refreshIfStale(): Promise<void> {
   try {
-    const { data } = await db()
-      .from('sync_runs')
-      .select('started_at, status')
-      .order('started_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    const last = data?.started_at ? Date.parse(data.started_at as string) : 0;
-    const running = data?.status === 'running' && Date.now() - last < 2 * 60 * 1000;
-    if (running || Date.now() - last < FRESH_FOR_MS) return;
-
-    await syncRiseup();
+    await syncIfStale(FRESH_FOR_MS);
   } catch (error) {
     console.error('Refresh on open failed', error);
   }

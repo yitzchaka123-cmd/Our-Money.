@@ -8,6 +8,8 @@ import {
   type NormalizedActual,
   type NormalizedEnvelope,
 } from '@/lib/riseup/envelopes';
+import { syncBanner, type SyncBanner } from '@/lib/riseup/banner';
+import { loadSyncState } from '@/lib/riseup/sync';
 import { matchesWithdrawalName } from '@/lib/riseup/withdrawals';
 import type { CashSpend, CashTopup, CashTransfer, CashWallet, EnvelopeType, HouseholdMember } from '@/lib/types';
 
@@ -32,6 +34,13 @@ export interface WalletMovement {
   category: string | null;
   walletId: string | null;
   walletName: string | null;
+  /** The typed note, separate from the label, so an edit sheet can prefill it. */
+  note: string | null;
+  /** A withdrawal RiseUp reported: its amount and date belong to the bank. */
+  fromBank: boolean;
+  /** Transfers only. */
+  fromWalletId?: string;
+  toWalletId?: string;
 }
 
 export interface WalletSummary {
@@ -60,6 +69,8 @@ export interface DashboardData {
   greeting: string;
   lastUpdated: string | null;
   lastSyncAt: string | null;
+  /** A sync problem worth telling the couple about, or null. */
+  syncBanner: SyncBanner | null;
   /** Expected income minus every expected expense — RiseUp's headline number. */
   forecast: number;
   variableRemaining: number;
@@ -94,7 +105,7 @@ export async function loadDashboard(month: string): Promise<DashboardData> {
     { data: allSpends },
     { data: allTopups },
     { data: members },
-    { data: syncRuns },
+    syncState,
     { data: monthList },
     { data: walletRows },
     { data: allTransfers },
@@ -119,12 +130,7 @@ export async function loadDashboard(month: string): Promise<DashboardData> {
     supabase.from('cash_spends').select('*').neq('status', 'deleted'),
     supabase.from('cash_topups').select('*').eq('is_dismissed', false),
     supabase.from('household_members').select('id, display_name'),
-    supabase
-      .from('sync_runs')
-      .select('finished_at')
-      .eq('status', 'succeeded')
-      .order('finished_at', { ascending: false })
-      .limit(1),
+    loadSyncState(),
     supabase.from('riseup_envelopes').select('month'),
     supabase.from('cash_wallets').select('*').eq('is_archived', false).order('position').order('created_at'),
     supabase.from('cash_transfers').select('*').eq('is_dismissed', false),
@@ -155,7 +161,7 @@ export async function loadDashboard(month: string): Promise<DashboardData> {
   const actualExpenses = sumBy(envelopes.filter((e) => EXPENSE_TYPES.has(e.type)), 'actual');
   const variable = envelopes.find((e) => e.type === 'variable');
 
-  const lastSyncAt = (syncRuns?.[0]?.finished_at as string | undefined) ?? null;
+  const lastSyncAt = syncState.lastSuccessAt;
 
   return {
     month,
@@ -167,6 +173,7 @@ export async function loadDashboard(month: string): Promise<DashboardData> {
     greeting: (memberList[0]?.display_name ?? '').split(' ')[0] || 'שלום',
     lastUpdated: formatUpdated(lastSyncAt),
     lastSyncAt,
+    syncBanner: syncBanner(syncState),
     forecast: round(income - expectedExpenses),
     variableRemaining: variable ? round(Math.max(variable.expected - variable.actual, 0)) : 0,
     totalActualExpenses: round(actualExpenses),
@@ -466,11 +473,16 @@ function buildWallet({
       kind: t.source === 'cash_income' ? 'income' : 'withdrawal',
       amountIls: Number(t.amount_ils),
       date: t.occurred_at,
-      label: t.source === 'cash_income' ? t.note || t.category || 'הכנסה במזומן' : t.business_name || 'משיכת מזומן',
+      label:
+        t.source === 'cash_income'
+          ? t.note || t.category || 'הכנסה במזומן'
+          : t.note || t.business_name || 'משיכת מזומן',
       memberName: t.member_id ? (memberNames.get(t.member_id) ?? null) : null,
       category: t.category,
       walletId: t.wallet_id ?? fallbackId,
       walletName: nameOf(t.wallet_id),
+      note: t.note,
+      fromBank: t.source === 'riseup_withdrawal' || t.riseup_transaction_id !== null,
     })),
     ...monthSpends.map((s): WalletMovement => ({
       id: s.id,
@@ -482,6 +494,8 @@ function buildWallet({
       category: s.category,
       walletId: s.wallet_id ?? fallbackId,
       walletName: nameOf(s.wallet_id),
+      note: s.note,
+      fromBank: false,
     })),
     ...monthTransfers.map((x): WalletMovement => ({
       id: x.id,
@@ -493,6 +507,10 @@ function buildWallet({
       category: x.note,
       walletId: x.to_wallet_id,
       walletName: walletName.get(x.to_wallet_id) ?? null,
+      note: x.note,
+      fromBank: false,
+      fromWalletId: x.from_wallet_id,
+      toWalletId: x.to_wallet_id,
     })),
   ].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
 
