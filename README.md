@@ -112,6 +112,30 @@ with a small ₪ (or microphone, for a voice note) marking it as cash.
   `זו הפקדה לחיסכון!` — plus edit and delete, which are ours to offer because the
   rows are ours. RiseUp's own charges open the same sheet with the same actions
   shown but disabled: the API is read-only.
+- **Withdrawals** — detected from RiseUp automatically, or recorded by hand
+  ("משכתי 500" to the bot, or `רישום משיכה מהכספומט` on the wallet card). A
+  hand-entered withdrawal is linked to the bank line when RiseUp reports it — same
+  amount, within three days — so the cash is never counted twice. Tap a
+  withdrawal to move it to another wallet or say it was not one; a bank
+  withdrawal keeps the bank's amount and date.
+- **Expected cash** — the cleaner paid in cash every month, a cash salary, a
+  one-off gift. A plan counts in the forecast before it happens and shows under
+  its envelope as `צפוי לצאת במזומן` with a one-tap `שולם` (or `התקבל`), which
+  records the real entry. Skip a month, stop it from a month on, or change it.
+  The evening nudge offers the same buttons in Telegram when a plan's day comes.
+- **The forecast with cash in it** — envelopes with no cash keep RiseUp's own
+  figure. Budget envelopes (variable, trackers, savings) absorb cash spent inside
+  the budget and only grow once it is overspent; planned cash is added on top.
+  The fixed envelope adds every cash payment, since RiseUp's plan lists specific
+  bank charges. Cash income expects what came in plus what is still due.
+- **The card's ⋮** — add cash or expected cash here, `חודשים קודמים` (the last
+  six months of this envelope, built the same way), move several cash spends to
+  another envelope together, and the list of every plan.
+- **Search and filter** — the app bar's icons. One search across RiseUp charges
+  and cash, by merchant, category or exact amount, filtered by source, time range
+  and wallet. Cash results open for editing.
+- **Export** — the drawer exports the month or the last year as a CSV that opens
+  correctly in Hebrew in Excel, each row in the envelope the dashboard shows.
 - **Adding in the app** — the two dashed rows under the wallet, or the "add here"
   row at the bottom of any expanded envelope.
 - **Refresh** — `עדכון מרייזאפ` in the drawer and beside the "last synced" line
@@ -135,14 +159,21 @@ cash entries say what it bought — so nothing is counted twice.
   style. Bank and credit balances are not there yet: the read-only API exposes
   cashflow and transactions, and `get_balances` is still on RiseUp's roadmap.
 - **המזומן היומי** (`/daily`) — the entries the AI intake was unsure about,
-  gathered for one confirmation pass. This is what the floating green badge
-  counts.
+  gathered for one pass: confirm, fix or delete each, or confirm them all. This
+  is what the floating green badge counts.
 
 ### Access
 
-There are no passwords. `/dashboard` mints a signed, member-bound token that is
-valid for seven days and arrives over Telegram, so only the two allowlisted
-accounts can ever get in. Opening the link exchanges it for an httpOnly cookie.
+There are no passwords. `/dashboard` sends a private message with a signed,
+member-bound link valid for seven days, and a six-digit code valid for ten
+minutes; asked in the group, the bot answers privately. Opening the link sets an
+httpOnly cookie good for thirty days.
+
+**On a phone's home screen.** Add the dashboard to the home screen (Share → Add
+to Home Screen on iPhone, the install prompt on Android) and it opens full-screen
+like an app. A home-screen app keeps its own cookies, so the browser link does not
+sign it in: type the code from the same bot message instead. Codes are stored
+hashed, work once, and wrong guesses are capped household-wide.
 
 ### Working on the design
 
@@ -230,6 +261,7 @@ See `.env.example` for the annotated list. The ones with real decisions behind t
 | `STT_LANGUAGE` | Blank = auto-detect, which is right when you mix Hebrew and English. Set `he` for maximum Hebrew accuracy at the cost of English. |
 | `TELEGRAM_ALLOWED_USER_IDS` | The allowlist. An empty value means nobody can log anything. |
 | `APP_BASE_URL` | Must match the deployment exactly — it's what the dashboard links are built from. |
+| `EVENING_NUDGE` | `on` by default. The 20:30 message names whoever has not logged cash today and offers paid / not this month for due plans; it stays silent on days with nothing to do. `off` silences it. |
 
 ## Why these services
 
@@ -243,10 +275,18 @@ See `.env.example` for the annotated list. The ones with real decisions behind t
 ## Development
 
 ```bash
-npm test          # 59 tests, no network or API keys needed
+npm test                  # unit tests, no network, database or API keys
+npm run test:integration  # the real app code against Postgres + PostgREST
 npm run typecheck
 npm run dev
 ```
+
+`npm run test:integration` starts a throwaway Postgres cluster, applies every
+migration, puts PostgREST in front of it under `/rest/v1` (the shape supabase-js
+expects) and runs server actions, the sync, the bot's handlers and the API routes
+against it — only Telegram, Claude and RiseUp are stubbed. It needs Postgres server
+binaries (found under `/usr/lib/postgresql`, or set `PG_BIN`) and downloads a
+PostgREST binary on first run (or set `POSTGREST_BIN`).
 
 The interesting logic is deliberately pure and directly testable: wallet arithmetic
 (`lib/reconcile.ts`), withdrawal detection (`lib/riseup/withdrawals.ts`), callback encoding and
@@ -258,12 +298,17 @@ date formatting (`lib/telegram/format.ts`), and the date/amount guards around th
 ```
 app/api/telegram/webhook   Telegram entry point (secret-verified)
 app/api/cron/sync-riseup   Scheduled RiseUp pull
+app/api/cron/evening-nudge The evening reminder and due-plan buttons
+app/api/export             CSV export
+app/api/auth               Sign-in by link and by code
+app/manifest.ts, public/   Home-screen app: manifest, icons, service worker
 app/dashboard              The dashboard (page = auth + data, view = pure UI)
 app/dashboard/components   RiseUp's UI, rebuilt: envelopes, sheets, drawer, amounts
 app/accounts               מצב העו״ש
 app/daily                  The daily cash review
 lib/dashboard              Envelope + cash aggregation and breakdown buckets
-lib/auth                   Signed dashboard login links
+lib/auth                   Signed sessions, one-time sign-in codes
+lib/cash                   Dashboard actions, envelope filing, expected-cash plans
 docs/riseup-ui-spec.md     Measured spec for the UI
 docs/ui-comparison.md      How to check ours against new screenshots
 lib/intake                 Claude structured extraction + category catalog

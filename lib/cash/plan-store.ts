@@ -1,4 +1,3 @@
-import type { EnvelopeRef } from '@/lib/cash/envelopes';
 import {
   occurrenceDate,
   occursIn,
@@ -9,24 +8,14 @@ import {
 } from '@/lib/cash/plans';
 import { isoDateInIsrael } from '@/lib/dates';
 import { db } from '@/lib/db/client';
-import type { EnvelopeType } from '@/lib/types';
+import { envelopeRefsForMonth } from '@/lib/db/queries';
 
 /**
  * Plan persistence shared by the dashboard's server actions and the bot's
  * buttons. Callers are responsible for having checked who is asking.
  */
 
-export async function monthEnvelopeRefs(month: string): Promise<EnvelopeRef[]> {
-  const { data } = await db()
-    .from('riseup_envelopes')
-    .select('envelope_id, envelope_type, name')
-    .eq('month', month);
-  return (data ?? []).map((row) => ({
-    envelopeId: row.envelope_id as string,
-    type: row.envelope_type as EnvelopeType,
-    name: (row.name as string | null) ?? '',
-  }));
-}
+export const monthEnvelopeRefs = envelopeRefsForMonth;
 
 export async function loadPlan(id: string): Promise<CashPlan | null> {
   const { data } = await db().from('cash_plans').select('*').eq('id', id).maybeSingle();

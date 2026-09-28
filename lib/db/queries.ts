@@ -1,4 +1,5 @@
 import { db } from '@/lib/db/client';
+import { ENVELOPE_TITLES } from '@/lib/riseup/envelopes';
 import { env } from '@/lib/env';
 import type { EnvelopeRef } from '@/lib/cash/envelopes';
 import type { CashSpend, CashTopup, CashWallet, EnvelopeType, HouseholdMember } from '@/lib/types';
@@ -192,17 +193,36 @@ export async function insertCashIncomes(rows: NewCashIncome[]): Promise<CashTopu
 }
 
 /** The month's envelopes, shaped for filing a cash spend into one of them. */
+/**
+ * A month's envelopes as the filing rules need them — including the category
+ * labels RiseUp has used inside each one, which is how a cash "ביטוח" finds
+ * the fixed envelope rather than falling through to variable. Every server
+ * path that pins cash to an envelope reads it from here, so they all file the
+ * way the dashboard does.
+ */
 export async function envelopeRefsForMonth(month: string): Promise<EnvelopeRef[]> {
-  const { data, error } = await db()
-    .from('riseup_envelopes')
-    .select('envelope_id, envelope_type, name')
-    .eq('month', month);
+  const supabase = db();
+  const [{ data, error }, { data: actuals }] = await Promise.all([
+    supabase.from('riseup_envelopes').select('envelope_id, envelope_type, name').eq('month', month),
+    supabase.from('riseup_envelope_actuals').select('envelope_id, category_label').eq('month', month).not('category_label', 'is', null),
+  ]);
   if (error) throw new Error(`Failed to load envelopes: ${error.message}`);
-  return (data ?? []).map((row) => ({
-    envelopeId: row.envelope_id as string,
-    type: row.envelope_type as EnvelopeType,
-    name: (row.name as string | null) ?? '',
-  }));
+
+  const labels = new Map<string, Set<string>>();
+  for (const row of actuals ?? []) {
+    const id = row.envelope_id as string;
+    labels.set(id, (labels.get(id) ?? new Set()).add(row.category_label as string));
+  }
+
+  return (data ?? []).map((row) => {
+    const type = row.envelope_type as EnvelopeType;
+    return {
+      envelopeId: row.envelope_id as string,
+      type,
+      name: (row.name as string | null) ?? ENVELOPE_TITLES[type] ?? '',
+      categoryLabels: [...(labels.get(row.envelope_id as string) ?? [])],
+    };
+  });
 }
 
 export async function listWallets(): Promise<CashWallet[]> {

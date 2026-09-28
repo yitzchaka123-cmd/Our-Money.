@@ -262,11 +262,10 @@ async function handleVoice(
     });
     transcript = result.text;
   } catch (error) {
+    console.error('Transcription failed', error);
     await sendMessage(
       message.chat.id,
-      `🎤 לא הצלחתי לתמלל את ההקלטה.\n<code>${escapeHtml(
-        error instanceof Error ? error.message : String(error),
-      )}</code>`,
+      '🎤 לא הצלחתי לתמלל את ההקלטה. אפשר להקליט שוב, או פשוט לכתוב — שום דבר לא נרשם.',
     );
     return;
   }
@@ -293,12 +292,9 @@ async function logFromNaturalLanguage(
       wallets: wallets.map((w) => w.name),
     });
   } catch (error) {
-    await sendMessage(
-      chatId,
-      `😕 נתקלתי בבעיה בהבנת ההודעה.\n<code>${escapeHtml(
-        error instanceof Error ? error.message : String(error),
-      )}</code>`,
-    );
+    // The detail is for the logs; the couple needs to know what to do.
+    console.error('Intake parse failed', error);
+    await sendMessage(chatId, '😕 לא הצלחתי לעבד את ההודעה כרגע. נסו לשלוח שוב בעוד רגע — שום דבר לא נרשם.');
     return;
   }
 

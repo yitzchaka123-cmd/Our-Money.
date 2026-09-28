@@ -14,7 +14,9 @@
     "telegram:register": "tsx scripts/register-webhook.ts",
     "riseup:probe": "tsx scripts/probe-riseup.ts",
     "dashboard:preview": "tsx scripts/preview-dashboard.tsx",
-    "ui:shots": "bash scripts/ui-shots.sh"
+    "ui:shots": "bash scripts/ui-shots.sh",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "icons": "bash scripts/make-icons.sh"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.125.0",

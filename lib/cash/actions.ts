@@ -3,10 +3,10 @@
 import { revalidatePath } from 'next/cache';
 
 import { SESSION_EXPIRED_MESSAGE, sessionMember } from '@/lib/auth/member';
-import { resolveEnvelopeForCategory, type EnvelopeRef } from '@/lib/cash/envelopes';
+import { resolveEnvelopeForCategory } from '@/lib/cash/envelopes';
 import { db } from '@/lib/db/client';
+import { envelopeRefsForMonth } from '@/lib/db/queries';
 import { syncIfStale } from '@/lib/riseup/sync';
-import type { EnvelopeType } from '@/lib/types';
 
 /**
  * Mutations for cash made from the web dashboard. Every action re-checks the
@@ -79,18 +79,7 @@ function validate(input: CashEntryInput): string | null {
 }
 
 /** The month's envelopes, read at write time so a pin is always current. */
-async function envelopeRefs(month: string): Promise<EnvelopeRef[]> {
-  const { data, error } = await db()
-    .from('riseup_envelopes')
-    .select('envelope_id, envelope_type, name')
-    .eq('month', month);
-  if (error) throw new Error(error.message);
-  return (data ?? []).map((row) => ({
-    envelopeId: row.envelope_id as string,
-    type: row.envelope_type as EnvelopeType,
-    name: (row.name as string | null) ?? '',
-  }));
-}
+const envelopeRefs = envelopeRefsForMonth;
 
 async function resolvePin(
   month: string,
