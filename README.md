@@ -196,10 +196,12 @@ These go in `TELEGRAM_ALLOWED_USER_IDS`; nobody else can use the bot, even if th
 
 ### 2. Create the Supabase project
 
-Run `supabase/migrations/0001_init.sql` against a new project (SQL editor, or
-`supabase db push`). It creates the tables, seeds the Hebrew category list, and enables RLS
-with no permissive policies — every path in goes through a server route holding the service
-role key, so nothing is reachable from a browser.
+Create a project (the Frankfurt region is closest to Israel) and apply every file
+in `supabase/migrations` in order — SQL editor, `supabase db push`, or the Supabase
+connector. They create the tables, seed the Hebrew categories and the main wallet,
+and lock the database to the server: row level security everywhere with no
+policies, and the public API roles stripped of table access. Only the secret
+(service role) key the server holds can read or write.
 
 ### 3. Get a RiseUp token
 
@@ -219,15 +221,16 @@ npm test
 npm run build
 ```
 
-Deploy to Vercel, set the same variables in the project settings, then point Telegram at it:
+Deploy to Vercel (import the repository; `vercel.json` pins the functions to
+Frankfurt, next to the database), set the variables in the project settings,
+redeploy, then open **`/setup`** on the deployment. It shows which variables are
+present (never their values), whether the database answers with every table in
+place, whether the bot token works, and the last RiseUp sync — and it registers
+the Telegram webhook as it goes. The daily sync re-registers it if the URL or
+secret ever drifts, so `npm run telegram:register` is only for running elsewhere.
 
-```bash
-TELEGRAM_BOT_TOKEN=... TELEGRAM_WEBHOOK_SECRET=... \
-PUBLIC_URL=https://your-app.vercel.app \
-npm run telegram:register
-```
-
-`vercel.json` already schedules the RiseUp sync twice a day (05:00 and 17:00 UTC).
+`vercel.json` schedules the RiseUp sync twice a day (05:00 and 17:00 UTC) and the
+evening nudge at 17:30 UTC, each once a day, which every Vercel plan allows.
 
 ### 5. Check the withdrawal detector against your bank
 

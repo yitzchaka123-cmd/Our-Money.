@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { env } from '@/lib/env';
-import { escapeHtml, sendMessage } from '@/lib/telegram/client';
+import { ensureWebhook, escapeHtml, sendMessage } from '@/lib/telegram/client';
 import { syncRiseup } from '@/lib/riseup/sync';
 import { announceWithdrawals } from '@/lib/telegram/handlers';
 
@@ -18,6 +18,9 @@ export async function GET(request: Request): Promise<NextResponse> {
   if (auth !== `Bearer ${env.cronSecret}`) {
     return NextResponse.json({ ok: false }, { status: 401 });
   }
+
+  // Keep the bot reachable: re-registers only if the URL or secret drifted.
+  await ensureWebhook().catch((error) => console.error('Webhook check failed', error));
 
   const result = await syncRiseup();
   const groupChatId = env.telegramGroupChatId;

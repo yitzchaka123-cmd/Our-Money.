@@ -14,6 +14,7 @@ import {
 import { loadDashboard } from '@/lib/dashboard/data';
 
 import { resetDb, seedMember, seedMonth, signIn, signOut, sql } from './helpers';
+import { signJwt } from './jwt';
 
 const MONTH = '2026-09';
 
@@ -162,5 +163,17 @@ describe('cash actions against the real schema', () => {
 
     expect((await deleteCashEntry(id, 'withdrawal')).ok).toBe(true);
     expect(sql('select is_dismissed from cash_topups')).toEqual([{ is_dismissed: true }]);
+  });
+
+  it('gives the public API roles nothing, even with a valid key', async () => {
+    await addCashEntry(entry());
+    for (const role of ['anon', 'authenticated']) {
+      const key = signJwt({ role });
+      const response = await fetch(`${process.env.SUPABASE_URL}/rest/v1/cash_spends?select=id`, {
+        headers: { apikey: key, Authorization: `Bearer ${key}` },
+      });
+      // 401/403: permission denied on the table itself, not just zero rows.
+      expect([401, 403]).toContain(response.status);
+    }
   });
 });

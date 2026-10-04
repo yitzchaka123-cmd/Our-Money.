@@ -92,6 +92,40 @@ export async function downloadFile(fileId: string): Promise<ArrayBuffer> {
   return response.arrayBuffer();
 }
 
+export async function getMe(): Promise<{ id: number; username?: string; first_name: string }> {
+  return call('getMe', {});
+}
+
+export interface WebhookInfo {
+  url: string;
+  pending_update_count: number;
+  last_error_date?: number;
+  last_error_message?: string;
+}
+
+export function webhookUrl(): string {
+  return `${env.appBaseUrl}/api/telegram/webhook`;
+}
+
+/**
+ * Point Telegram at this deployment, with the current secret. Without `force`
+ * it only acts when the URL is wrong or Telegram reports our endpoint
+ * rejecting it (a changed secret); with it, it always re-registers. Pending
+ * messages are kept either way.
+ */
+export async function ensureWebhook(force = false): Promise<{ changed: boolean; info: WebhookInfo }> {
+  const info = await call<WebhookInfo>('getWebhookInfo', {});
+  const rejected = /401|403|Unauthorized|Forbidden/i.test(info.last_error_message ?? '');
+  if (!force && info.url === webhookUrl() && !rejected) return { changed: false, info };
+
+  await call('setWebhook', {
+    url: webhookUrl(),
+    secret_token: env.telegramWebhookSecret,
+    allowed_updates: ['message', 'callback_query'],
+  });
+  return { changed: true, info: await call<WebhookInfo>('getWebhookInfo', {}) };
+}
+
 /** Escape text before interpolating it into an HTML-parse-mode message. */
 export function escapeHtml(value: string): string {
   return value

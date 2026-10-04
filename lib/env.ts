@@ -6,6 +6,8 @@
  * error three layers down, which is much harder to diagnose.
  */
 
+import { createHmac } from 'node:crypto';
+
 function required(name: string, purpose: string): string {
   const value = process.env[name];
   if (!value) {
@@ -22,11 +24,15 @@ export const env = {
   get telegramBotToken(): string {
     return required('TELEGRAM_BOT_TOKEN', 'Create a bot with @BotFather.');
   },
+  /**
+   * How the webhook proves a request came from Telegram. Derived from the
+   * session secret unless set, so there is one less value to generate; the
+   * derivation only uses characters Telegram accepts (A-Z a-z 0-9 _ -).
+   */
   get telegramWebhookSecret(): string {
-    return required(
-      'TELEGRAM_WEBHOOK_SECRET',
-      'This is how the webhook proves a request came from Telegram.',
-    );
+    const explicit = optional('TELEGRAM_WEBHOOK_SECRET');
+    if (explicit) return explicit;
+    return createHmac('sha256', env.sessionSecret).update('telegram-webhook').digest('base64url');
   },
   get telegramGroupChatId(): number | null {
     const raw = optional('TELEGRAM_GROUP_CHAT_ID');
@@ -87,9 +93,17 @@ export const env = {
   get sessionSecret(): string {
     return required('APP_SESSION_SECRET', 'Signs dashboard login links.');
   },
-  /** Absolute base URL of the deployment — used to build dashboard links. */
+  /**
+   * Absolute base URL of the deployment — used to build dashboard links and to
+   * register the Telegram webhook. On Vercel it defaults to the project's
+   * production domain, which Vercel provides; set it to use a custom domain.
+   */
   get appBaseUrl(): string {
-    return required('APP_BASE_URL', 'e.g. https://our-money.vercel.app').replace(/\/$/, '');
+    const explicit = optional('APP_BASE_URL');
+    if (explicit) return explicit.replace(/\/$/, '');
+    const vercel = optional('VERCEL_PROJECT_PRODUCTION_URL');
+    if (vercel) return `https://${vercel.replace(/\/$/, '')}`;
+    return required('APP_BASE_URL', 'e.g. https://our-money.vercel.app');
   },
 
   /** The evening "anything in cash today?" message. On unless set to "off". */

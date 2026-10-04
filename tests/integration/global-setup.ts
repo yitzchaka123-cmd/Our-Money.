@@ -9,16 +9,16 @@
  * into node_modules/.cache). Run with `npm run test:integration`.
  */
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
-import { createHmac } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { createServer, request as httpRequest, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { JWT_SECRET, signJwt } from './jwt';
+
 const ROOT = join(__dirname, '..', '..');
 const POSTGREST_VERSION = 'v12.2.3';
-const JWT_SECRET = 'integration-tests-only-jwt-secret-0123456789';
 
 function findPgBin(): string {
   if (process.env.PG_BIN) return process.env.PG_BIN;
@@ -77,17 +77,6 @@ async function freePort(): Promise<number> {
   });
 }
 
-function base64url(input: string): string {
-  return Buffer.from(input).toString('base64url');
-}
-
-export function signJwt(payload: Record<string, unknown>): string {
-  const head = base64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-  const body = base64url(JSON.stringify(payload));
-  const signature = createHmac('sha256', JWT_SECRET).update(`${head}.${body}`).digest('base64url');
-  return `${head}.${body}.${signature}`;
-}
-
 async function waitFor(url: string, timeoutMs = 20_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -109,6 +98,12 @@ create role authenticated nologin noinherit;
 create role service_role nologin noinherit bypassrls;
 create role authenticator login password 'authenticator' noinherit;
 grant anon, authenticated, service_role to authenticator;
+grant usage on schema public to anon, authenticated, service_role;
+-- Supabase grants every new table to all three API roles by default; mirror
+-- that, so a test proves our migrations take the access away.
+alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
+alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
+alter default privileges in schema public grant all on functions to anon, authenticated, service_role;
 `;
 
 const GRANTS_SQL = `

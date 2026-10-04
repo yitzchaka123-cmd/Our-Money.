@@ -78,11 +78,15 @@ const HELP = [
   '/id — מזהי הצ׳אט (שימושי להגדרת קבוצה)',
 ].join('\n');
 
-const NOT_AUTHORIZED = [
-  '🔒 הבוט הזה פרטי.',
-  '',
-  'אם זה הבוט שלכם, הוסיפו את מזהה המשתמש שלכם ל-TELEGRAM_ALLOWED_USER_IDS ופרסו מחדש.',
-].join('\n');
+/** Includes the sender's own id: it is theirs to know, and it is exactly what setup needs. */
+function notAuthorized(telegramUserId: number): string {
+  return [
+    '🔒 הבוט הזה פרטי.',
+    '',
+    `מזהה המשתמש שלך בטלגרם: <code>${telegramUserId}</code>`,
+    'אם זה הבוט שלכם, הוסיפו את המספר הזה ל-TELEGRAM_ALLOWED_USER_IDS ב-Vercel ופרסו מחדש.',
+  ].join('\n');
+}
 
 let cachedBotUsername: string | null = null;
 
@@ -109,7 +113,7 @@ export async function handleUpdate(update: TelegramUpdate): Promise<void> {
   if (!member) {
     // In a group, an unknown speaker is just someone else talking — staying
     // quiet is correct. In a DM, they deserve an explanation.
-    if (isPrivate) await sendMessage(message.chat.id, NOT_AUTHORIZED);
+    if (isPrivate) await sendMessage(message.chat.id, notAuthorized(message.from.id));
     return;
   }
 
