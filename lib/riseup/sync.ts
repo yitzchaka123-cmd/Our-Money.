@@ -44,7 +44,6 @@ function toRow(transaction: RiseupTransaction) {
     category_label: transaction.categoryLabel ?? null,
     category_type: transaction.categoryType ?? null,
     is_withdrawal: isWithdrawal(transaction),
-    raw: transaction,
     synced_at: new Date().toISOString(),
   };
 }
@@ -319,7 +318,6 @@ async function storeEnvelopes(
       planned_ils: envelope.plannedIls,
       actual_ils: envelope.actualIls,
       position: envelope.position,
-      raw: envelope,
     })),
   );
   if (insertEnvelopes) throw new Error(`Failed to store envelopes: ${insertEnvelopes.message}`);
@@ -341,7 +339,6 @@ async function storeEnvelopes(
       payment_number: actual.paymentNumber,
       total_payments: actual.totalPayments,
       category_label: actual.categoryLabel,
-      raw: actual,
     })),
   );
 

@@ -194,14 +194,36 @@ Message [@BotFather](https://t.me/BotFather) → `/newbot` → keep the token.
 Then get the numeric user ids for both of you from [@userinfobot](https://t.me/userinfobot).
 These go in `TELEGRAM_ALLOWED_USER_IDS`; nobody else can use the bot, even if they find it.
 
-### 2. Create the Supabase project
+### 2. The database: schema `money` in the shared Supabase project
 
-Create a project (the Frankfurt region is closest to Israel) and apply every file
-in `supabase/migrations` in order — SQL editor, `supabase db push`, or the Supabase
-connector. They create the tables, seed the Hebrew categories and the main wallet,
-and lock the database to the server: row level security everywhere with no
-policies, and the public API roles stripped of table access. Only the secret
-(service role) key the server holds can read or write.
+Our Money does not get a Supabase project of its own. It lives in the household's
+one shared project (`abirjil`, Frankfurt, free plan) next to the other apps, in
+its own schema, **`money`**, and never touches anything outside it: no other
+schema, no extension, no Supabase Auth, no storage, no global defaults.
+
+```bash
+SUPABASE_ACCESS_TOKEN=... npm run db:migrate -- --check   # what is pending
+SUPABASE_ACCESS_TOKEN=... npm run db:migrate              # apply it
+```
+
+The runner checks every file with `scripts/lib/migration-guard.ts` first and
+refuses anything that reaches outside `money`. It records what it applied in
+`money.schema_migrations` rather than in Supabase's own migration history, which
+the other apps own. Every object in the SQL is written as `money.<name>`.
+
+- **Exposed to the API by appending.** The project's API schema list gets
+  `, money` added to the end; the other apps' schemas stay listed. The app's
+  client is created with `{ db: { schema: 'money' } }`.
+- **Server-only.** Row level security on every table with no policies, and
+  `anon`, `authenticated` and `PUBLIC` have no access to the schema at all;
+  only the service role does. `tests/integration` checks this, and checks that
+  the neighbours' grants are untouched.
+- **Lean.** The free plan's 500 MB is shared by every app in the project. RiseUp
+  data is kept as the columns the app reads, not raw JSON copies, and the daily
+  sync prunes the sync log, spent sign-in codes and the old transaction mirror
+  (`lib/riseup/prune.ts`). Cash entries, plans and envelopes are never pruned.
+- **The service role key opens every app in the project.** It lives only in
+  Vercel, marked sensitive, read only by server code.
 
 ### 3. Get a RiseUp token
 
@@ -273,7 +295,8 @@ See `.env.example` for the annotated list. The ones with real decisions behind t
   afterwards, because a hallucinated future date would quietly skew every month report.
 - **OpenAI** appears exactly once, in `lib/stt/openai.ts`, to transcribe voice notes. Claude's
   Messages API doesn't accept audio. Swapping providers means replacing that one file.
-- **Supabase** holds the ledger. **Vercel** runs the webhook and the cron.
+- **Supabase** holds the ledger, in schema `money` of the shared project. **Vercel** runs
+  the webhook and the cron, in Frankfurt next to the database.
 
 ## Development
 
@@ -319,14 +342,16 @@ lib/stt                    Voice transcription (provider behind one function)
 lib/riseup                 Read-only API client, withdrawal detection, sync
 lib/telegram               API client, message formatting, update handlers
 lib/reconcile.ts           Wallet arithmetic and report aggregation
-supabase/migrations        Schema
+supabase/migrations        The money schema (applied with npm run db:migrate)
+scripts/migrate-shared.ts  Migration runner for the shared project, behind a guard
 ```
 
 ## Security notes
 
 - The webhook rejects any request without the matching `X-Telegram-Bot-Api-Secret-Token`.
 - Only allowlisted Telegram user ids can log or read anything.
-- The Supabase service role key and every other secret stay server-side; there is no client
+- The Supabase service role key opens every app in the shared project. It is a sensitive
+  Vercel variable, and it and every other secret stay server-side; there is no client
   bundle that touches them.
 - The RiseUp token is read-only by design, so the worst case for a leaked PAT is disclosure,
   never modification of your RiseUp account. Rotate it at the tokens page regardless.

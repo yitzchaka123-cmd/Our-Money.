@@ -91,26 +91,29 @@ async function waitFor(url: string, timeoutMs = 20_000): Promise<void> {
   throw new Error(`Timed out waiting for ${url}`);
 }
 
-/** The roles Supabase provides, so migrations and grants behave as they do there. */
-const ROLES_SQL = `
+/**
+ * A miniature of the shared Supabase project: its API roles, its default
+ * grants on `public`, and two neighbours' tables — so the tests prove our
+ * migrations work on their own and leave everyone else's schema alone.
+ */
+const SHARED_PROJECT_SQL = `
 create role anon nologin noinherit;
 create role authenticated nologin noinherit;
 create role service_role nologin noinherit bypassrls;
 create role authenticator login password 'authenticator' noinherit;
 grant anon, authenticated, service_role to authenticator;
 grant usage on schema public to anon, authenticated, service_role;
--- Supabase grants every new table to all three API roles by default; mirror
--- that, so a test proves our migrations take the access away.
+-- Supabase grants every new table in public to all three API roles.
 alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
 alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
 alter default privileges in schema public grant all on functions to anon, authenticated, service_role;
-`;
 
-const GRANTS_SQL = `
-grant usage on schema public to anon, authenticated, service_role;
-grant all on all tables in schema public to service_role;
-grant all on all sequences in schema public to service_role;
-grant all on all functions in schema public to service_role;
+-- The neighbours: the studio app in public, the family dashboard in family.
+create table public.studio_sentinel (id int primary key);
+create schema family;
+grant usage on schema family to anon, authenticated, service_role;
+create table family.dashboard_sentinel (id int primary key);
+grant select on family.dashboard_sentinel to anon, authenticated, service_role;
 `;
 
 let postgrest: ChildProcess | null = null;
@@ -147,7 +150,7 @@ export default async function setup(): Promise<() => Promise<void>> {
       stdio: ['pipe', 'pipe', 'pipe'],
     });
 
-  psql(ROLES_SQL);
+  psql(SHARED_PROJECT_SQL);
   const migrationsDir = join(ROOT, 'supabase', 'migrations');
   for (const file of readdirSync(migrationsDir).filter((f) => f.endsWith('.sql')).sort()) {
     try {
@@ -157,14 +160,14 @@ export default async function setup(): Promise<() => Promise<void>> {
       throw new Error(`Migration ${file} failed:\n${stderr}`);
     }
   }
-  psql(GRANTS_SQL);
 
   const postgrestPort = await freePort();
   postgrest = spawn(postgrestBin, [], {
     env: {
       ...process.env,
       PGRST_DB_URI: `postgres://authenticator:authenticator@127.0.0.1:${pgPort}/postgres`,
-      PGRST_DB_SCHEMAS: 'public',
+      // As in the shared project: other apps' schemas plus ours.
+      PGRST_DB_SCHEMAS: 'public,family,money',
       PGRST_DB_ANON_ROLE: 'anon',
       PGRST_JWT_SECRET: JWT_SECRET,
       PGRST_SERVER_HOST: '127.0.0.1',

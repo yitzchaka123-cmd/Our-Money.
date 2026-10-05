@@ -9,15 +9,21 @@
 import { createHmac } from 'node:crypto';
 
 function required(name: string, purpose: string): string {
-  const value = process.env[name];
+  const value = process.env[name]?.trim();
   if (!value) {
     throw new Error(`${name} is not set. ${purpose} See .env.example.`);
   }
   return value;
 }
 
+/**
+ * Blank counts as unset. Hosting dashboards happily store empty variables
+ * (an imported template leaves every one of them blank), and an empty
+ * RISEUP_API_BASE or STT_MODEL must fall back to the default, not to "".
+ */
 function optional(name: string, fallback = ''): string {
-  return process.env[name] ?? fallback;
+  const value = process.env[name]?.trim();
+  return value ? value : fallback;
 }
 
 export const env = {

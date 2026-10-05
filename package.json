@@ -16,7 +16,8 @@
     "dashboard:preview": "tsx scripts/preview-dashboard.tsx",
     "ui:shots": "bash scripts/ui-shots.sh",
     "test:integration": "vitest run --config vitest.integration.config.ts",
-    "icons": "bash scripts/make-icons.sh"
+    "icons": "bash scripts/make-icons.sh",
+    "db:migrate": "tsx scripts/migrate-shared.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.125.0",

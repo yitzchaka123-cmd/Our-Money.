@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { env } from '@/lib/env';
 import { ensureWebhook, escapeHtml, sendMessage } from '@/lib/telegram/client';
+import { pruneOldData } from '@/lib/riseup/prune';
 import { syncRiseup } from '@/lib/riseup/sync';
 import { announceWithdrawals } from '@/lib/telegram/handlers';
 
@@ -23,6 +24,8 @@ export async function GET(request: Request): Promise<NextResponse> {
   await ensureWebhook().catch((error) => console.error('Webhook check failed', error));
 
   const result = await syncRiseup();
+  // Once a day is plenty, and this route runs once or twice a day.
+  await pruneOldData().catch((error) => console.error('Prune failed', error));
   const groupChatId = env.telegramGroupChatId;
 
   // A dead PAT silently stops the wallet from being topped up, which would

@@ -15,12 +15,15 @@ export function signOut(): void {
   cookieJar.value = null;
 }
 
+/** psql sessions resolve unqualified names in our schema, like the app does. */
+const PSQL_ENV = { ...process.env, PGOPTIONS: '-c search_path=money' };
+
 /** Run SQL as the superuser and return the rows as JSON. */
 export function sql<T = Record<string, unknown>>(query: string): T[] {
   const out = execFileSync(
     join(process.env.TEST_PG_BIN!, 'psql'),
     ['-h', '127.0.0.1', '-p', process.env.TEST_PG_PORT!, '-U', 'postgres', '-d', 'postgres', '-At', '-v', 'ON_ERROR_STOP=1', '-c', `select coalesce(json_agg(t), '[]') from (${query}) t`],
-    { stdio: ['ignore', 'pipe', 'pipe'] },
+    { stdio: ['ignore', 'pipe', 'pipe'], env: PSQL_ENV },
   ).toString();
   return JSON.parse(out.trim() || '[]') as T[];
 }
@@ -29,7 +32,7 @@ function exec(statement: string): void {
   execFileSync(
     join(process.env.TEST_PG_BIN!, 'psql'),
     ['-h', '127.0.0.1', '-p', process.env.TEST_PG_PORT!, '-U', 'postgres', '-d', 'postgres', '-q', '-v', 'ON_ERROR_STOP=1', '-c', statement],
-    { stdio: ['ignore', 'pipe', 'pipe'] },
+    { stdio: ['ignore', 'pipe', 'pipe'], env: PSQL_ENV },
   );
 }
 
@@ -67,7 +70,7 @@ export async function seedMonth(month: string): Promise<void> {
     { envelope_id: `${month}-fix`, envelope_type: 'fixed', name: null, planned_ils: 4000, actual_ils: 3500, position: 2 },
     { envelope_id: `${month}-food`, envelope_type: 'trackingCategory', name: 'אוכל בחוץ', planned_ils: 600, actual_ils: 100, position: 3 },
     { envelope_id: `${month}-goal`, envelope_type: 'riseupGoal', name: null, planned_ils: 1000, actual_ils: 0, position: 4 },
-  ].map((e) => ({ ...e, month, raw: {} }));
+  ].map((e) => ({ ...e, month }));
   const { error } = await supabase.from('riseup_envelopes').insert(envelopes);
   if (error) throw new Error(error.message);
 
@@ -80,7 +83,6 @@ export async function seedMonth(month: string): Promise<void> {
     business_name: name,
     amount_ils: amount,
     is_income: false,
-    raw: {},
     ...extra,
   });
   const { error: actualsError } = await supabase.from('riseup_envelope_actuals').insert([

@@ -165,15 +165,69 @@ describe('cash actions against the real schema', () => {
     expect(sql('select is_dismissed from cash_topups')).toEqual([{ is_dismissed: true }]);
   });
 
-  it('gives the public API roles nothing, even with a valid key', async () => {
+  it('locks the money schema to the service role, and only the money schema', async () => {
     await addCashEntry(entry());
+
+    // Through the API: a valid anon or authenticated key is refused at the
+    // schema itself, not just shown zero rows.
     for (const role of ['anon', 'authenticated']) {
       const key = signJwt({ role });
       const response = await fetch(`${process.env.SUPABASE_URL}/rest/v1/cash_spends?select=id`, {
-        headers: { apikey: key, Authorization: `Bearer ${key}` },
+        headers: { apikey: key, Authorization: `Bearer ${key}`, 'Accept-Profile': 'money' },
       });
-      // 401/403: permission denied on the table itself, not just zero rows.
       expect([401, 403]).toContain(response.status);
     }
+
+    // In the catalog: no usage, no table, sequence or function privilege for
+    // anyone but the service role — and RLS on every table.
+    const [access] = sql<Record<string, boolean>>(`
+      select
+        not has_schema_privilege('anon', 'money', 'usage')
+          and not has_schema_privilege('authenticated', 'money', 'usage') as schema_closed,
+        has_schema_privilege('service_role', 'money', 'usage') as service_role_in,
+        not exists (
+          select 1 from pg_tables t, (values ('anon'), ('authenticated')) r(role)
+          where t.schemaname = 'money'
+            and has_table_privilege(r.role, format('%I.%I', t.schemaname, t.tablename), 'select,insert,update,delete')
+        ) as tables_closed,
+        not exists (
+          select 1 from pg_tables t
+          where t.schemaname = 'money'
+            and not has_table_privilege('service_role', format('%I.%I', t.schemaname, t.tablename), 'select,insert,update,delete')
+        ) as service_role_has_tables,
+        not exists (
+          select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace, (values ('anon'), ('authenticated')) r(role)
+          where n.nspname = 'money' and c.relkind = 'S' and has_sequence_privilege(r.role, c.oid, 'usage')
+        ) as sequences_closed,
+        not exists (
+          select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace, (values ('anon'), ('authenticated'), ('public')) r(role)
+          where n.nspname = 'money'
+            and (r.role = 'public' and exists (select 1 from aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a where a.grantee = 0)
+                 or r.role <> 'public' and has_function_privilege(r.role, p.oid, 'execute'))
+        ) as functions_closed,
+        not exists (
+          select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace
+          where n.nspname = 'money' and c.relkind = 'r' and not c.relrowsecurity
+        ) as rls_everywhere
+    `);
+    expect(access).toEqual({
+      schema_closed: true,
+      service_role_in: true,
+      tables_closed: true,
+      service_role_has_tables: true,
+      sequences_closed: true,
+      functions_closed: true,
+      rls_everywhere: true,
+    });
+
+    // The neighbours are untouched: nothing of ours in public, and their
+    // grants still stand.
+    const [neighbours] = sql<Record<string, boolean>>(`
+      select
+        not exists (select 1 from pg_tables where schemaname = 'public' and tablename <> 'studio_sentinel') as public_has_nothing_of_ours,
+        has_table_privilege('anon', 'public.studio_sentinel', 'select') as studio_grants_intact,
+        has_table_privilege('anon', 'family.dashboard_sentinel', 'select') as family_grants_intact
+    `);
+    expect(neighbours).toEqual({ public_has_nothing_of_ours: true, studio_grants_intact: true, family_grants_intact: true });
   });
 });
