@@ -211,9 +211,13 @@ refuses anything that reaches outside `money`. It records what it applied in
 `money.schema_migrations` rather than in Supabase's own migration history, which
 the other apps own. Every object in the SQL is written as `money.<name>`.
 
-- **Exposed to the API by appending.** The project's API schema list gets
-  `, money` added to the end; the other apps' schemas stay listed. The app's
-  client is created with `{ db: { schema: 'money' } }`.
+- **Exposed to the API by appending.** The schema list the database API serves
+  gets `, money` added to the end; the other apps' schemas stay listed. In this
+  project the live list is set inside the database, on the API's login role
+  (`pgrst.db_schemas` on `authenticator`), which overrides the dashboard's API
+  setting — so `money` was appended in both places. To check what is really
+  served, ask the API for a schema that does not exist: its error lists them.
+  The app's client is created with `{ db: { schema: 'money' } }`.
 - **Server-only.** Row level security on every table with no policies, and
   `anon`, `authenticated` and `PUBLIC` have no access to the schema at all;
   only the service role does. `tests/integration` checks this, and checks that

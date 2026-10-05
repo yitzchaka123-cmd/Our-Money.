@@ -31,8 +31,14 @@ async function checkDatabase(): Promise<Check> {
   try {
     // login_codes comes from the newest migration that adds a table; if it
     // answers, every migration before it ran too.
-    const { error } = await db().from('login_codes').select('id', { count: 'exact', head: true });
-    if (error) return { label: 'מסד הנתונים', ok: false, detail: `החיבור נכשל או שהטבלאות חסרות: ${error.message}` };
+    // A GET with no rows rather than a HEAD: a HEAD error arrives without a
+    // body, and the message ("Invalid schema: money", a permission error) is
+    // exactly what this page is for.
+    const { error } = await db().from('login_codes').select('id').limit(0);
+    if (error) {
+      const why = [error.message, error.hint].filter(Boolean).join(' — ');
+      return { label: 'מסד הנתונים', ok: false, detail: `החיבור נכשל או שהטבלאות חסרות: ${why}` };
+    }
     return { label: 'מסד הנתונים', ok: true, detail: 'מחובר, כל הטבלאות קיימות.' };
   } catch (error) {
     return { label: 'מסד הנתונים', ok: false, detail: error instanceof Error ? error.message : String(error) };
