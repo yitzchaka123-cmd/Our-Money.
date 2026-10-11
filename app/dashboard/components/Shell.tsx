@@ -4,6 +4,7 @@ import { useState, type ReactNode } from 'react';
 
 import { RefreshButton } from '@/app/dashboard/components/RefreshButton';
 import { Sheet } from '@/app/dashboard/components/Sheet';
+import { SyncButton } from '@/app/dashboard/components/SyncButton';
 import {
   Bank,
   Chart,
@@ -65,6 +66,7 @@ export function Shell({
           <button className="icon-btn" type="button" aria-label="חיפוש" onClick={onSearch}>
             <Search />
           </button>
+          <SyncButton />
         </div>
         <button className="icon-btn" type="button" aria-label="העוזר החכם">
           <SparkleBubble />

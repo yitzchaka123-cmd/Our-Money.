@@ -14,6 +14,7 @@ import { writeFileSync, readFileSync } from 'node:fs';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 import { DashboardView } from '../app/dashboard/view';
+import { previewOverlay } from './preview-overlays';
 import type { DashboardData, EnvelopeView } from '../lib/dashboard/data';
 import type { NormalizedActual } from '../lib/riseup/envelopes';
 
@@ -236,9 +237,13 @@ const fixture: DashboardData = {
   briefCount: 8,
 };
 
-const css = readFileSync(new URL('../app/globals.css', import.meta.url), 'utf8');
+const css = ['../app/globals.css', '../app/assistant-and-setup.css']
+  .map((file) => readFileSync(new URL(file, import.meta.url), 'utf8'))
+  .join('\n');
 const target = process.argv[2] ?? 'dashboard-preview.html';
 const expandAll = process.argv[3] === 'expanded';
+// Other modes draw a sheet or toast over the page: see preview-overlays.tsx.
+const overlay = previewOverlay(process.argv[3]);
 
 const html = `<!doctype html>
 <html lang="he" dir="rtl">
@@ -248,7 +253,7 @@ const html = `<!doctype html>
 <title>Our Money — preview</title>
 <style>${css}</style>
 </head>
-<body>${renderToStaticMarkup(<DashboardView data={fixture} sessionMemberId="m1" expandAll={expandAll} />)}</body>
+<body>${renderToStaticMarkup(<><DashboardView data={fixture} sessionMemberId="m1" expandAll={expandAll} />{overlay}</>)}</body>
 </html>`;
 
 writeFileSync(target, html);
