@@ -18,6 +18,8 @@ import {
   type NormalizedEnvelope,
 } from '@/lib/riseup/envelopes';
 import { syncBanner, type SyncBanner } from '@/lib/riseup/banner';
+import { loadNameBook } from '@/lib/riseup/name-book';
+import { isUnresolvedName, resolveTrackerName, type NameBook } from '@/lib/riseup/tracker-names';
 import { loadSyncState } from '@/lib/riseup/sync';
 import { matchesWithdrawalName } from '@/lib/riseup/withdrawals';
 import type { CashSpend, CashTopup, CashTransfer, CashWallet, EnvelopeType, HouseholdMember } from '@/lib/types';
@@ -133,6 +135,8 @@ export interface MonthRows {
   plans: CashPlan[];
   skippedPlanIds: ReadonlySet<string>;
   memberNames: Map<string, string>;
+  /** Names learned in other months, for trackers stored without one. */
+  names?: NameBook | null;
 }
 
 /**
@@ -145,7 +149,7 @@ export function assembleMonth(rows: MonthRows): {
   riseupEnvelopes: NormalizedEnvelope[];
 } {
   const actualsByEnvelope = groupActuals(rows.actualRows);
-  const riseupEnvelopes = rows.envelopeRows.map((row) => toNormalized(row, actualsByEnvelope));
+  const riseupEnvelopes = rows.envelopeRows.map((row) => toNormalized(row, actualsByEnvelope, rows.names));
 
   const occurrences = planOccurrences(
     rows.plans,
@@ -204,6 +208,7 @@ export async function loadDashboard(month: string, sessionMemberId: string | nul
     { data: monthTransfers },
     { data: planRows },
     { data: skipRows },
+    names,
   ] = await Promise.all([
     supabase.from('riseup_envelopes').select('*').eq('month', month).order('position'),
     supabase.from('riseup_envelope_actuals').select('*').eq('month', month),
@@ -236,6 +241,7 @@ export async function loadDashboard(month: string, sessionMemberId: string | nul
       .lte('occurred_at', to),
     supabase.from('cash_plans').select('*').eq('is_active', true).order('day_of_month'),
     supabase.from('cash_plan_skips').select('plan_id').eq('month', month),
+    loadNameBook(),
   ]);
 
   const wallets = (walletRows ?? []) as CashWallet[];
@@ -255,6 +261,7 @@ export async function loadDashboard(month: string, sessionMemberId: string | nul
     plans,
     skippedPlanIds: new Set(((skipRows ?? []) as { plan_id: string }[]).map((r) => r.plan_id)),
     memberNames,
+    names,
   });
 
   const totals = monthTotals(envelopes);
@@ -361,14 +368,20 @@ export interface EnvelopeRow {
 function toNormalized(
   row: EnvelopeRow,
   actualsByEnvelope: Map<string, NormalizedActual[]>,
+  names?: NameBook | null,
 ): NormalizedEnvelope {
   const actuals = actualsByEnvelope.get(row.envelope_id) ?? [];
   const type = row.envelope_type as EnvelopeType;
   const actualIls = round(actuals.reduce((sum, a) => sum + a.amountIls, 0));
+  // Rows synced before trackers had names carry the raw id; name them now.
+  const name =
+    type === 'trackingCategory' && isUnresolvedName(row.name)
+      ? resolveTrackerName({ envelopeId: row.envelope_id, ownLabels: actuals.map((a) => a.categoryLabel), book: names })
+      : (row.name ?? ENVELOPE_TITLES[type] ?? row.envelope_id);
   return {
     envelopeId: row.envelope_id,
     type,
-    name: row.name ?? ENVELOPE_TITLES[type] ?? row.envelope_id,
+    name,
     plannedIls: plannedForType(type, Number(row.planned_ils), actualIls),
     actualIls,
     position: row.position,

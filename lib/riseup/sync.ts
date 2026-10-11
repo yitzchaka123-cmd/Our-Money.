@@ -9,6 +9,7 @@ import {
   RiseupAuthError,
 } from '@/lib/riseup/client';
 import { normalizeBudget, type NormalizedEnvelope } from '@/lib/riseup/envelopes';
+import { budgetActualRows, loadNameBook } from '@/lib/riseup/name-book';
 import { envelopeShape } from '@/lib/riseup/shape';
 import {
   isWithdrawal,
@@ -97,12 +98,15 @@ export async function syncRiseup(monthsBack = 2): Promise<SyncResult> {
 
     // The dashboard is built on envelopes, not on the raw transaction feed, so
     // the budget endpoint is the one that actually feeds the UI.
-    let envelopesUpserted = 0;
     const budgets: RiseupBudget[] = [];
-    for (const month of months) {
-      const budget = await fetchBudget(month);
-      budgets.push(budget);
-      envelopesUpserted += await storeEnvelopes(month, normalizeBudget(budget));
+    for (const month of months) budgets.push(await fetchBudget(month));
+
+    // Trackers carry no name: learn it from every month, stored and fresh,
+    // before the stored months are replaced.
+    const names = await loadNameBook(budgetActualRows(budgets));
+    let envelopesUpserted = 0;
+    for (const [index, month] of months.entries()) {
+      envelopesUpserted += await storeEnvelopes(month, normalizeBudget(budgets[index]!, names));
     }
 
     await finish({

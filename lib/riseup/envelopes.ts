@@ -4,6 +4,7 @@ import type {
   RiseupEnvelope,
   RiseupEnvelopeActual,
 } from '@/lib/types';
+import { resolveTrackerName, type NameBook } from '@/lib/riseup/tracker-names';
 
 export interface NormalizedActual {
   transactionId: string;
@@ -102,28 +103,24 @@ export function normalizeActual(actual: RiseupEnvelopeActual): NormalizedActual 
 }
 
 /**
- * Tracking categories need a display name, and the field carrying it is not
- * documented — so try every plausible one before falling back to the category
- * label on the envelope's own transactions, and only then to the raw id.
- * `scripts/probe-riseup.ts` prints the real shape once a token is configured.
+ * Tracking categories need a display name, and the API sends none — see
+ * lib/riseup/tracker-names.ts for the order the name is looked for in. The
+ * big envelopes keep RiseUp's fixed titles.
  */
-export function envelopeName(envelope: RiseupEnvelope): string {
-  const direct =
-    envelope.name ??
-    envelope.categoryName ??
-    envelope.label ??
-    envelope.sequenceCustomerComment;
+export function envelopeName(envelope: RiseupEnvelope, book?: NameBook | null): string {
+  const direct = envelope.name ?? envelope.categoryName ?? envelope.label;
   if (direct && direct.trim()) return direct.trim();
 
   const titled = ENVELOPE_TITLES[envelope.type];
   if (titled) return titled;
 
-  const fromActuals = (envelope.actuals ?? [])
-    .map((a) => a.categoryLabel ?? a.expense)
-    .find((label) => label && label.trim());
-  if (fromActuals) return fromActuals.trim();
-
-  return envelope.id;
+  return resolveTrackerName({
+    envelopeId: envelope.id,
+    ownLabels: (envelope.actuals ?? []).map((a) => a.categoryLabel ?? a.expense),
+    book,
+    // The customer's own note is not a name, but it beats a placeholder.
+    note: envelope.sequenceCustomerComment,
+  });
 }
 
 /**
@@ -177,6 +174,7 @@ export function plannedForType(type: EnvelopeType, planned: number, actual: numb
 export function normalizeEnvelope(
   envelope: RiseupEnvelope,
   position: number,
+  book?: NameBook | null,
 ): NormalizedEnvelope {
   const actuals = (envelope.actuals ?? []).map(normalizeActual);
   const type = KNOWN_TYPES.has(envelope.type) ? envelope.type : 'trackingCategory';
@@ -185,7 +183,7 @@ export function normalizeEnvelope(
   return {
     envelopeId: envelope.id,
     type,
-    name: envelopeName(envelope),
+    name: envelopeName(envelope, book),
     plannedIls: round(plannedForType(type, plannedAmount(envelope), actualIls)),
     actualIls,
     position,
@@ -193,9 +191,10 @@ export function normalizeEnvelope(
   };
 }
 
-export function normalizeBudget(budget: RiseupBudget): NormalizedEnvelope[] {
+/** `book` carries names learned in other months, for trackers with no transactions. */
+export function normalizeBudget(budget: RiseupBudget, book?: NameBook | null): NormalizedEnvelope[] {
   return (budget.envelopes ?? []).map((envelope, index) =>
-    normalizeEnvelope(envelope, index),
+    normalizeEnvelope(envelope, index, book),
   );
 }
 
