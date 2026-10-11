@@ -240,6 +240,27 @@ Two traps: a four-value `border-radius` cannot produce eight lobes (it needs a
 block is the viewport — whose direction comes from `<html>`, not from the RTL
 page — so it needs the **physical** `left`, not `inset-inline-*`.
 
+Ours reads `לסיכום היומי שלי ←`, shows only while something is new, and its
+counter is the number of cards in the brief.
+
+### The brief itself (video 1, 4:32–5:00)
+
+Tapping the blob dims the page (~74% dark) and lays a deck over it — not a sheet:
+- White `X` at the top-right corner of the screen.
+- Cards ~68% of the width (243px at 360), ratio ~1:1.78, radius 18px, on cream
+  `#FCF8EF`, the next two cards peeking ~11px and ~21px above the top one.
+- Intro card: `- חדש! -`, the brand art, a bold line and two lines of body; under
+  the deck the hint `גררו את הכרטיס לימין או לשמאל`.
+- A charge: an inset panel in a deeper tint of the envelope hue (fixed `#F9D5DE`
+  with pink ink, income lime `#E3F3C6` with ink) — category line with a rule under
+  it, the amount ~34px bold with two decimals, business bold, `dd.mm.yy`, a rule,
+  `כרטיס 7722` / `חשבון 674-1908922`. Under the panel one insight sentence in dark
+  green, its amount bold in green.
+- Under the deck: `להמשיך` (right, outlined white, fills green when pressed),
+  `נשארו עוד N` (counts this card), `לערוך` (left, outlined).
+- End card: yellow sunburst, an illustration, `סיימנו להיום`,
+  `אלה כל העדכונים כרגע. ניפגש מחר!`, hint `גררו את הכרטיס למטה כדי לסיים`.
+
 ---
 
 ## 9. Accounts page (`מצב העו״ש`)
