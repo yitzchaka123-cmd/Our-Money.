@@ -36,7 +36,7 @@ export function DashboardView({
 }) {
   const today = isoDateInIsrael();
   const monthName = monthLabel(data.month).split(' ')[0] ?? data.month;
-  const [search, setSearch] = useState<'search' | 'filter' | null>(null);
+  const [search, setSearch] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [hiddenAccounts, setHiddenAccounts] = useState<Set<string>>(() => new Set(previewHiddenAccounts ?? []));
   useEffect(() => {
@@ -67,7 +67,7 @@ export function DashboardView({
       userName={data.userName}
       lastUpdated={data.lastUpdated}
       briefCount={data.briefCount}
-      onSearch={() => setSearch('search')}
+      onSearch={() => setSearch(true)}
       onFilter={() => setFilterOpen(true)}
     >
       <div className="app">
@@ -145,13 +145,12 @@ export function DashboardView({
 
       {search ? (
         <SearchSheet
-          month={data.month}
-          focus={search}
           envelopes={data.envelopeChoices}
+          months={data.months}
           members={data.members}
           wallets={data.wallet.wallets}
           sessionMemberId={sessionMemberId}
-          onClose={() => setSearch(null)}
+          onClose={() => setSearch(false)}
         />
       ) : null}
     </Shell>

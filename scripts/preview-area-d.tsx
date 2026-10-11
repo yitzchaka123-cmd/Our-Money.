@@ -22,7 +22,8 @@ import { EnvelopeMenu } from '../app/dashboard/components/EnvelopeMenu';
 import { ExpectedIncomePopup, MoveIncomesPopup } from '../app/dashboard/components/IncomeSheets';
 import { TrackerHistorySheet } from '../app/dashboard/components/TrackerHistorySheet';
 import { EditTargetPopup, HidePopup, RenamePopup } from '../app/dashboard/components/TrackerSheets';
-import type { HistoryPoint } from '../lib/dashboard/actions';
+import type { HistoryPoint, SearchHit } from '../lib/dashboard/actions';
+import { SearchSheet } from '../app/dashboard/components/SearchSheet';
 import type { DashboardData, EnvelopeView } from '../lib/dashboard/data';
 import type { NormalizedActual } from '../lib/riseup/envelopes';
 
@@ -141,6 +142,40 @@ const dashboard: DashboardData = {
   members: [{ id: 'm1', display_name: 'יצחק' }],
   briefCount: 0,
 };
+
+const searchProps = { envelopes: [], months: [MONTH], members: [], wallets: [], sessionMemberId: null, onClose: noop };
+
+function hit(id: string, date: string, amount: number, name: string, type: EnvelopeView['type'], extra: Partial<SearchHit> = {}): SearchHit {
+  const row = actual(id, date, amount, name, { accountNumberHash: '0848' });
+  return {
+    key: id,
+    source: 'card',
+    kind: 'spend',
+    id,
+    date,
+    month: date.slice(0, 7),
+    amountIls: amount,
+    title: name,
+    category: null,
+    note: null,
+    memberId: null,
+    walletId: null,
+    fromBank: false,
+    detail: '0848',
+    actual: row,
+    envelopeType: type,
+    envelopeTitle: '',
+    envelopeId: null,
+    ...extra,
+  };
+}
+
+const searchHits: SearchHit[] = [
+  hit('s1', `${MONTH}-01`, 60, 'באג בית שמש', 'variable'),
+  hit('s2', '2026-09-14', 45, 'באגט — מאפייה', 'variable', { source: 'cash', title: 'באגט — מאפייה', category: 'מזון וצריכה' }),
+  hit('s3', '2026-09-02', 1299, 'באג מחשבים', 'trackingCategory'),
+  hit('s4', '2026-07-21', 89.9, 'באג בית שמש', 'variable'),
+];
 
 const incomeHistory: HistoryPoint[] = [
   { month: '2026-06', actual: 7400, expected: 7400, cash: 0, present: true },
@@ -282,6 +317,11 @@ export const screens: Record<string, () => ReactElement> = {
     </>
   ),
   'filter-chip': () => <DashboardView data={dashboard} sessionMemberId="m1" previewHiddenAccounts={['card:0848']} />,
+  'search-empty': () => <SearchSheet {...searchProps} />,
+  'search-loading': () => <SearchSheet {...searchProps} initialQuery="באג" initialPhase="loading" />,
+  'search-results': () => (
+    <SearchSheet {...searchProps} initialQuery="באג" initialPhase="done" initialHits={searchHits} initialNext={{ card: 3, spend: 1, topup: 0 }} />
+  ),
   hide: () => (
     <>
       {background(tracker)}

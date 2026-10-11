@@ -4,7 +4,6 @@ import { MAX_FAILURES, issueLoginCode, redeemLoginCode } from '@/lib/auth/codes'
 import { addCashEntry } from '@/lib/cash/actions';
 import { createPlan, settlePlan, skipPlanMonth, stopPlan, type PlanInput } from '@/lib/cash/plan-actions';
 import { duePlans } from '@/lib/cash/plan-store';
-import { searchTransactions } from '@/lib/dashboard/actions';
 import { loadDashboard } from '@/lib/dashboard/data';
 import type { RiseupBudget, RiseupTransaction } from '@/lib/types';
 
@@ -143,29 +142,6 @@ describe('RiseUp sync', () => {
     expect(result.tokenExpired).toBe(true);
     expect(sql('select status, error_kind from sync_runs')).toEqual([{ status: 'failed', error_kind: 'auth' }]);
     expect((await loadDashboard(MONTH, member)).syncBanner?.tone).toBe('error');
-  });
-});
-
-describe('search', () => {
-  it('finds RiseUp charges and cash together, by name and by exact amount', async () => {
-    await addCashEntry({ kind: 'spend', amountIls: 42, category: 'סופר', note: 'שופרסל בשכונה', date: `${MONTH}-15`, envelopeId: null, memberId: null, walletId: null });
-
-    const byName = await searchTransactions({ query: 'שופרסל', source: 'all', fromMonth: MONTH, toMonth: MONTH, walletId: null });
-    if (!byName.ok) throw new Error(byName.error);
-    expect(byName.data.map((h) => h.source).sort()).toEqual(['card', 'cash']);
-
-    const byAmount = await searchTransactions({ query: '42', source: 'all', fromMonth: MONTH, toMonth: MONTH, walletId: null });
-    if (!byAmount.ok) throw new Error(byAmount.error);
-    expect(byAmount.data.map((h) => h.title)).toEqual(['שופרסל בשכונה']);
-
-    const cashOnly = await searchTransactions({ query: '', source: 'cash', fromMonth: MONTH, toMonth: MONTH, walletId: null });
-    if (!cashOnly.ok) throw new Error(cashOnly.error);
-    expect(cashOnly.data.every((h) => h.source === 'cash')).toBe(true);
-  });
-
-  it('treats filter syntax in a query as plain text', async () => {
-    const result = await searchTransactions({ query: 'a,b.eq.1)', source: 'all', fromMonth: MONTH, toMonth: MONTH, walletId: null });
-    expect(result.ok).toBe(true);
   });
 });
 

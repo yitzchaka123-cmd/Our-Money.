@@ -544,3 +544,148 @@
   color: var(--primary);
   text-decoration: underline;
 }
+
+/* --- search page ("חיפוש בתזרים") ------------------------------------------ */
+.search-page {
+  position: fixed;
+  inset: 0;
+  z-index: 35;
+  background: var(--surface);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.search-bar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 64px;
+  padding: 0 16px;
+  padding-top: env(safe-area-inset-top, 0px);
+  background: var(--surface);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.search-bar-icon {
+  display: grid;
+  color: var(--ink);
+}
+
+.search-bar-input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  font: inherit;
+  font-size: 18px;
+  background: transparent;
+  color: var(--ink);
+  padding: 8px 0;
+}
+
+.search-bar-input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.search-bar-input::placeholder {
+  color: var(--ink-2);
+}
+
+.search-clear {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #d4d4d4;
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.search-body {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding-bottom: 40px;
+}
+
+.search-empty {
+  text-align: center;
+  padding: 48px var(--page-gutter) 0;
+}
+
+.search-empty p {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 18px 0 0;
+  line-height: 1.5;
+}
+
+.search-art {
+  width: 220px;
+  max-width: 70%;
+  height: auto;
+}
+
+.search-error {
+  padding: 24px var(--page-gutter);
+}
+
+.search-month-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0;
+  padding: 18px 16px 10px;
+}
+
+.search-hit-wrap {
+  position: relative;
+}
+
+/* RiseUp marks each result with its envelope's colour along the row's start. */
+.search-hit-wrap::after {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 6px;
+  background: var(--accent);
+}
+
+.search-hit {
+  border-bottom: 1px solid var(--hairline);
+  padding-inline: 20px 12px;
+}
+
+.search-hit .kebab {
+  grid-column: 4;
+  grid-row: 1 / 3;
+  align-self: center;
+}
+
+.search-more {
+  text-align: center;
+  padding: 26px var(--page-gutter) 0;
+}
+
+.btn-outline {
+  border: 1.5px solid var(--primary);
+  border-radius: 14px;
+  padding: 14px 32px;
+  color: var(--primary);
+  font-size: 17px;
+  background: var(--surface);
+}
+
+.btn-outline:disabled {
+  opacity: 0.6;
+}
+
+.search-range,
+.search-end {
+  margin: 14px 0 0;
+  font-size: 15px;
+  color: var(--ink);
+}

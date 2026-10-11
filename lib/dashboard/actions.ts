@@ -4,10 +4,21 @@ import { sessionMember } from '@/lib/auth/member';
 import type { CashPlan } from '@/lib/cash/plans';
 import {
   assembleMonth,
+  spendToActual,
   toPlans,
   type ActualRow,
   type EnvelopeRow,
 } from '@/lib/dashboard/data';
+import {
+  amountOf,
+  cleanQuery,
+  FIRST_PAGE,
+  mergePage,
+  SEARCH_PAGE,
+  validCursor,
+  type SearchCursor,
+} from '@/lib/dashboard/search';
+import { ENVELOPE_TITLES, type NormalizedActual } from '@/lib/riseup/envelopes';
 import { db } from '@/lib/db/client';
 import { toOverrides, type TrackerOverrideRow } from '@/lib/dashboard/trackers';
 import { monthBounds } from '@/lib/reconcile';
@@ -144,26 +155,18 @@ export async function envelopeHistory(
 }
 
 // ---------------------------------------------------------------------------
-// Search
+// Search — "חיפוש בתזרים"
 // ---------------------------------------------------------------------------
-
-export interface SearchFilters {
-  query: string;
-  source: 'all' | 'cash' | 'card';
-  /** Inclusive, YYYY-MM. */
-  fromMonth: string;
-  toMonth: string;
-  /** Cash only. */
-  walletId: string | null;
-}
 
 export interface SearchHit {
   key: string;
   source: 'cash' | 'card';
   kind: 'spend' | 'income' | 'withdrawal';
-  /** For a cash hit: the row id, so the entry sheet can open it. */
+  /** The row id: RiseUp's transaction id, or our cash row's id. */
   id: string;
   date: string;
+  /** The cashflow month the row belongs to, for the month headers. */
+  month: string;
   amountIls: number;
   title: string;
   category: string | null;
@@ -172,77 +175,64 @@ export interface SearchHit {
   walletId: string | null;
   fromBank: boolean;
   detail: string | null;
+  /** What the transaction sheet needs to open this row. */
+  actual: NormalizedActual;
+  envelopeType: EnvelopeType;
+  envelopeTitle: string;
+  envelopeId: string | null;
 }
 
-const MAX_HITS = 200;
-
-/** Strip the characters PostgREST's filter grammar treats as syntax. */
-function cleanQuery(query: string): string {
-  return query.replace(/[,()%*\\]/g, ' ').trim().slice(0, 60);
+export interface SearchResults {
+  hits: SearchHit[];
+  /** Where "טען תוצאות ישנות יותר" continues; null when nothing is left. */
+  next: SearchCursor | null;
 }
 
-export async function searchTransactions(filters: SearchFilters): Promise<Loaded<SearchHit[]>> {
+/**
+ * Every RiseUp charge and every cash entry, across all months, matching a
+ * business name, note, category or amount — newest first, a page at a time.
+ */
+export async function searchTransactions(
+  query: string,
+  cursor: SearchCursor | null = null,
+): Promise<Loaded<SearchResults>> {
   if (!(await sessionMember())) return { ok: false, error: EXPIRED };
-  const month = /^\d{4}-\d{2}$/;
-  if (!month.test(filters.fromMonth) || !month.test(filters.toMonth)) return { ok: false, error: 'חודשים לא תקינים.' };
+  const at = cursor ?? FIRST_PAGE;
+  if (!validCursor(at)) return { ok: false, error: 'החיפוש נכשל. נסו שוב.' };
+  const q = cleanQuery(typeof query === 'string' ? query : '');
+  if (!q) return { ok: true, data: { hits: [], next: null } };
 
-  const q = cleanQuery(filters.query);
-  const amount = /^\d+(\.\d+)?$/.test(q) ? Number(q) : null;
-  const from = monthBounds(filters.fromMonth).from;
-  const to = monthBounds(filters.toMonth).to;
+  const amount = amountOf(q);
   const supabase = db();
-  const wantCard = filters.source !== 'cash' && !filters.walletId;
-  const wantCash = filters.source !== 'card';
+  const take = SEARCH_PAGE + 1;
+  const match = (columns: string[]) =>
+    [...columns.map((c) => `${c}.ilike.%${q}%`), ...(amount !== null ? [`amount_ils.eq.${amount}`] : [])].join(',');
 
-  const like = (columns: string[]) => columns.map((c) => `${c}.ilike.%${q}%`).join(',');
-
-  const cardQuery = () => {
-    let query = supabase
+  const [card, spends, topups, members] = await Promise.all([
+    supabase
       .from('riseup_envelope_actuals')
-      .select('transaction_id, transaction_date, business_name, amount_ils, is_income, category_label, account_nickname, account_number_hash, month')
-      .gte('month', filters.fromMonth)
-      .lte('month', filters.toMonth)
-      .order('transaction_date', { ascending: false })
-      .limit(MAX_HITS);
-    if (amount !== null) query = query.eq('amount_ils', amount);
-    else if (q) query = query.or(like(['business_name', 'category_label']));
-    return query;
-  };
-
-  const spendQuery = () => {
-    let query = supabase
+      .select('*')
+      .or(match(['business_name', 'category_label']))
+      .order('transaction_date', { ascending: false, nullsFirst: false })
+      .order('id', { ascending: false })
+      .range(at.card, at.card + take - 1),
+    supabase
       .from('cash_spends')
       .select('*')
       .neq('status', 'deleted')
-      .gte('spent_at', from)
-      .lte('spent_at', to)
+      .or(match(['note', 'category']))
       .order('spent_at', { ascending: false })
-      .limit(MAX_HITS);
-    if (filters.walletId) query = query.eq('wallet_id', filters.walletId);
-    if (amount !== null) query = query.eq('amount_ils', amount);
-    else if (q) query = query.or(like(['note', 'category']));
-    return query;
-  };
-
-  const topupQuery = () => {
-    let query = supabase
+      .order('id', { ascending: false })
+      .range(at.spend, at.spend + take - 1),
+    supabase
       .from('cash_topups')
       .select('*')
       .eq('is_dismissed', false)
-      .gte('occurred_at', from)
-      .lte('occurred_at', to)
+      .or(match(['note', 'category', 'business_name']))
       .order('occurred_at', { ascending: false })
-      .limit(MAX_HITS);
-    if (filters.walletId) query = query.eq('wallet_id', filters.walletId);
-    if (amount !== null) query = query.eq('amount_ils', amount);
-    else if (q) query = query.or(like(['note', 'category', 'business_name']));
-    return query;
-  };
-
-  const [card, spends, topups] = await Promise.all([
-    wantCard ? cardQuery() : Promise.resolve({ data: [], error: null }),
-    wantCash ? spendQuery() : Promise.resolve({ data: [], error: null }),
-    wantCash ? topupQuery() : Promise.resolve({ data: [], error: null }),
+      .order('id', { ascending: false })
+      .range(at.topup, at.topup + take - 1),
+    supabase.from('household_members').select('id, display_name'),
   ]);
   const failed = [card, spends, topups].find((r) => r.error);
   if (failed?.error) {
@@ -250,28 +240,76 @@ export async function searchTransactions(filters: SearchFilters): Promise<Loaded
     return { ok: false, error: 'החיפוש נכשל. נסו שוב.' };
   }
 
-  const hits: SearchHit[] = [
-    ...((card.data ?? []) as Record<string, unknown>[]).map((row): SearchHit => ({
-      key: `card:${row.transaction_id as string}:${row.month as string}`,
+  const memberNames = new Map(
+    ((members.data ?? []) as { id: string; display_name: string }[]).map((m) => [m.id, m.display_name]),
+  );
+  const cardRows = (card.data ?? []) as (ActualRow & { month: string })[];
+
+  // The envelope each charge sits in, for the sheet's colour and label.
+  const envelopeIds = [...new Set(cardRows.map((r) => r.envelope_id))];
+  const { data: envelopeRows } = envelopeIds.length
+    ? await supabase.from('riseup_envelopes').select('month, envelope_id, envelope_type, name').in('envelope_id', envelopeIds)
+    : { data: [] };
+  const envelopeOf = new Map(
+    ((envelopeRows ?? []) as { month: string; envelope_id: string; envelope_type: string; name: string | null }[]).map((e) => [
+      `${e.month}|${e.envelope_id}`,
+      e,
+    ]),
+  );
+
+  const titleFor = (type: EnvelopeType, name: string | null) => name ?? ENVELOPE_TITLES[type] ?? '';
+
+  const cardHits = cardRows.map((row): SearchHit => {
+    const envelope = envelopeOf.get(`${row.month}|${row.envelope_id}`);
+    const type = (envelope?.envelope_type ?? 'variable') as EnvelopeType;
+    const date = row.transaction_date ?? `${row.month}-01`;
+    const actual: NormalizedActual = {
+      transactionId: row.transaction_id,
+      transactionDate: row.transaction_date,
+      billingDate: row.billing_date,
+      businessName: row.business_name ?? '',
+      amountIls: Number(row.amount_ils),
+      isIncome: row.is_income,
+      accountNickname: row.account_nickname,
+      accountNumberHash: row.account_number_hash,
+      source: row.source,
+      isInstallment: row.is_installment,
+      paymentNumber: row.payment_number,
+      totalPayments: row.total_payments,
+      categoryLabel: row.category_label,
+    };
+    return {
+      key: `card:${row.month}:${row.envelope_id}:${row.transaction_id}`,
       source: 'card',
       kind: row.is_income ? 'income' : 'spend',
-      id: row.transaction_id as string,
-      date: (row.transaction_date as string | null) ?? `${row.month as string}-01`,
-      amountIls: Number(row.amount_ils),
-      title: (row.business_name as string | null) || 'עסקה',
-      category: (row.category_label as string | null) ?? null,
+      id: row.transaction_id,
+      date,
+      month: row.month,
+      amountIls: actual.amountIls,
+      title: actual.businessName || 'עסקה',
+      category: row.category_label,
       note: null,
       memberId: null,
       walletId: null,
       fromBank: false,
-      detail: (row.account_nickname as string | null) ?? (row.account_number_hash ? `כרטיס ${row.account_number_hash as string}` : null),
-    })),
-    ...((spends.data ?? []) as CashSpend[]).map((s): SearchHit => ({
+      detail: row.account_nickname ?? row.account_number_hash ?? null,
+      actual,
+      envelopeType: type,
+      envelopeTitle: titleFor(type, envelope?.name ?? null),
+      envelopeId: row.envelope_id,
+    };
+  });
+
+  const spendHits = ((spends.data ?? []) as CashSpend[]).map((s): SearchHit => {
+    const type = (s.envelope_type ?? 'variable') as EnvelopeType;
+    const actual = spendToActual(s, memberNames);
+    return {
       key: `spend:${s.id}`,
       source: 'cash',
       kind: 'spend',
       id: s.id,
       date: s.spent_at,
+      month: s.spent_at.slice(0, 7),
       amountIls: Number(s.amount_ils),
       title: s.note || s.category,
       category: s.category,
@@ -280,29 +318,62 @@ export async function searchTransactions(filters: SearchFilters): Promise<Loaded
       walletId: s.wallet_id,
       fromBank: false,
       detail: s.category,
-    })),
-    ...((topups.data ?? []) as CashTopup[]).map((t): SearchHit => {
-      const kind = t.source === 'cash_income' ? 'income' : 'withdrawal';
-      return {
-        key: `topup:${t.id}`,
-        source: 'cash',
-        kind,
-        id: t.id,
-        date: t.occurred_at,
-        amountIls: Number(t.amount_ils),
-        title: t.note || (kind === 'income' ? t.category || 'הכנסה במזומן' : t.business_name || 'משיכת מזומן'),
-        category: t.category,
-        note: t.note,
-        memberId: t.member_id,
-        walletId: t.wallet_id,
-        fromBank: t.source === 'riseup_withdrawal' || t.riseup_transaction_id !== null,
-        detail: kind === 'withdrawal' ? 'משיכה' : t.category,
-      };
-    }),
-  ];
+      actual,
+      envelopeType: type,
+      envelopeTitle: type === 'trackingCategory' ? s.category : titleFor(type, null),
+      envelopeId: s.envelope_id,
+    };
+  });
 
-  hits.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
-  return { ok: true, data: hits.slice(0, MAX_HITS) };
+  const topupHits = ((topups.data ?? []) as CashTopup[]).map((t): SearchHit => {
+    const kind = t.source === 'cash_income' ? 'income' : 'withdrawal';
+    const title = t.note || (kind === 'income' ? t.category || 'הכנסה במזומן' : t.business_name || 'משיכת מזומן');
+    return {
+      key: `topup:${t.id}`,
+      source: 'cash',
+      kind,
+      id: t.id,
+      date: t.occurred_at,
+      month: t.occurred_at.slice(0, 7),
+      amountIls: Number(t.amount_ils),
+      title,
+      category: t.category,
+      note: t.note,
+      memberId: t.member_id,
+      walletId: t.wallet_id,
+      fromBank: t.source === 'riseup_withdrawal' || t.riseup_transaction_id !== null,
+      detail: kind === 'withdrawal' ? 'משיכה' : t.category,
+      actual: {
+        transactionId: `cash-income:${t.id}`,
+        transactionDate: t.occurred_at,
+        billingDate: t.occurred_at,
+        businessName: title,
+        amountIls: Number(t.amount_ils),
+        isIncome: true,
+        accountNickname: 'מזומן',
+        accountNumberHash: null,
+        source: 'cash',
+        isInstallment: false,
+        paymentNumber: null,
+        totalPayments: null,
+        categoryLabel: t.category,
+        cash: {
+          id: t.id,
+          kind: 'income',
+          memberName: t.member_id ? (memberNames.get(t.member_id) ?? null) : null,
+          inputKind: t.input_kind ?? 'text',
+          status: 'confirmed',
+          walletId: t.wallet_id,
+        },
+      },
+      envelopeType: 'cashIncome',
+      envelopeTitle: titleFor('cashIncome', null),
+      envelopeId: null,
+    };
+  });
+
+  const page = mergePage({ card: cardHits, spend: spendHits, topup: topupHits }, at);
+  return { ok: true, data: { hits: page.items, next: page.next } };
 }
 
 function round(value: number): number {
