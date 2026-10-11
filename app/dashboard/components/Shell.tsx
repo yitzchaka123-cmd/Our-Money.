@@ -6,18 +6,17 @@ import { RefreshButton } from '@/app/dashboard/components/RefreshButton';
 import { Sheet } from '@/app/dashboard/components/Sheet';
 import {
   Bank,
-  Chart,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   Coins,
-  Download,
   Filter,
   Gear,
   Menu,
   Search,
   SparkleBubble,
 } from '@/app/dashboard/components/icons';
+import { Cards, LogOut, Refresh, Wallet } from '@/app/dashboard/components/icons-extra';
 import { monthLabel, monthParts } from '@/lib/money';
 
 export function Shell({
@@ -28,6 +27,7 @@ export function Shell({
   briefCount,
   onSearch,
   onFilter,
+  onOpenWallets,
   children,
 }: {
   month: string;
@@ -37,6 +37,8 @@ export function Shell({
   briefCount: number;
   onSearch?: () => void;
   onFilter?: () => void;
+  /** The drawer's "ארנקים": opens the wallets sheet. */
+  onOpenWallets?: () => void;
   children: ReactNode;
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -114,10 +116,17 @@ export function Shell({
           <div className="scrim" onClick={() => setDrawerOpen(false)} aria-hidden="true" />
           <aside className="drawer" role="dialog" aria-modal="true" aria-label="תפריט">
             <DrawerContent
-              month={month}
               userName={userName}
               lastUpdated={lastUpdated}
               briefCount={briefCount}
+              onOpenWallets={
+                onOpenWallets
+                  ? () => {
+                      setDrawerOpen(false);
+                      onOpenWallets();
+                    }
+                  : undefined
+              }
             />
           </aside>
         </>
@@ -154,21 +163,21 @@ function MonthPicker({ month, months }: { month: string; months: string[] }) {
   );
 }
 
-function yearBefore(month: string): string {
-  const [year, monthNumber] = month.split('-').map(Number);
-  return new Date(Date.UTC(year!, monthNumber! - 12, 1)).toISOString().slice(0, 7);
-}
-
-function DrawerContent({
-  month,
+/**
+ * The side drawer, cut down to what the couple uses (feedback video 1, item
+ * 24): the cashflow, the daily brief, accounts, wallets, settings, sync and
+ * sign out. Exported for the tests.
+ */
+export function DrawerContent({
   userName,
   lastUpdated,
   briefCount,
+  onOpenWallets,
 }: {
-  month: string;
   userName: string;
   lastUpdated: string | null;
   briefCount: number;
+  onOpenWallets?: () => void;
 }) {
   return (
     <>
@@ -177,37 +186,54 @@ function DrawerContent({
           <p className="drawer-name">{userName}</p>
           {lastUpdated ? <p className="drawer-updated">עדכון אחרון: {lastUpdated}</p> : null}
         </div>
-        <span className="drawer-gear">
+        <a className="drawer-gear" href="/settings" aria-label="הגדרות">
           <Gear />
-        </span>
+        </a>
       </div>
 
-      <a className="drawer-link" href="/dashboard">
-        <Coins />
-        <span>תזרים חודשי</span>
-      </a>
-      <div className="drawer-link">
-        <Chart />
-        <RefreshButton className="drawer-refresh" />
-      </div>
-      <a className="drawer-link" href="/accounts">
-        <Bank />
-        <span>מצב העו״ש והאשראי</span>
-      </a>
-      <a className="drawer-link" href="/daily">
-        <Chart />
-        <span>המזומן היומי</span>
-        <span className="drawer-chip">חדש!</span>
-        {briefCount > 0 ? <span className="drawer-badge">{briefCount}</span> : null}
-      </a>
-      <a className="drawer-link" href={`/api/export?from=${month}&to=${month}`} download>
-        <Download />
-        <span>ייצוא {monthLabel(month).split(' ')[0]} לאקסל</span>
-      </a>
-      <a className="drawer-link" href={`/api/export?from=${yearBefore(month)}&to=${month}`} download>
-        <Download />
-        <span>ייצוא השנה האחרונה</span>
-      </a>
+      <nav className="drawer-nav" aria-label="תפריט">
+        <a className="drawer-link" href="/dashboard">
+          <Coins />
+          <span className="drawer-label">תזרים חודשי</span>
+        </a>
+        <a className="drawer-link" href="/daily">
+          <Cards />
+          <span className="drawer-label">הרייזאפ היומי</span>
+          {briefCount > 0 ? <span className="drawer-badge">{briefCount}</span> : null}
+        </a>
+        <a className="drawer-link" href="/accounts">
+          <Bank />
+          <span className="drawer-label">מצב העו״ש והאשראי</span>
+        </a>
+        {onOpenWallets ? (
+          <button className="drawer-link" type="button" onClick={onOpenWallets}>
+            <Wallet />
+            <span className="drawer-label">ארנקים</span>
+          </button>
+        ) : (
+          <a className="drawer-link" href="/dashboard">
+            <Wallet />
+            <span className="drawer-label">ארנקים</span>
+          </a>
+        )}
+        <a className="drawer-link" href="/settings">
+          <Gear size={22} />
+          <span className="drawer-label">הגדרות</span>
+        </a>
+
+        <hr className="drawer-rule" />
+
+        <div className="drawer-link drawer-sync">
+          <Refresh />
+          <RefreshButton className="drawer-refresh" />
+        </div>
+        <form method="post" action="/api/auth/logout" className="drawer-form">
+          <button className="drawer-link" type="submit">
+            <LogOut />
+            <span className="drawer-label">התנתקות</span>
+          </button>
+        </form>
+      </nav>
     </>
   );
 }

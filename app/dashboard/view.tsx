@@ -8,6 +8,7 @@ import { HeroCard } from '@/app/dashboard/components/HeroCard';
 import { RefreshButton } from '@/app/dashboard/components/RefreshButton';
 import { SearchSheet } from '@/app/dashboard/components/SearchSheet';
 import { Shell } from '@/app/dashboard/components/Shell';
+import { WalletsSheet } from '@/app/dashboard/components/WalletsSheet';
 import { ChevronLeft, Clover } from '@/app/dashboard/components/icons';
 import type { DashboardData } from '@/lib/dashboard/data';
 import { isoDateInIsrael } from '@/lib/dates';
@@ -31,6 +32,7 @@ export function DashboardView({
   const today = isoDateInIsrael();
   const monthName = monthLabel(data.month).split(' ')[0] ?? data.month;
   const [search, setSearch] = useState<'search' | 'filter' | null>(null);
+  const [walletsOpen, setWalletsOpen] = useState(false);
 
   return (
     <Shell
@@ -41,6 +43,7 @@ export function DashboardView({
       briefCount={data.briefCount}
       onSearch={() => setSearch('search')}
       onFilter={() => setSearch('filter')}
+      onOpenWallets={() => setWalletsOpen(true)}
     >
       <div className="app">
         <div className="steps-section">
@@ -94,6 +97,15 @@ export function DashboardView({
       </div>
 
       <DailyBriefBlob count={data.briefCount} />
+
+      {walletsOpen ? (
+        <WalletsSheet
+          wallets={data.wallet.wallets}
+          members={data.members}
+          movements={data.wallet.movements}
+          onClose={() => setWalletsOpen(false)}
+        />
+      ) : null}
 
       {search ? (
         <SearchSheet

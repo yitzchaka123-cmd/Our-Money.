@@ -15,6 +15,7 @@ import type { ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 import { AccountsView } from '../app/accounts/AccountsView';
+import { DrawerContent } from '../app/dashboard/components/Shell';
 import { WalletsSheet } from '../app/dashboard/components/WalletsSheet';
 import { summarizeAccounts } from '../lib/dashboard/accounts';
 import type { WalletMovement, WalletSummary } from '../lib/dashboard/data';
@@ -58,6 +59,14 @@ export const screens: Record<string, () => ReactElement> = {
   ),
   'wallet-set': () => (
     <WalletsSheet wallets={wallets} members={members} movements={movements} focus={{ walletId: 'w-sara', panel: 'set' }} onClose={() => {}} />
+  ),
+  drawer: () => (
+    <>
+      <div className="scrim" />
+      <aside className="drawer">
+        <DrawerContent userName="יצחק אברגל" lastUpdated="11.10 11:20" briefCount={2} onOpenWallets={() => {}} />
+      </aside>
+    </>
   ),
   accounts: () => (
     <AccountsView data={{ month: '2026-10', updated: '11.10.26, 11:20', accounts, cash: { balance: 515, walletCount: 3 } }} />

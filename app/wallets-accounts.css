@@ -286,3 +286,47 @@
   font-size: 15px;
   gap: 6px;
 }
+
+/* --- side drawer -------------------------------------------------------- */
+.drawer-gear {
+  color: var(--drawer-ink);
+  text-decoration: none;
+}
+
+.drawer-nav {
+  display: flex;
+  flex-direction: column;
+  margin-top: 8px;
+}
+
+.drawer-nav .drawer-link {
+  background: none;
+  color: var(--drawer-ink);
+  border: 0;
+  cursor: pointer;
+}
+
+.drawer-rule {
+  border: 0;
+  border-top: 1px solid #e6dfcc;
+  margin: 10px 4px;
+}
+
+.drawer-form {
+  margin: 0;
+}
+
+.drawer-sync .refresh {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.drawer-sync .drawer-refresh {
+  background: none;
+  padding: 0;
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--drawer-ink);
+}
