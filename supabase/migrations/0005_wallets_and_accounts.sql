@@ -46,3 +46,13 @@ comment on table money.account_labels is
 -- Server-only, like every table here: RLS with no policies, and 0002's default
 -- privileges already keep anon and authenticated out of new tables.
 alter table money.account_labels enable row level security;
+
+-- ---------------------------------------------------------------------------
+-- Your own name (item 25, shared with item 8)
+--
+-- The settings page lets each member set the name the app calls them by,
+-- instead of their Telegram account's name. Item 8's migration (0004) adds
+-- the same column; "if not exists" makes whichever runs second a no-op.
+-- ---------------------------------------------------------------------------
+
+alter table money.household_members add column if not exists preferred_name text;

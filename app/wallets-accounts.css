@@ -330,3 +330,169 @@
   font-weight: 600;
   color: var(--drawer-ink);
 }
+
+/* --- settings page ------------------------------------------------------ */
+.settings-hero {
+  background: var(--primary);
+  color: #ffffff;
+  text-align: center;
+  padding: 28px var(--page-gutter) 30px;
+}
+
+.settings-avatar {
+  display: grid;
+  place-items: center;
+  width: 84px;
+  height: 84px;
+  margin: 0 auto 14px;
+  border-radius: 50%;
+  background: #1f2a8a;
+  color: #ffffff;
+  font-size: 38px;
+  font-weight: 700;
+}
+
+.settings-name {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.settings-sub {
+  margin: 2px 0 16px;
+  font-size: 16px;
+  opacity: 0.85;
+}
+
+.settings-edit-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 999px;
+  background: transparent;
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.settings-name-form {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.settings-name-form input {
+  flex: 1 1 160px;
+  max-width: 240px;
+  min-width: 0;
+  font: inherit;
+  font-size: 16px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 999px;
+  color: var(--ink);
+}
+
+.settings-save {
+  padding: 8px 18px;
+  border: 1px solid #ffffff;
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.settings-name-error {
+  flex-basis: 100%;
+  margin: 4px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.settings-group {
+  margin: 0 var(--page-gutter);
+  padding: 18px 0 6px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.settings-group-title {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 2px;
+  background: none;
+  color: var(--ink);
+  text-align: start;
+  text-decoration: none;
+}
+
+.settings-row + .settings-row {
+  border-top: 1px solid #f2f2f2;
+}
+
+.settings-ico {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: var(--primary);
+}
+
+.settings-row-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.settings-row-title {
+  font-size: 17px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.settings-row-sub {
+  font-size: 14px;
+  color: var(--ink-2);
+}
+
+.settings-link .settings-row-title {
+  color: var(--ink);
+}
+
+.settings-chev {
+  color: var(--ink);
+  flex: 0 0 auto;
+}
+
+.settings-you {
+  display: inline-block;
+  margin-inline-start: 8px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #eef0fe;
+  color: var(--primary);
+  font-size: 12px;
+  vertical-align: middle;
+}
+
+.settings-empty {
+  margin: 6px 0 10px;
+  color: var(--ink-2);
+  font-size: 15px;
+}
+
+.settings-logout {
+  border-bottom: 0;
+}

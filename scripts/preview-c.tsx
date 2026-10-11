@@ -17,6 +17,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { AccountsView } from '../app/accounts/AccountsView';
 import { DrawerContent } from '../app/dashboard/components/Shell';
 import { WalletsSheet } from '../app/dashboard/components/WalletsSheet';
+import { SettingsView } from '../app/settings/SettingsView';
 import { summarizeAccounts } from '../lib/dashboard/accounts';
 import type { WalletMovement, WalletSummary } from '../lib/dashboard/data';
 
@@ -67,6 +68,22 @@ export const screens: Record<string, () => ReactElement> = {
         <DrawerContent userName="יצחק אברגל" lastUpdated="11.10 11:20" briefCount={2} onOpenWallets={() => {}} />
       </aside>
     </>
+  ),
+  settings: () => (
+    <SettingsView
+      data={{
+        preferredName: 'יצחק',
+        telegramName: 'Nechemiah',
+        members: [
+          { id: 'm1', name: 'יצחק', telegramName: 'Nechemiah', isYou: true },
+          { id: 'm2', name: 'שרה', telegramName: 'שרה', isYou: false },
+        ],
+        accounts: accounts.map((a) => ({ key: a.key, name: a.displayName, provider: a.provider, kind: a.kind, named: Boolean(a.label) })),
+        lastSync: '11.10 11:20',
+        month: '2026-10',
+        yearAgo: '2025-10',
+      }}
+    />
   ),
   accounts: () => (
     <AccountsView data={{ month: '2026-10', updated: '11.10.26, 11:20', accounts, cash: { balance: 515, walletCount: 3 } }} />
