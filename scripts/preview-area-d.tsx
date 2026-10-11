@@ -17,6 +17,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { AddTrackerButton, AddTrackerSheet } from '../app/dashboard/components/AddTrackerSheet';
 import { EnvelopeCard } from '../app/dashboard/components/EnvelopeCard';
 import { EnvelopeMenu } from '../app/dashboard/components/EnvelopeMenu';
+import { ExpectedIncomePopup, MoveIncomesPopup } from '../app/dashboard/components/IncomeSheets';
 import { TrackerHistorySheet } from '../app/dashboard/components/TrackerHistorySheet';
 import { EditTargetPopup, HidePopup, RenamePopup } from '../app/dashboard/components/TrackerSheets';
 import type { HistoryPoint } from '../lib/dashboard/actions';
@@ -76,6 +77,41 @@ const history: HistoryPoint[] = [
 ];
 
 const noop = () => {};
+
+export const income: EnvelopeView = {
+  key: 'income',
+  envelopeId: 'income',
+  type: 'variableIncome',
+  title: 'הכנסות',
+  actual: 7635,
+  expected: 7635,
+  showRemaining: false,
+  pending: [],
+  pendingTotal: 0,
+  actuals: [actual('i1', `${MONTH}-08`, 7635, 'העברת משכורת חשבון 674-1908922', { isIncome: true })],
+};
+
+const cashIncomeEnvelope: EnvelopeView = {
+  ...income,
+  key: 'cash-income',
+  envelopeId: 'cash-income',
+  type: 'cashIncome',
+  title: 'הכנסות במזומן',
+  actual: 650,
+  expected: 650,
+  actuals: [
+    actual('cash-income:a', `${MONTH}-03`, 350, 'מתנה מסבתא', { isIncome: true, source: 'cash', cash: { id: 'a', kind: 'income', memberName: 'שרה', inputKind: 'web', status: 'confirmed', walletId: null } }),
+    actual('cash-income:b', `${MONTH}-09`, 300, 'שיעור פרטי', { isIncome: true, source: 'cash', cash: { id: 'b', kind: 'income', memberName: 'שרה', inputKind: 'web', status: 'confirmed', walletId: null } }),
+  ],
+};
+
+const incomeHistory: HistoryPoint[] = [
+  { month: '2026-06', actual: 7400, expected: 7400, cash: 0, present: true },
+  { month: '2026-07', actual: 7635, expected: 7635, cash: 0, present: true },
+  { month: '2026-08', actual: 9100, expected: 7635, cash: 0, present: true },
+  { month: '2026-09', actual: 7635, expected: 7635, cash: 0, present: true },
+  { month: '2026-10', actual: 7635, expected: 7635, cash: 0, present: true },
+];
 
 const offer = {
   categories: [
@@ -166,6 +202,30 @@ export const screens: Record<string, () => ReactElement> = {
     <>
       {background(tracker)}
       <AddTrackerSheet month={MONTH} trackedNames={[]} onClose={noop} initial={offer} initialPick={offer.categories[0]} />
+    </>
+  ),
+  'income-menu': () => (
+    <>
+      {background(income)}
+      <EnvelopeMenu envelope={income} onPick={noop} onClose={noop} />
+    </>
+  ),
+  'income-history': () => (
+    <>
+      {background(income)}
+      <TrackerHistorySheet envelope={income} month={MONTH} onClose={noop} onEditTarget={noop} initialPoints={incomeHistory} />
+    </>
+  ),
+  'income-target': () => (
+    <>
+      {background(income)}
+      <ExpectedIncomePopup envelope={{ ...income, expected: 9000 }} month={MONTH} onClose={noop} />
+    </>
+  ),
+  'move-incomes': () => (
+    <>
+      {background(income)}
+      <MoveIncomesPopup envelopes={[income, cashIncomeEnvelope]} month={MONTH} months={[MONTH, '2026-09']} onClose={noop} />
     </>
   ),
   hide: () => (

@@ -7,6 +7,7 @@ import { loadDashboard } from '@/lib/dashboard/data';
 import {
   addCustomTracker,
   hideTracker,
+  moveCashIncomesToMonth,
   renameTracker,
   setExpectedIncome,
   setTrackerTarget,
@@ -125,6 +126,19 @@ describe('tracker overrides against the real schema', () => {
     expect((await loadDashboard(SEP, yitzchak)).envelopes.find((e) => e.type === 'variableIncome')!.expected).toBe(12000);
     await setExpectedIncome(OCT, null);
     expect((await loadDashboard(OCT, yitzchak)).forecast).toBe(before.forecast);
+  });
+
+  it('moves several cash incomes to another month together', async () => {
+    const ids: string[] = [];
+    for (const amount of [100, 200]) {
+      const result = await addCashEntry({ kind: 'income', amountIls: amount, category: 'מתנה', note: null, date: `${OCT}-15`, envelopeId: null, memberId: null, walletId: null });
+      if (result.ok) ids.push(result.id);
+    }
+    expect(ids).toHaveLength(2);
+    expect(await moveCashIncomesToMonth([], SEP)).toEqual({ ok: false, error: 'לא נבחרו הכנסות.' });
+    expect((await moveCashIncomesToMonth(ids, SEP)).ok).toBe(true);
+    expect(sql<{ occurred_at: string }>('select occurred_at from cash_topups order by amount_ils').map((r) => r.occurred_at)).toEqual([`${SEP}-15`, `${SEP}-15`]);
+    expect((await loadDashboard(SEP, yitzchak)).envelopes.find((e) => e.type === 'cashIncome')?.actual).toBe(300);
   });
 
   it("reads a tracker's months by its key, and falls back to transactions by label", async () => {

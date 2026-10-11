@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 
 import { SESSION_EXPIRED_MESSAGE, sessionMember } from '@/lib/auth/member';
+import { moveCashEntryToMonth } from '@/lib/cash/actions';
 import { db } from '@/lib/db/client';
 import {
   customKey,
@@ -140,6 +141,22 @@ export async function setExpectedIncome(month: string, targetIls: number | null)
   if (targetIls === null) return done(await drop(INCOME_KEY, month));
   if (!validAmount(targetIls)) return fail('צריך סכום של אפס ומעלה.');
   return done(await upsert({ tracker_key: INCOME_KEY, month, target_ils: targetIls }, member));
+}
+
+/**
+ * "העברת כמה הכנסות יחד": several cash incomes to another month at once.
+ * RiseUp's own incomes cannot move — its API is read-only — so only ours do.
+ */
+export async function moveCashIncomesToMonth(ids: string[], month: string): Promise<TrackerResult> {
+  if (!(await sessionMember())) return fail(SESSION_EXPIRED_MESSAGE);
+  if (!Array.isArray(ids) || ids.length === 0) return fail('לא נבחרו הכנסות.');
+  if (ids.length > 100) return fail('יותר מדי הכנסות בבת אחת.');
+  if (!MONTH.test(month)) return fail('חודש לא תקין.');
+  for (const id of ids) {
+    const result = await moveCashEntryToMonth(id, 'income', month);
+    if (!result.ok) return fail(result.error);
+  }
+  return { ok: true };
 }
 
 export interface TrackableCategory {

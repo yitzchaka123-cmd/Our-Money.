@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from 'react';
 
 import { Amount } from '@/app/dashboard/components/Amount';
+import { ExpectedIncomePopup, MoveIncomesPopup } from '@/app/dashboard/components/IncomeSheets';
 import { Popup } from '@/app/dashboard/components/Popup';
 import { barsFrom, MonthBars, TrackerHistorySheet } from '@/app/dashboard/components/TrackerHistorySheet';
 import { envelopeHistory, type HistoryPoint } from '@/lib/dashboard/actions';
@@ -18,7 +19,7 @@ import { monthParts } from '@/lib/money';
  * line.
  */
 
-export type TrackerSheetKind = 'tracker-history' | 'edit-target' | 'rename' | 'hide';
+export type TrackerSheetKind = 'tracker-history' | 'edit-target' | 'rename' | 'hide' | 'income-target' | 'move-incomes';
 
 export const READ_ONLY_LINE = 'השינוי נשמר אצלנו בלבד — רייזאפ לא מתעדכנת, כי הגישה שלנו אליה היא לקריאה בלבד.';
 
@@ -38,19 +39,27 @@ export function useSave(onDone: () => void) {
 export function TrackerSheets({
   kind,
   envelope,
+  envelopes,
   month,
+  months,
   onSwitch,
   onClose,
 }: {
   kind: TrackerSheetKind;
   envelope: EnvelopeView;
+  /** Every envelope this month, for moving several incomes. */
+  envelopes: EnvelopeView[];
   month: string;
+  months: string[];
   onSwitch: (kind: TrackerSheetKind) => void;
   onClose: () => void;
 }) {
   if (kind === 'tracker-history') {
-    return <TrackerHistorySheet envelope={envelope} month={month} onClose={onClose} onEditTarget={() => onSwitch('edit-target')} />;
+    const next = envelope.type === 'variableIncome' ? 'income-target' : 'edit-target';
+    return <TrackerHistorySheet envelope={envelope} month={month} onClose={onClose} onEditTarget={() => onSwitch(next)} />;
   }
+  if (kind === 'income-target') return <ExpectedIncomePopup envelope={envelope} month={month} onClose={onClose} />;
+  if (kind === 'move-incomes') return <MoveIncomesPopup envelopes={envelopes} month={month} months={months} onClose={onClose} />;
   if (kind === 'edit-target') return <EditTargetPopup envelope={envelope} month={month} onClose={onClose} />;
   if (kind === 'rename') return <RenamePopup envelope={envelope} onClose={onClose} />;
   return <HidePopup envelope={envelope} onClose={onClose} />;

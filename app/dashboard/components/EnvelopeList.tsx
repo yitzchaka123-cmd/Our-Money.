@@ -104,9 +104,13 @@ export function EnvelopeList({
     const envelopeId = income ? null : envelope.envelopeId;
     if (pick === 'add-cash') openNew(income ? 'income' : 'spend', envelopeId);
     if (pick === 'add-plan') setPlanDraft(newPlanDraft(income ? 'income' : 'spend', month, today, sessionMemberId, envelopeId));
-    if (pick === 'history' && envelope.type === 'trackingCategory') setTrackerSheet({ kind: 'tracker-history', envelope });
-    else if (pick === 'history') setHistoryFor(envelope);
-    if (pick === 'edit-target' || pick === 'rename' || pick === 'hide') setTrackerSheet({ kind: pick, envelope });
+    if (pick === 'history' && (envelope.type === 'trackingCategory' || envelope.type === 'variableIncome')) {
+      setTrackerSheet({ kind: 'tracker-history', envelope });
+    } else if (pick === 'history') setHistoryFor(envelope);
+    if (pick === 'edit-target' || pick === 'rename' || pick === 'hide' || pick === 'income-target' || pick === 'move-incomes') {
+      setTrackerSheet({ kind: pick, envelope });
+    }
+    if (pick === 'add-income') openNew('income');
     if (pick === 'bulk-move') setBulkFor(envelope);
     if (pick === 'plans') setPlansOpen(true);
   };
@@ -268,7 +272,9 @@ export function EnvelopeList({
         <TrackerSheets
           kind={trackerSheet.kind}
           envelope={trackerSheet.envelope}
+          envelopes={envelopes}
           month={month}
+          months={months}
           onSwitch={(kind) => setTrackerSheet({ kind, envelope: trackerSheet.envelope })}
           onClose={() => setTrackerSheet(null)}
         />

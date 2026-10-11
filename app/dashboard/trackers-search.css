@@ -379,3 +379,112 @@
   font-weight: 400;
   color: var(--muted);
 }
+
+/* --- income --------------------------------------------------------------- */
+.impact-card {
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-card);
+  padding: 0 18px 16px;
+  margin: 8px 0 18px;
+  overflow: hidden;
+}
+
+.impact-title {
+  font-size: 17px;
+  font-weight: 700;
+  margin: 0 -18px 14px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.impact-foot {
+  font-size: 14px;
+  margin: 12px 0 0;
+}
+
+.tip-box {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  background: var(--info-wash);
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-bottom: 18px;
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.tip-box svg {
+  flex: 0 0 auto;
+  color: var(--primary);
+  margin-top: 2px;
+}
+
+.tip-box a {
+  color: var(--primary);
+}
+
+.tip-box p {
+  margin: 2px 0 0;
+}
+
+.income-pick {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 4px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.income-pick[aria-disabled='true'] {
+  color: var(--muted);
+}
+
+.income-pick-main {
+  flex: 1;
+  display: grid;
+  gap: 2px;
+}
+
+.income-pick-top {
+  display: flex;
+  gap: 14px;
+  font-size: 16px;
+}
+
+.income-pick-name {
+  font-size: 14px;
+}
+
+.round-check {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1.5px solid #9a9a9a;
+  margin: 0;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  background: #ffffff;
+}
+
+.round-check:checked {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.round-check:checked::after {
+  content: '';
+  width: 12px;
+  height: 7px;
+  border: solid #ffffff;
+  border-width: 0 0 2.5px 2.5px;
+  transform: rotate(-45deg) translate(1px, -1px);
+}
+
+.round-check:disabled {
+  border-color: #dedede;
+  background: #f4f4f4;
+}
