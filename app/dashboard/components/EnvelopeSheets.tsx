@@ -228,7 +228,7 @@ export function PlansListSheet({
         {group('הכנסות', incomes)}
         <div className="plan-now" style={{ borderBottom: 0, marginTop: 12 }}>
           <button className="btn" type="button" onClick={() => onAdd('spend')}>הוצאה צפויה חדשה</button>
-          <button className="btn-ghost" type="button" onClick={() => onAdd('income')}>הכנסה צפויה חדשה</button>
+          <button className="btn-ghost btn-link" type="button" onClick={() => onAdd('income')}>הכנסה צפויה חדשה</button>
         </div>
       </div>
     </Sheet>

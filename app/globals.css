@@ -1370,6 +1370,11 @@ a {
   text-align: center;
 }
 
+/* A ghost button that adds rather than removes reads as a normal link. */
+.btn-ghost.btn-link {
+  color: var(--primary);
+}
+
 .btn-danger {
   background: #ffe9e3;
   border-radius: 999px;
