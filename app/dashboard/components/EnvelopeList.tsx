@@ -11,6 +11,7 @@ import {
   type CashAction,
 } from '@/app/dashboard/components/CashActionSheets';
 import { CashEntrySheet, emptyDraft, type CashEntryDraft } from '@/app/dashboard/components/CashEntrySheet';
+import { AddTrackerButton, AddTrackerSheet } from '@/app/dashboard/components/AddTrackerSheet';
 import { EnvelopeCard } from '@/app/dashboard/components/EnvelopeCard';
 import { EnvelopeMenu, type EnvelopeMenuAction } from '@/app/dashboard/components/EnvelopeMenu';
 import { BulkMoveSheet, HistorySheet, PlansListSheet } from '@/app/dashboard/components/EnvelopeSheets';
@@ -25,6 +26,7 @@ import type { EnvelopeRef } from '@/lib/cash/envelopes';
 import { settlePlan } from '@/lib/cash/plan-actions';
 import type { CashPlan } from '@/lib/cash/plans';
 import type { EnvelopeView, PendingPlanView, WalletMovement, WalletView } from '@/lib/dashboard/data';
+import { addTrackerSlot } from '@/lib/dashboard/trackers';
 import type { NormalizedActual } from '@/lib/riseup/envelopes';
 import type { HouseholdMember } from '@/lib/types';
 
@@ -75,6 +77,11 @@ export function EnvelopeList({
   const [trackerSheet, setTrackerSheet] = useState<{ kind: TrackerSheetKind; envelope: EnvelopeView } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [, start] = useTransition();
+
+  const [addTrackerOpen, setAddTrackerOpen] = useState(false);
+  // RiseUp's "הוספת קטגוריה למעקב" sits right after the trackers.
+  const trackers = envelopes.filter((e) => e.type === 'trackingCategory');
+  const addTrackerAfter = addTrackerSlot(envelopes);
 
   const pendingPlanIds = new Set(envelopes.flatMap((e) => e.pending.map((p) => p.planId)));
 
@@ -200,6 +207,7 @@ export function EnvelopeList({
             onSettlePlan={settle}
             onMenu={() => setMenuFor(envelope)}
           />
+          {envelope.key === addTrackerAfter ? <AddTrackerButton onClick={() => setAddTrackerOpen(true)} /> : null}
           {envelope.type === 'fixed' ? (
             <SpendSummary actual={totalActualExpenses} expected={totalExpectedExpenses} />
           ) : null}
@@ -264,6 +272,9 @@ export function EnvelopeList({
           onSwitch={(kind) => setTrackerSheet({ kind, envelope: trackerSheet.envelope })}
           onClose={() => setTrackerSheet(null)}
         />
+      ) : null}
+      {addTrackerOpen ? (
+        <AddTrackerSheet month={month} trackedNames={trackers.map((t) => t.title)} onClose={() => setAddTrackerOpen(false)} />
       ) : null}
       {historyFor ? <HistorySheet envelope={historyFor} month={month} onClose={() => setHistoryFor(null)} /> : null}
       {bulkFor ? <BulkMoveSheet envelope={bulkFor} envelopes={envelopeChoices} onClose={() => setBulkFor(null)} /> : null}

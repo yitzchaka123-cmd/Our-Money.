@@ -14,6 +14,7 @@ import type { ReactElement } from 'react';
 
 import { renderToStaticMarkup } from 'react-dom/server';
 
+import { AddTrackerButton, AddTrackerSheet } from '../app/dashboard/components/AddTrackerSheet';
 import { EnvelopeCard } from '../app/dashboard/components/EnvelopeCard';
 import { EnvelopeMenu } from '../app/dashboard/components/EnvelopeMenu';
 import { TrackerHistorySheet } from '../app/dashboard/components/TrackerHistorySheet';
@@ -76,10 +77,29 @@ const history: HistoryPoint[] = [
 
 const noop = () => {};
 
-function background(envelope: EnvelopeView): ReactElement {
+const offer = {
+  categories: [
+    { label: 'חיות מחמד', spent: 820 },
+    { label: 'אחר', spent: 410 },
+    { label: 'תחבורה ציבורית', spent: 260 },
+    { label: 'פארמה', spent: 0 },
+  ],
+  hidden: [{ key: 'v2-default-il-expense-category-9', name: 'מגנטים' }],
+};
+
+function background(envelope: EnvelopeView, after?: ReactElement): ReactElement {
   return (
     <div className="app" style={{ paddingTop: 16 }}>
       <div className="section">
+        {card(envelope)}
+        {after}
+      </div>
+    </div>
+  );
+}
+
+function card(envelope: EnvelopeView): ReactElement {
+  return (
         <EnvelopeCard
           type={envelope.type}
           title={envelope.title}
@@ -94,8 +114,6 @@ function background(envelope: EnvelopeView): ReactElement {
           pendingTotal={envelope.pendingTotal}
           onMenu={noop}
         />
-      </div>
-    </div>
   );
 }
 
@@ -128,6 +146,26 @@ export const screens: Record<string, () => ReactElement> = {
     <>
       {background(retargeted)}
       <RenamePopup envelope={{ ...retargeted, title: 'האוטו', override: { ...retargeted.override!, renamed: true } }} onClose={noop} />
+    </>
+  ),
+  'add-tracker-button': () =>
+    background(
+      { ...tracker, title: 'טרריומים', expected: 1000 },
+      <>
+        <AddTrackerButton onClick={noop} />
+        {card({ ...tracker, key: 'fixed', type: 'fixed', title: 'הוצאות קבועות', expected: 6195.4, actual: 4437.7, showRemaining: false })}
+      </>,
+    ),
+  'add-tracker': () => (
+    <>
+      {background(tracker)}
+      <AddTrackerSheet month={MONTH} trackedNames={[]} onClose={noop} initial={offer} />
+    </>
+  ),
+  'add-tracker-target': () => (
+    <>
+      {background(tracker)}
+      <AddTrackerSheet month={MONTH} trackedNames={[]} onClose={noop} initial={offer} initialPick={offer.categories[0]} />
     </>
   ),
   hide: () => (

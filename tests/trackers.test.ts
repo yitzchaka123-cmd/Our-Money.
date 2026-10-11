@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { assembleMonth, monthTotals, type ActualRow, type EnvelopeRow } from '@/lib/dashboard/data';
 import {
+  addTrackerSlot,
   customTrackerRefs,
   resolveOverride,
   trackerKey,
@@ -192,5 +193,19 @@ describe('overrides in the loader', () => {
       [],
     );
     expect(refs).toEqual([{ envelopeId: 'custom:פארמה', type: 'trackingCategory', name: 'פארמה', categoryLabels: ['פארמה'] }]);
+  });
+});
+
+describe('the add-tracker button', () => {
+  it('follows the last tracker, or the variable card when nothing is tracked', () => {
+    const cards = [
+      { key: 'var', type: 'variable' },
+      { key: 'a', type: 'trackingCategory' },
+      { key: 'b', type: 'trackingCategory' },
+      { key: 'fix', type: 'fixed' },
+    ];
+    expect(addTrackerSlot(cards)).toBe('b');
+    expect(addTrackerSlot(cards.filter((c) => c.type !== 'trackingCategory'))).toBe('var');
+    expect(addTrackerSlot([])).toBeNull();
   });
 });

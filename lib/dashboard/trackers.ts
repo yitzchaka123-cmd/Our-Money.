@@ -270,6 +270,15 @@ export function customTrackerRefs(
   });
 }
 
+/**
+ * Which card "הוספת קטגוריה למעקב" follows: the last tracker, as in RiseUp,
+ * or the variable card when nothing is tracked yet.
+ */
+export function addTrackerSlot(envelopes: { key: string; type: string }[]): string | null {
+  const trackers = envelopes.filter((e) => e.type === 'trackingCategory');
+  return (trackers[trackers.length - 1] ?? envelopes.find((e) => e.type === 'variable'))?.key ?? null;
+}
+
 function round(value: number): number {
   return Math.round(value * 100) / 100;
 }

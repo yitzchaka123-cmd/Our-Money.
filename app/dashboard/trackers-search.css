@@ -312,3 +312,70 @@
     transform: rotate(360deg);
   }
 }
+
+/* --- add tracker ---------------------------------------------------------- */
+.add-tracker {
+  margin-bottom: 22px;
+  border-color: #c9d1f7;
+  border-width: 1.5px;
+}
+
+.tracker-filter {
+  width: 100%;
+  border: 1px solid #d9d9d9;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font: inherit;
+  margin-bottom: 14px;
+}
+
+.category-list {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 8px;
+}
+
+.category-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  min-height: 96px;
+  padding: 14px 18px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-card);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+  text-align: start;
+}
+
+.category-tile {
+  width: 60px;
+  height: 60px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  color: #ffffff;
+  font-size: 26px;
+  font-weight: 700;
+  flex: 0 0 auto;
+}
+
+.category-name {
+  flex: 1;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.category-sub {
+  display: block;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--primary);
+}
+
+.amount-box input::placeholder {
+  font-size: 22px;
+  font-weight: 400;
+  color: var(--muted);
+}
