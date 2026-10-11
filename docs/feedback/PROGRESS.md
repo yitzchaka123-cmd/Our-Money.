@@ -9,14 +9,22 @@ Read this first after any stop.
 - [x] Transcribed twice (faster-whisper large-v3-turbo, openai-whisper medium), both read in full
 - [x] Watched every frame against the words; DB checked (tracker names and budgets, card hashes)
 - [x] Item list written: docs/feedback/2026-10-11-video1.md
-- [ ] Helpers launched
+- [x] Helpers launched 2026-10-11 ~10:40 UTC (five, each in its own worktree)
 - [ ] Helpers merged, migrations applied, pushed
 - [ ] Full end-to-end run
 - [ ] Independent check of every item
 - [ ] Deploy live, statuses updated
 
 ## Helpers
-(none yet)
+| Helper | Items | Migration | State |
+|---|---|---|---|
+| A data and order | 10, 11, 12, 13, 14, 15 | 0003 | running |
+| B top bar, assistant | 1, 2, 8, 9 | 0004 | running |
+| C wallets, accounts, settings | 4, 5, 7, 23, 24, 25, 26 | 0005 | running |
+| D search, filter, menus | 17, 18, 19, 20, 21, 22 | 0006 | running |
+| E daily brief, insights | 3, 16 | 0007 | running |
+
+Helper branches are `worktree-agent-*`; check `git log` on each for per-item commits after a stop.
 
 ## Stops
 (none yet)
