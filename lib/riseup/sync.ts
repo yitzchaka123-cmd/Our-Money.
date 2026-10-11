@@ -9,13 +9,15 @@ import {
   RiseupAuthError,
 } from '@/lib/riseup/client';
 import { normalizeBudget, type NormalizedEnvelope } from '@/lib/riseup/envelopes';
+import { budgetActualRows, loadNameBook } from '@/lib/riseup/name-book';
+import { envelopeShape } from '@/lib/riseup/shape';
 import {
   isWithdrawal,
   matchManualWithdrawals,
   toDateOnly,
   WITHDRAWAL_MATCH_WINDOW_DAYS,
 } from '@/lib/riseup/withdrawals';
-import type { CashTopup, RiseupTransaction } from '@/lib/types';
+import type { CashTopup, RiseupBudget, RiseupTransaction } from '@/lib/types';
 
 export type SyncErrorKind = 'auth' | 'rate_limit' | 'network' | 'other';
 
@@ -96,9 +98,15 @@ export async function syncRiseup(monthsBack = 2): Promise<SyncResult> {
 
     // The dashboard is built on envelopes, not on the raw transaction feed, so
     // the budget endpoint is the one that actually feeds the UI.
+    const budgets: RiseupBudget[] = [];
+    for (const month of months) budgets.push(await fetchBudget(month));
+
+    // Trackers carry no name: learn it from every month, stored and fresh,
+    // before the stored months are replaced.
+    const names = await loadNameBook(budgetActualRows(budgets));
     let envelopesUpserted = 0;
-    for (const month of months) {
-      envelopesUpserted += await storeEnvelopes(month, normalizeBudget(await fetchBudget(month)));
+    for (const [index, month] of months.entries()) {
+      envelopesUpserted += await storeEnvelopes(month, normalizeBudget(budgets[index]!, names));
     }
 
     await finish({
@@ -106,6 +114,7 @@ export async function syncRiseup(monthsBack = 2): Promise<SyncResult> {
       transactions_upserted: transactions.length,
       topups_created: newTopups.length,
     });
+    await recordEnvelopeShape(runId, budgets);
 
     return {
       months,
@@ -127,6 +136,24 @@ export async function syncRiseup(monthsBack = 2): Promise<SyncResult> {
       tokenExpired: error instanceof RiseupAuthError,
       error: message,
     };
+  }
+}
+
+/**
+ * Note which fields RiseUp's envelopes carried (names and value kinds only —
+ * see lib/riseup/shape.ts). A separate write from the run's status, so a
+ * database without the column yet (migration 0003) never fails a sync.
+ */
+async function recordEnvelopeShape(runId: string | undefined, budgets: RiseupBudget[]): Promise<void> {
+  if (!runId) return;
+  try {
+    const { error } = await db()
+      .from('sync_runs')
+      .update({ envelope_shape: envelopeShape(budgets) })
+      .eq('id', runId);
+    if (error) console.warn('Could not record the envelope shape:', error.message);
+  } catch (error) {
+    console.warn('Could not record the envelope shape:', error instanceof Error ? error.message : String(error));
   }
 }
 

@@ -534,6 +534,18 @@ a {
   color: var(--muted);
 }
 
+/* A fixed charge RiseUp still expects this month: greyed, as RiseUp shows it. */
+.breakdown-row.is-upcoming,
+.breakdown-row.is-upcoming .actual,
+.txn-row.is-upcoming .amount,
+.txn-row.is-upcoming .date {
+  color: var(--muted);
+}
+
+.txn-row.is-upcoming .merchant {
+  color: var(--ink-2);
+}
+
 /* --- expected cash, still to come ----------------------------------------- */
 .pending-block {
   background: var(--surface-sunken);
@@ -1368,6 +1380,11 @@ a {
   font-size: 15px;
   font-weight: 700;
   text-align: center;
+}
+
+/* A ghost button that adds rather than removes reads as a normal link. */
+.btn-ghost.btn-link {
+  color: var(--primary);
 }
 
 .btn-danger {

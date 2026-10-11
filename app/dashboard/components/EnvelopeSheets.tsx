@@ -9,6 +9,7 @@ import { moveCashSpendsToEnvelope } from '@/lib/cash/actions';
 import type { EnvelopeRef } from '@/lib/cash/envelopes';
 import type { CashPlan } from '@/lib/cash/plans';
 import { envelopeHistory, type HistoryPoint } from '@/lib/dashboard/actions';
+import { barRatio } from '@/lib/dashboard/bar';
 import type { EnvelopeView } from '@/lib/dashboard/data';
 import { monthLabel } from '@/lib/money';
 
@@ -63,7 +64,7 @@ export function HistorySheet({
 
         <ul className="history-list">
           {shown.map((point) => {
-            const ratio = point.expected > 0 ? Math.min(point.actual / point.expected, 1) : point.actual > 0 ? 1 : 0;
+            const ratio = barRatio(point.actual, point.expected);
             const over = point.expected > 0 && point.actual > point.expected;
             return (
               <li key={point.month} className="envelope history-row" data-type={envelope.type}>
@@ -227,7 +228,7 @@ export function PlansListSheet({
         {group('הכנסות', incomes)}
         <div className="plan-now" style={{ borderBottom: 0, marginTop: 12 }}>
           <button className="btn" type="button" onClick={() => onAdd('spend')}>הוצאה צפויה חדשה</button>
-          <button className="btn-ghost" type="button" onClick={() => onAdd('income')}>הכנסה צפויה חדשה</button>
+          <button className="btn-ghost btn-link" type="button" onClick={() => onAdd('income')}>הכנסה צפויה חדשה</button>
         </div>
       </div>
     </Sheet>

@@ -10,6 +10,7 @@ import {
 } from '@/lib/dashboard/data';
 import { db } from '@/lib/db/client';
 import { monthBounds } from '@/lib/reconcile';
+import { buildNameBook } from '@/lib/riseup/tracker-names';
 import type { CashSpend, CashTopup, EnvelopeType } from '@/lib/types';
 
 /**
@@ -79,7 +80,12 @@ export async function envelopeHistory(
     ((members.data ?? []) as { id: string; display_name: string }[]).map((m) => [m.id, m.display_name]),
   );
   const planList = toPlans(plans.data as CashPlan[] | null);
-  const inMonth = <T,>(rows: T[] | null, key: (row: T) => string, m: string) =>
+  // So a tracker is named the same in every month and the title match holds.
+  const names = buildNameBook({
+    envelopes: (envelopes.data ?? []) as EnvelopeRow[],
+    actuals: (actuals.data ?? []) as ActualRow[],
+  });
+  const inMonth =<T,>(rows: T[] | null, key: (row: T) => string, m: string) =>
     (rows ?? []).filter((row) => key(row).startsWith(m));
 
   const points = months.map((m): HistoryPoint => {
@@ -94,6 +100,7 @@ export async function envelopeHistory(
         ((skips.data ?? []) as { plan_id: string; month: string }[]).filter((s) => s.month === m).map((s) => s.plan_id),
       ),
       memberNames,
+      names,
     });
 
     const match =

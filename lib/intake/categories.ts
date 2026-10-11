@@ -1,4 +1,5 @@
 import { db } from '@/lib/db/client';
+import { isUnresolvedName } from '@/lib/riseup/tracker-names';
 
 /**
  * Fallback list, mirroring the seed rows in the migration. Used when the
@@ -45,7 +46,8 @@ export async function activeCategories(): Promise<string[]> {
     ]);
     if (error) throw new Error(error.message);
 
-    const trackerNames = (trackers ?? []).map((t) => t.name as string).filter(Boolean);
+    // Rows synced before trackers had names hold the raw id: not a category.
+    const trackerNames = (trackers ?? []).map((t) => t.name as string).filter((name) => !isUnresolvedName(name));
     const labels = [
       ...new Set([...trackerNames, ...(rows ?? []).map((row) => row.label as string)]),
     ];

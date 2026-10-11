@@ -4,6 +4,7 @@ import type {
   RiseupEnvelope,
   RiseupEnvelopeActual,
 } from '@/lib/types';
+import { resolveTrackerName, type NameBook } from '@/lib/riseup/tracker-names';
 
 export interface NormalizedActual {
   transactionId: string;
@@ -38,15 +39,33 @@ export interface NormalizedEnvelope {
   actualIls: number;
   position: number;
   actuals: NormalizedActual[];
+  /** Fixed charges planned this month that have not come in yet ("צפוי לרדת"). */
+  upcoming?: UpcomingCharge[];
+  /** A tracker RiseUp splits into weekly parts: its breakdown is by week. */
+  weekly?: boolean;
 }
 
-/** Display order on the dashboard, matching RiseUp's own top-to-bottom order. */
+/** A fixed charge RiseUp expects this month that has not been charged yet. */
+export interface UpcomingCharge {
+  /** The RiseUp envelope it came from. */
+  key: string;
+  amountIls: number;
+  /** Category and merchant from the same charge in earlier months, when known. */
+  categoryLabel: string | null;
+  businessName: string | null;
+}
+
+/**
+ * Display order on the dashboard, matching RiseUp's own top-to-bottom order:
+ * variable, the trackers (followed by "הוספת קטגוריה למעקב"), fixed (followed
+ * by the spending summary), income, our cash income, savings.
+ */
 export const ENVELOPE_ORDER: EnvelopeType[] = [
   'variable',
+  'trackingCategory',
   'fixed',
   'variableIncome',
   'cashIncome',
-  'trackingCategory',
   'riseupGoal',
 ];
 
@@ -102,60 +121,98 @@ export function normalizeActual(actual: RiseupEnvelopeActual): NormalizedActual 
 }
 
 /**
- * Tracking categories need a display name, and the field carrying it is not
- * documented — so try every plausible one before falling back to the category
- * label on the envelope's own transactions, and only then to the raw id.
- * `scripts/probe-riseup.ts` prints the real shape once a token is configured.
+ * Tracking categories need a display name, and the API sends none — see
+ * lib/riseup/tracker-names.ts for the order the name is looked for in. The
+ * big envelopes keep RiseUp's fixed titles.
  */
-export function envelopeName(envelope: RiseupEnvelope): string {
-  const direct =
-    envelope.name ??
-    envelope.categoryName ??
-    envelope.label ??
-    envelope.sequenceCustomerComment;
+export function envelopeName(envelope: RiseupEnvelope, book?: NameBook | null): string {
+  const direct = envelope.name ?? envelope.categoryName ?? envelope.label;
   if (direct && direct.trim()) return direct.trim();
 
   const titled = ENVELOPE_TITLES[envelope.type];
   if (titled) return titled;
 
-  const fromActuals = (envelope.actuals ?? [])
-    .map((a) => a.categoryLabel ?? a.expense)
-    .find((label) => label && label.trim());
-  if (fromActuals) return fromActuals.trim();
-
-  return envelope.id;
+  return resolveTrackerName({
+    envelopeId: envelope.id,
+    ownLabels: (envelope.actuals ?? []).map((a) => a.categoryLabel ?? a.expense),
+    book,
+    // The customer's own note is not a name, but it beats a placeholder.
+    note: envelope.sequenceCustomerComment,
+  });
 }
 
 /**
- * The planned figure. `balancedAmount` and `originalAmount` are documented
- * inconsistently (each is described as the plan in one place and the actual in
- * another), so prefer the first that is present and treat it as a magnitude.
+ * Where the plan may sit, in order. Only the first two are documented, and in
+ * the real data every tracker and the income envelope come back with a zero
+ * `balancedAmount` while RiseUp's own app shows a goal — so a zero is not
+ * trusted while another field holds a number. Each sync records which of these
+ * fields exist and whether they are zero (`sync_runs.envelope_shape`), so the
+ * list can be narrowed to the real one.
  */
+export const PLANNED_FIELDS = [
+  'balancedAmount',
+  'originalAmount',
+  'amount',
+  'plannedAmount',
+  'goal',
+  'budget',
+  'expectedAmount',
+  'predictedAmount',
+  'customPrediction',
+] as const;
+
+function numeric(value: unknown): number {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+}
+
+/** The planned figure: the first non-zero candidate field, as a magnitude. */
 export function plannedAmount(envelope: RiseupEnvelope): number {
-  const raw = envelope.balancedAmount ?? envelope.originalAmount ?? 0;
-  return Math.abs(Number(raw) || 0);
+  const fields = envelope as unknown as Record<string, unknown>;
+  for (const field of PLANNED_FIELDS) {
+    const value = numeric(fields[field]);
+    if (value !== 0) return Math.abs(value);
+  }
+  return 0;
+}
+
+/**
+ * Income that already arrived is income expected: RiseUp's income envelope
+ * never expects less than what came in, and with no plan at all it expects
+ * exactly that.
+ */
+export function plannedForType(type: EnvelopeType, planned: number, actual: number): number {
+  return type === 'variableIncome' ? Math.max(planned, actual) : planned;
 }
 
 export function normalizeEnvelope(
   envelope: RiseupEnvelope,
   position: number,
+  book?: NameBook | null,
 ): NormalizedEnvelope {
   const actuals = (envelope.actuals ?? []).map(normalizeActual);
+  const type = KNOWN_TYPES.has(envelope.type) ? envelope.type : 'trackingCategory';
+  // Summed rather than read off the envelope: the actuals are unambiguous.
+  const actualIls = round(actuals.reduce((total, a) => total + a.amountIls, 0));
   return {
     envelopeId: envelope.id,
-    type: KNOWN_TYPES.has(envelope.type) ? envelope.type : 'trackingCategory',
-    name: envelopeName(envelope),
-    plannedIls: round(plannedAmount(envelope)),
-    // Summed rather than read off the envelope: the actuals are unambiguous.
-    actualIls: round(actuals.reduce((total, a) => total + a.amountIls, 0)),
+    type,
+    name: envelopeName(envelope, book),
+    plannedIls: round(plannedForType(type, plannedAmount(envelope), actualIls)),
+    actualIls,
     position,
     actuals,
   };
 }
 
-export function normalizeBudget(budget: RiseupBudget): NormalizedEnvelope[] {
+/** `book` carries names learned in other months, for trackers with no transactions. */
+export function normalizeBudget(budget: RiseupBudget, book?: NameBook | null): NormalizedEnvelope[] {
   return (budget.envelopes ?? []).map((envelope, index) =>
-    normalizeEnvelope(envelope, index),
+    normalizeEnvelope(envelope, index, book),
   );
 }
 
