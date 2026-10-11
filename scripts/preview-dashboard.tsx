@@ -14,8 +14,10 @@ import { writeFileSync, readFileSync } from 'node:fs';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 import { DashboardView } from '../app/dashboard/view';
-import type { DashboardData, EnvelopeView } from '../lib/dashboard/data';
-import type { NormalizedActual } from '../lib/riseup/envelopes';
+import { envelopeChoices } from '../lib/cash/envelopes';
+import { monthTotals, type DashboardData, type EnvelopeView } from '../lib/dashboard/data';
+import { ENVELOPE_ORDER, type NormalizedActual } from '../lib/riseup/envelopes';
+import { realMonthEnvelopes } from './preview-real-month';
 
 function actual(
   id: string,
@@ -191,6 +193,20 @@ const envelopes: EnvelopeView[] = [
   },
 ];
 
+// The fixed card and the trackers come from real-shaped RiseUp rows (one
+// envelope per fixed charge, unnamed trackers, a weekly grocery tracker) run
+// through the live merge; the hand-written ones above give the expected cash.
+const handFixed = envelopes.find((e) => e.type === 'fixed')!;
+const shown: EnvelopeView[] = [
+  ...envelopes.filter((e) => e.type !== 'fixed' && e.type !== 'trackingCategory'),
+  ...realMonthEnvelopes('2026-09').map((e) =>
+    e.type === 'fixed'
+      ? { ...e, pending: handFixed.pending, pendingTotal: handFixed.pendingTotal, expected: e.expected + handFixed.pendingTotal }
+      : e,
+  ),
+].sort((a, b) => ENVELOPE_ORDER.indexOf(a.type) - ENVELOPE_ORDER.indexOf(b.type));
+const shownTotals = monthTotals(shown);
+
 const fixture: DashboardData = {
   month: '2026-09',
   months: ['2026-10', '2026-09', '2026-08', '2026-07', '2026-06'],
@@ -201,17 +217,15 @@ const fixture: DashboardData = {
   syncBanner: process.env.PREVIEW_BANNER
     ? { tone: 'error', text: 'החיבור ל-RiseUp פג תוקף. צריך ליצור טוקן חדש ב-RiseUp ולעדכן אותו בהגדרות, ועד אז הנתונים לא מתעדכנים.' }
     : null,
-  forecast: -8478,
+  forecast: shownTotals.forecast,
   variableRemaining: 0,
-  totalActualExpenses: 4608,
-  totalExpectedExpenses: 16114,
-  envelopes,
+  totalActualExpenses: shownTotals.actualExpenses,
+  totalExpectedExpenses: shownTotals.expectedExpenses,
+  envelopes: shown,
   plans: [],
-  envelopeChoices: [
-    { envelopeId: 'variable', type: 'variable', name: 'הוצאות משתנות' },
-    { envelopeId: 'fixed', type: 'fixed', name: 'הוצאות קבועות', categoryLabels: ['ביטוח', 'הלוואה'] },
-    { envelopeId: 'track-food', type: 'trackingCategory', name: 'אוכל בחוץ' },
-  ],
+  envelopeChoices: envelopeChoices(
+    shown.map((e) => ({ envelopeId: e.envelopeId ?? e.key, type: e.type, name: e.title })),
+  ),
   savingsEnvelopeId: 'goal',
   wallet: {
     balance: 515,

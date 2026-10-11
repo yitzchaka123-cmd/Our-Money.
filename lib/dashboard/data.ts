@@ -16,8 +16,10 @@ import {
   sortEnvelopes,
   type NormalizedActual,
   type NormalizedEnvelope,
+  type UpcomingCharge,
 } from '@/lib/riseup/envelopes';
 import { syncBanner, type SyncBanner } from '@/lib/riseup/banner';
+import { mergeRiseupEnvelopes } from '@/lib/dashboard/merge-envelopes';
 import { loadNameBook } from '@/lib/riseup/name-book';
 import { isUnresolvedName, resolveTrackerName, type NameBook } from '@/lib/riseup/tracker-names';
 import { loadSyncState } from '@/lib/riseup/sync';
@@ -36,6 +38,10 @@ export interface EnvelopeView {
   /** Expected cash not yet paid (or received) this month. */
   pending: PendingPlanView[];
   pendingTotal: number;
+  /** Fixed charges RiseUp still expects this month ("צפוי לרדת"). */
+  upcoming?: UpcomingCharge[];
+  /** A tracker RiseUp keeps by the week: its breakdown is weekly. */
+  weekly?: boolean;
 }
 
 export interface PendingPlanView {
@@ -149,7 +155,11 @@ export function assembleMonth(rows: MonthRows): {
   riseupEnvelopes: NormalizedEnvelope[];
 } {
   const actualsByEnvelope = groupActuals(rows.actualRows);
-  const riseupEnvelopes = rows.envelopeRows.map((row) => toNormalized(row, actualsByEnvelope, rows.names));
+  // One fixed card and one card per tracker, as RiseUp shows them.
+  const { envelopes: riseupEnvelopes, aliases } = mergeRiseupEnvelopes(
+    rows.envelopeRows.map((row) => toNormalized(row, actualsByEnvelope, rows.names)),
+    rows.names,
+  );
 
   const occurrences = planOccurrences(
     rows.plans,
@@ -158,7 +168,7 @@ export function assembleMonth(rows: MonthRows): {
     rows.skippedPlanIds,
   );
 
-  const merged = mergeCashIntoEnvelopes(riseupEnvelopes, rows.spends, rows.memberNames);
+  const merged = mergeCashIntoEnvelopes(riseupEnvelopes, rows.spends, rows.memberNames, aliases);
   const cashIncome = cashIncomeEnvelope(
     rows.topups,
     rows.memberNames,
@@ -396,7 +406,9 @@ function toRef(envelope: NormalizedEnvelope): EnvelopeRef {
     name: envelope.name,
     categoryLabels: [
       ...new Set(
-        envelope.actuals.map((a) => a.categoryLabel).filter((l): l is string => Boolean(l)),
+        [...envelope.actuals.map((a) => a.categoryLabel), ...(envelope.upcoming ?? []).map((u) => u.categoryLabel)].filter(
+          (l): l is string => Boolean(l),
+        ),
       ),
     ],
   };
@@ -414,6 +426,8 @@ function toView(envelope: NormalizedEnvelope): EnvelopeView {
     showRemaining: envelope.type === 'trackingCategory' || envelope.type === 'riseupGoal',
     pending: [],
     pendingTotal: 0,
+    ...(envelope.upcoming?.length ? { upcoming: envelope.upcoming } : {}),
+    ...(envelope.weekly ? { weekly: true } : {}),
   };
 }
 
@@ -524,13 +538,19 @@ export function mergeCashIntoEnvelopes(
   envelopes: NormalizedEnvelope[],
   spends: CashSpend[],
   memberNames: Map<string, string>,
+  /** Ids folded into another envelope (one fixed card, one card per tracker). */
+  aliases: ReadonlyMap<string, string> = new Map(),
 ): NormalizedEnvelope[] {
   const byId = new Map(envelopes.map((e) => [e.envelopeId, cloneEnvelope(e)]));
   const refs = envelopes.map(toRef);
+  const fixedId = envelopes.find((e) => e.type === 'fixed')?.envelopeId;
 
   for (const spend of spends) {
+    const pinned = spend.envelope_id ? (aliases.get(spend.envelope_id) ?? spend.envelope_id) : null;
     let target =
-      (spend.envelope_id && byId.get(spend.envelope_id)) ||
+      (pinned && byId.get(pinned)) ||
+      // There is one fixed card a month, so a spend filed as fixed belongs in it.
+      (spend.envelope_type === 'fixed' ? pickById(byId, fixedId) : undefined) ||
       pickById(byId, resolveEnvelopeForCategory(refs, spend.category)?.envelopeId);
 
     // Before the first sync there is nothing to file into. Rather than lose the

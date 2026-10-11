@@ -7,7 +7,7 @@ import { ChevronDown, Kebab, Mic } from '@/app/dashboard/components/icons';
 import { barRatio } from '@/lib/dashboard/bar';
 import { buildBuckets, type Bucket } from '@/lib/dashboard/buckets';
 import type { PendingPlanView } from '@/lib/dashboard/data';
-import type { NormalizedActual } from '@/lib/riseup/envelopes';
+import type { NormalizedActual, UpcomingCharge } from '@/lib/riseup/envelopes';
 import { formatAmount } from '@/lib/money';
 import type { EnvelopeType } from '@/lib/types';
 
@@ -33,6 +33,10 @@ export interface EnvelopeCardProps {
   onSettlePlan?: (plan: PendingPlanView) => void;
   /** The card's ⋮. */
   onMenu?: () => void;
+  /** Fixed charges still expected this month, shown greyed as "צפוי לרדת". */
+  upcoming?: UpcomingCharge[];
+  /** A tracker RiseUp keeps by the week: break it down by week. */
+  weekly?: boolean;
 }
 
 /** Column wording differs per envelope type, exactly as RiseUp words it. */
@@ -95,16 +99,18 @@ export function EnvelopeCard({
   onOpenPlan,
   onSettlePlan,
   onMenu,
+  upcoming = [],
+  weekly = false,
 }: EnvelopeCardProps) {
   const [open, setOpen] = useState(defaultOpen);
-  const text = labels(type);
+  const text = weekly ? { ...labels(type), expander: 'פירוט שבועי' } : labels(type);
 
   // Empty when nothing is planned or spent; full (over budget) when money went
   // out with nothing planned.
   const ratio = barRatio(actual, expected);
   // Cash already promised is not free to spend, even before it goes out.
   const remaining = Math.max(expected - actual - pendingTotal, 0);
-  const buckets = buildBuckets(type, actuals, { today, month });
+  const buckets = buildBuckets(type, actuals, { today, month, upcoming, weekly });
 
   return (
     <article className="card envelope" data-type={type}>
@@ -228,13 +234,15 @@ function BucketRow({
   defaultOpen?: boolean;
   onOpenTransaction?: (actual: NormalizedActual, envelopeTitle: string) => void;
 }) {
-  const [open, setOpen] = useState(defaultOpen && bucket.items.length > 0);
-  const expandable = bucket.items.length > 0;
+  const expandable = bucket.items.length > 0 || bucket.upcoming.length > 0;
+  const [open, setOpen] = useState(defaultOpen && expandable);
 
   return (
     <>
       <button
-        className={bucket.isEmpty ? 'breakdown-row is-empty' : 'breakdown-row'}
+        className={
+          bucket.isEmpty ? 'breakdown-row is-empty' : bucket.isUpcoming ? 'breakdown-row is-upcoming' : 'breakdown-row'
+        }
         type="button"
         aria-expanded={expandable ? open : undefined}
         disabled={!expandable}
@@ -285,6 +293,18 @@ function BucketRow({
                 ) : null}
               </span>
             </button>
+          ))
+        : null}
+
+      {open
+        ? bucket.upcoming.map((charge) => (
+            <div key={charge.key} className="txn-row is-upcoming">
+              <span className="date">צפוי לרדת</span>
+              <span className="amount">
+                <Amount value={charge.amountIls} />
+              </span>
+              <span className="merchant">{charge.businessName || charge.categoryLabel || 'חיוב קבוע'}</span>
+            </div>
           ))
         : null}
     </>

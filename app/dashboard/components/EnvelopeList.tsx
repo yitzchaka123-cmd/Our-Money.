@@ -46,7 +46,13 @@ export function EnvelopeList({
   totalActualExpenses,
   totalExpectedExpenses,
   expandAll = false,
+  onAddTracker,
 }: {
+  /**
+   * The "הוספת קטגוריה למעקב" slot, right after the trackers and before the
+   * fixed card, as in RiseUp. Nothing renders there until this is passed.
+   */
+  onAddTracker?: () => void;
   envelopes: EnvelopeView[];
   plans?: CashPlan[];
   envelopeChoices: EnvelopeRef[];
@@ -148,6 +154,12 @@ export function EnvelopeList({
   const current = openTxn?.actual ?? null;
   const currentKind = current?.cash?.kind ?? 'spend';
 
+  // RiseUp's order: variable, trackers, "הוספת קטגוריה למעקב", fixed, the
+  // spending summary (once), then income and savings.
+  const afterTrackers = envelopes.findIndex((e) => e.type !== 'variable' && e.type !== 'trackingCategory');
+  const addTrackerAt = afterTrackers === -1 ? envelopes.length : afterTrackers;
+  const summaryAt = envelopes.findIndex((e) => e.type === 'fixed');
+
   return (
     <>
       <WalletCard
@@ -168,14 +180,17 @@ export function EnvelopeList({
         </button>
       </div>
 
-      {envelopes.map((envelope) => (
+      {envelopes.map((envelope, index) => (
         <div key={envelope.key}>
+          {index === addTrackerAt && onAddTracker ? <AddTrackerRow onClick={onAddTracker} /> : null}
           <EnvelopeCard
             type={envelope.type}
             title={envelope.title}
             actual={envelope.actual}
             expected={envelope.expected}
             actuals={envelope.actuals}
+            upcoming={envelope.upcoming}
+            weekly={envelope.weekly}
             month={month}
             today={today}
             showRemaining={envelope.showRemaining}
@@ -196,11 +211,12 @@ export function EnvelopeList({
             onSettlePlan={settle}
             onMenu={() => setMenuFor(envelope)}
           />
-          {envelope.type === 'fixed' ? (
+          {index === summaryAt ? (
             <SpendSummary actual={totalActualExpenses} expected={totalExpectedExpenses} />
           ) : null}
         </div>
       ))}
+      {addTrackerAt === envelopes.length && onAddTracker ? <AddTrackerRow onClick={onAddTracker} /> : null}
 
       <TransactionSheet
         open={openTxn !== null && action === null}
@@ -284,6 +300,16 @@ export function EnvelopeList({
         </div>
       ) : null}
     </>
+  );
+}
+
+/** The slot after the trackers; helper code for adding a tracker plugs in here. */
+function AddTrackerRow({ onClick }: { onClick: () => void }) {
+  return (
+    <button className="add-row add-tracker-row" type="button" onClick={onClick}>
+      <span className="add-plus" aria-hidden="true">+</span>
+      <span>הוספת קטגוריה למעקב</span>
+    </button>
   );
 }
 

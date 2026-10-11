@@ -39,15 +39,33 @@ export interface NormalizedEnvelope {
   actualIls: number;
   position: number;
   actuals: NormalizedActual[];
+  /** Fixed charges planned this month that have not come in yet ("צפוי לרדת"). */
+  upcoming?: UpcomingCharge[];
+  /** A tracker RiseUp splits into weekly parts: its breakdown is by week. */
+  weekly?: boolean;
 }
 
-/** Display order on the dashboard, matching RiseUp's own top-to-bottom order. */
+/** A fixed charge RiseUp expects this month that has not been charged yet. */
+export interface UpcomingCharge {
+  /** The RiseUp envelope it came from. */
+  key: string;
+  amountIls: number;
+  /** Category and merchant from the same charge in earlier months, when known. */
+  categoryLabel: string | null;
+  businessName: string | null;
+}
+
+/**
+ * Display order on the dashboard, matching RiseUp's own top-to-bottom order:
+ * variable, the trackers (followed by "הוספת קטגוריה למעקב"), fixed (followed
+ * by the spending summary), income, our cash income, savings.
+ */
 export const ENVELOPE_ORDER: EnvelopeType[] = [
   'variable',
+  'trackingCategory',
   'fixed',
   'variableIncome',
   'cashIncome',
-  'trackingCategory',
   'riseupGoal',
 ];
 

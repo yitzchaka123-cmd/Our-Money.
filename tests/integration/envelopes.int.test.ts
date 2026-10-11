@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import { addCashEntry } from '@/lib/cash/actions';
 import { loadDashboard } from '@/lib/dashboard/data';
 import { db } from '@/lib/db/client';
 
@@ -65,6 +66,60 @@ beforeEach(async () => {
   resetDb();
   signIn(await seedMember(111, 'יצחק'));
   await seedRealMonths();
+});
+
+describe('one fixed card, in RiseUp order', () => {
+  it('shows every fixed charge in a single card, the still-expected one included', async () => {
+    const data = await loadDashboard(OCT);
+    const fixedCards = data.envelopes.filter((e) => e.type === 'fixed');
+    expect(fixedCards).toHaveLength(1);
+
+    const card = fixedCards[0]!;
+    expect(card.title).toBe('הוצאות קבועות');
+    expect(card.actual).toBe(1935.85);
+    expect(card.expected).toBe(2011.36);
+    // `aaa` was charged in September as "RiseUp" and is due again.
+    expect(card.upcoming).toEqual([{ key: fixed(OCT, 'aaa'), amountIls: 55, categoryLabel: 'RiseUp', businessName: 'רייזאפ' }]);
+  });
+
+  it('orders the cards variable, trackers, fixed, income, savings', async () => {
+    const data = await loadDashboard(OCT);
+    expect(data.envelopes.map((e) => e.type)).toEqual([
+      'variable',
+      'trackingCategory',
+      'trackingCategory',
+      'trackingCategory',
+      'trackingCategory',
+      'fixed',
+      'variableIncome',
+      'riseupGoal',
+    ]);
+  });
+
+  it('keeps a weekly tracker in one card', async () => {
+    const data = await loadDashboard(OCT);
+    const groceries = data.envelopes.filter((e) => e.title === 'כלכלה');
+    expect(groceries).toHaveLength(1);
+    expect(groceries[0]).toMatchObject({ actual: 50, weekly: true });
+  });
+
+  it('expects the income that already came in', async () => {
+    const data = await loadDashboard(OCT);
+    expect(data.envelopes.find((e) => e.type === 'variableIncome')?.expected).toBe(7635);
+  });
+
+  it('lists one fixed envelope in the pickers, and cash filed there lands in the one card', async () => {
+    const data = await loadDashboard(OCT);
+    const fixedChoices = data.envelopeChoices.filter((e) => e.type === 'fixed');
+    expect(fixedChoices).toHaveLength(1);
+
+    // Cash pinned to another charge's envelope (as older entries are) still shows in the one card.
+    await addCashEntry({ kind: 'spend', amountIls: 800, category: 'ניקיון', note: 'עוזרת', date: `${OCT}-08`, envelopeId: fixed(OCT, 'ccc'), memberId: null, walletId: null });
+    const after = await loadDashboard(OCT);
+    const card = after.envelopes.find((e) => e.type === 'fixed')!;
+    expect(card.actuals.some((a) => a.cash && a.amountIls === 800)).toBe(true);
+    expect(after.envelopes.filter((e) => e.type === 'fixed')).toHaveLength(1);
+  });
 });
 
 describe('tracker names on the dashboard', () => {

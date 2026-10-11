@@ -14,7 +14,7 @@
 set -euo pipefail
 
 OUT="${1:-./ui-shots}"
-WIDTH=432
+WIDTH="${WIDTH:-432}"
 mkdir -p "$OUT"
 
 CHROME="${CHROME_BIN:-$(ls -d /opt/pw-browsers/chromium-*/chrome-linux/chrome 2>/dev/null | head -1)}"

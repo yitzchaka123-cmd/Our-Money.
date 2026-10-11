@@ -534,6 +534,18 @@ a {
   color: var(--muted);
 }
 
+/* A fixed charge RiseUp still expects this month: greyed, as RiseUp shows it. */
+.breakdown-row.is-upcoming,
+.breakdown-row.is-upcoming .actual,
+.txn-row.is-upcoming .amount,
+.txn-row.is-upcoming .date {
+  color: var(--muted);
+}
+
+.txn-row.is-upcoming .merchant {
+  color: var(--ink-2);
+}
+
 /* --- expected cash, still to come ----------------------------------------- */
 .pending-block {
   background: var(--surface-sunken);

@@ -1,4 +1,4 @@
-import type { NormalizedActual } from '@/lib/riseup/envelopes';
+import type { NormalizedActual, UpcomingCharge } from '@/lib/riseup/envelopes';
 import type { EnvelopeType } from '@/lib/types';
 
 export interface Bucket {
@@ -11,7 +11,11 @@ export interface Bucket {
   isCurrent: boolean;
   /** Nothing happened and nothing is expected: rendered greyed out. */
   isEmpty: boolean;
+  /** Only charges still expected this month: greyed, but it opens. */
+  isUpcoming: boolean;
   items: NormalizedActual[];
+  /** Fixed charges in this category that have not come in yet. */
+  upcoming: UpcomingCharge[];
 }
 
 /** Day of the week the month's 1st falls on, 0 = Sunday. */
@@ -49,17 +53,19 @@ function weekWithin(isoDate: string, month: string): number {
 }
 
 /**
- * Variable expenses break down by week (`פירוט שבועי`); everything else breaks
- * down by the category label on its transactions (`פירוט חודשי`).
+ * Variable expenses — and a tracker RiseUp keeps by the week — break down by
+ * week (`פירוט שבועי`); everything else breaks down by the category label on
+ * its transactions (`פירוט חודשי`), with the fixed charges still expected this
+ * month folded into their category.
  */
 export function buildBuckets(
   type: EnvelopeType,
   actuals: NormalizedActual[],
-  options: { today?: string; month: string },
+  options: { today?: string; month: string; upcoming?: UpcomingCharge[]; weekly?: boolean },
 ): Bucket[] {
-  return type === 'variable'
+  return type === 'variable' || options.weekly
     ? weeklyBuckets(actuals, options)
-    : categoryBuckets(actuals);
+    : categoryBuckets(actuals, options.upcoming ?? []);
 }
 
 function weeklyBuckets(
@@ -87,36 +93,50 @@ function weeklyBuckets(
       expected: null,
       isCurrent: currentWeek === week,
       isEmpty: items.length === 0,
+      isUpcoming: false,
       items,
+      upcoming: [],
     };
   });
 }
 
-function categoryBuckets(actuals: NormalizedActual[]): Bucket[] {
-  const byCategory = new Map<string, NormalizedActual[]>();
+function categoryBuckets(actuals: NormalizedActual[], upcoming: UpcomingCharge[]): Bucket[] {
+  const byCategory = new Map<string, { items: NormalizedActual[]; upcoming: UpcomingCharge[] }>();
+  const slot = (label: string) => {
+    const existing = byCategory.get(label);
+    if (existing) return existing;
+    const fresh = { items: [] as NormalizedActual[], upcoming: [] as UpcomingCharge[] };
+    byCategory.set(label, fresh);
+    return fresh;
+  };
+
   for (const actual of actuals) {
-    const label = actual.categoryLabel?.trim() || actual.businessName || 'אחר';
-    byCategory.set(label, [...(byCategory.get(label) ?? []), actual]);
+    slot(actual.categoryLabel?.trim() || actual.businessName || 'אחר').items.push(actual);
+  }
+  for (const charge of upcoming) {
+    slot(charge.categoryLabel?.trim() || charge.businessName || 'אחר').upcoming.push(charge);
   }
 
   return [...byCategory.entries()]
-    .map(([label, items]) => {
+    .map(([label, { items, upcoming: due }]) => {
       const actual = round(items.reduce((sum, item) => sum + item.amountIls, 0));
+      const stillDue = round(due.reduce((sum, charge) => sum + charge.amountIls, 0));
       return {
         key: label,
         label,
         actual,
-        // The budget endpoint gives a plan per envelope, not per category
-        // inside it. For a charge that already happened RiseUp shows the two
-        // as equal, so that is the honest reconstruction; a category that was
-        // expected but has not been charged cannot appear here at all.
-        expected: actual,
+        // The budget gives a plan per charge. For a charge that already
+        // happened RiseUp shows plan and actual as equal; a charge still to
+        // come adds its plan.
+        expected: round(actual + stillDue),
         isCurrent: false,
-        isEmpty: items.length === 0,
+        isEmpty: items.length === 0 && due.length === 0,
+        isUpcoming: items.length === 0 && due.length > 0,
         items,
+        upcoming: due,
       };
     })
-    .sort((a, b) => b.actual - a.actual);
+    .sort((a, b) => b.actual - a.actual || (b.expected ?? 0) - (a.expected ?? 0));
 }
 
 function round(value: number): number {
