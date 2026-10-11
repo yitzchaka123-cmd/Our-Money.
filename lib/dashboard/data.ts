@@ -53,7 +53,8 @@ export interface PendingPlanView {
 
 export interface WalletMovement {
   id: string;
-  kind: 'withdrawal' | 'income' | 'spend' | 'transfer';
+  /** 'adjustment': "there is really X in this wallet" — its amount is signed. */
+  kind: 'withdrawal' | 'income' | 'spend' | 'transfer' | 'adjustment';
   amountIls: number;
   date: string;
   label: string;
@@ -671,13 +672,15 @@ function buildWallet({
   const movements: WalletMovement[] = [
     ...monthTopups.map((t): WalletMovement => ({
       id: t.id,
-      kind: t.source === 'cash_income' ? 'income' : 'withdrawal',
+      kind: t.source === 'cash_income' ? 'income' : t.source === 'adjustment' ? 'adjustment' : 'withdrawal',
       amountIls: Number(t.amount_ils),
       date: t.occurred_at,
       label:
         t.source === 'cash_income'
           ? t.note || t.category || 'הכנסה במזומן'
-          : t.note || t.business_name || 'משיכת מזומן',
+          : t.source === 'adjustment'
+            ? t.note || 'עדכון יתרה'
+            : t.note || t.business_name || 'משיכת מזומן',
       memberName: t.member_id ? (memberNames.get(t.member_id) ?? null) : null,
       category: t.category,
       walletId: t.wallet_id ?? fallbackId,
@@ -718,7 +721,7 @@ function buildWallet({
   return {
     balance: state.unaccounted,
     wallets: summaries,
-    withdrawn: round(monthTopups.filter((t) => t.source !== 'cash_income').reduce((s, t) => s + Number(t.amount_ils), 0)),
+    withdrawn: round(monthTopups.filter((t) => t.source === 'riseup_withdrawal' || t.source === 'manual').reduce((s, t) => s + Number(t.amount_ils), 0)),
     income: round(monthTopups.filter((t) => t.source === 'cash_income').reduce((s, t) => s + Number(t.amount_ils), 0)),
     spent: round(monthSpends.reduce((s, x) => s + Number(x.amount_ils), 0)),
     movements,

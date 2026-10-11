@@ -27,3 +27,128 @@
   line-height: 20px;
   white-space: nowrap;
 }
+
+/* --- wallets sheet: rows open the wallet's settings --------------------- */
+.wallet-row--button {
+  display: block;
+  width: 100%;
+  text-align: start;
+  background: var(--surface);
+  color: inherit;
+}
+
+.wallet-row--button .wallet-row-main {
+  min-height: 32px;
+}
+
+.wallet-row--button .wallet-name {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.wallet-row-chev {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  flex: 0 0 auto;
+  margin-inline-start: -4px;
+}
+
+.wallet-list-hint {
+  margin: 2px 4px 0;
+}
+
+/* The wallet card's per-wallet list: each line opens that wallet. */
+.wallet-list-open {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 0;
+  background: none;
+  color: inherit;
+  text-align: start;
+  font-size: 15px;
+}
+
+/* --- wallet settings ---------------------------------------------------- */
+.wallet-back {
+  margin-inline-start: -6px;
+  margin-inline-end: 4px;
+}
+
+.wallet-settings-name {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 4px 0 6px;
+}
+
+.wallet-done {
+  background: #e3f7ea;
+  color: #0b7a30;
+  border-radius: var(--radius-row);
+  padding: 10px 14px;
+  margin: 0 0 12px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.wallet-panel {
+  padding-top: 4px;
+}
+
+.wallet-panel .picker-title {
+  margin-inline: 0;
+}
+
+.wallet-panel .chips .chip {
+  background: var(--surface);
+}
+
+.wallet-panel .chips .chip[data-selected='true'] {
+  background: var(--primary);
+}
+
+.wallet-cancel {
+  color: var(--ink-2);
+}
+
+.btn-danger-solid {
+  background: var(--alert);
+}
+
+.btn-danger-solid:active {
+  background: #e85a3b;
+}
+
+.wallet-adjustments {
+  margin-top: 18px;
+}
+
+.wallet-adjustments .picker-title {
+  margin-inline: 4px;
+  font-size: 15px;
+}
+
+.wallet-adjustment {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px 4px;
+  border-top: 1px solid var(--hairline);
+  font-size: 14px;
+}
+
+.wallet-adjustment .date {
+  color: var(--muted);
+}
+
+.wallet-adjustment .is-negative {
+  color: var(--alert);
+}
+
+.wallet-adjustment .is-positive {
+  color: var(--income);
+}

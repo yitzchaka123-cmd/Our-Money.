@@ -199,6 +199,8 @@ export async function searchTransactions(filters: SearchFilters): Promise<Loaded
       .from('cash_topups')
       .select('*')
       .eq('is_dismissed', false)
+      // A balance adjustment is bookkeeping, not a transaction to find.
+      .neq('source', 'adjustment')
       .gte('occurred_at', from)
       .lte('occurred_at', to)
       .order('occurred_at', { ascending: false })

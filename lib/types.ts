@@ -39,7 +39,8 @@ export interface CashTopup {
   id: string;
   amount_ils: number;
   occurred_at: string;
-  source: 'riseup_withdrawal' | 'manual' | 'cash_income';
+  /** 'adjustment': "there is really X in this wallet" — signed, may be negative. */
+  source: 'riseup_withdrawal' | 'manual' | 'cash_income' | 'adjustment';
   riseup_transaction_id: string | null;
   business_name: string | null;
   note: string | null;

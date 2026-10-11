@@ -18,7 +18,7 @@ import { newPlanDraft, PlanSheet, planToDraft, type PlanDraft } from '@/app/dash
 import { TransferSheet } from '@/app/dashboard/components/TransferSheet';
 import { TransactionSheet, type OpenTransaction } from '@/app/dashboard/components/TransactionSheet';
 import { WalletCard } from '@/app/dashboard/components/WalletCard';
-import { WalletsSheet } from '@/app/dashboard/components/WalletsSheet';
+import { WalletsSheet, type WalletsSheetFocus } from '@/app/dashboard/components/WalletsSheet';
 import { deleteCashEntry, markCashSpendAsSavings, type CashKind } from '@/lib/cash/actions';
 import type { EnvelopeRef } from '@/lib/cash/envelopes';
 import { settlePlan } from '@/lib/cash/plan-actions';
@@ -64,7 +64,7 @@ export function EnvelopeList({
   const [openTxn, setOpenTxn] = useState<OpenTransaction | null>(null);
   const [action, setAction] = useState<CashAction | null>(null);
   const [draft, setDraft] = useState<CashEntryDraft | null>(null);
-  const [walletsOpen, setWalletsOpen] = useState(false);
+  const [walletsFocus, setWalletsFocus] = useState<WalletsSheetFocus | null>(null);
   const [transfer, setTransfer] = useState<WalletMovement | null>(null);
   const [planDraft, setPlanDraft] = useState<PlanDraft | null>(null);
   const [menuFor, setMenuFor] = useState<EnvelopeView | null>(null);
@@ -131,6 +131,10 @@ export function EnvelopeList({
       setTransfer(m);
       return;
     }
+    if (m.kind === 'adjustment') {
+      setWalletsFocus({ walletId: m.walletId ?? undefined });
+      return;
+    }
     setDraft({
       id: m.id,
       kind: m.kind,
@@ -153,8 +157,10 @@ export function EnvelopeList({
       <WalletCard
         wallet={wallet}
         onOpenMovement={openMovement}
-        onManage={() => setWalletsOpen(true)}
+        onManage={() => setWalletsFocus({})}
         onAddWithdrawal={() => openNew('withdrawal')}
+        onAddMoney={() => setWalletsFocus({ walletId: wallet.wallets.find((w) => w.isDefault)?.id ?? wallet.wallets[0]?.id, panel: 'add' })}
+        onOpenWallet={(walletId) => setWalletsFocus({ walletId })}
       />
 
       <div className="add-row-pair">
@@ -245,7 +251,9 @@ export function EnvelopeList({
         <CashEntrySheet open draft={draft} envelopes={envelopeChoices} members={members} wallets={wallet.wallets} onClose={() => setDraft(null)} />
       ) : null}
 
-      {walletsOpen ? <WalletsSheet wallets={wallet.wallets} members={members} onClose={() => setWalletsOpen(false)} /> : null}
+      {walletsFocus ? (
+        <WalletsSheet wallets={wallet.wallets} members={members} movements={wallet.movements} focus={walletsFocus} onClose={() => setWalletsFocus(null)} />
+      ) : null}
 
       {transfer ? <TransferSheet transfer={transfer} wallets={wallet.wallets} onClose={() => setTransfer(null)} /> : null}
 

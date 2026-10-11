@@ -85,9 +85,11 @@ export interface WalletBalance {
 
 /**
  * Per-wallet balances. A wallet holds what went into it (withdrawals, cash
- * income, transfers in) minus what left it (spends, transfers out). Rows
- * written before wallets existed have no wallet and count toward the default,
- * so the total across wallets always equals the single-wallet figure.
+ * income, transfers in, balance adjustments — which are signed) minus what
+ * left it (spends, transfers out). Rows written before wallets existed have no
+ * wallet, and rows of a removed wallet have none in the list; both count
+ * toward the default, so the total across wallets always equals the
+ * single-wallet figure.
  */
 export function walletBalances(
   wallets: CashWallet[],
@@ -114,8 +116,10 @@ export function walletBalances(
   }
   for (const x of transfers) {
     if (x.is_dismissed) continue;
-    const from = totals.get(x.from_wallet_id);
-    const to = totals.get(x.to_wallet_id);
+    // A removed wallet's transfers fold into the default like its other rows;
+    // dropping only one side would make money appear or vanish.
+    const from = bucket(x.from_wallet_id);
+    const to = bucket(x.to_wallet_id);
     if (from) from.out += Number(x.amount_ils);
     if (to) to.in += Number(x.amount_ils);
   }
