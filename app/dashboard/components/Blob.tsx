@@ -1,14 +1,17 @@
-/** The floating daily-brief button: a rotated green blob with a counter. */
-export function DailyBriefBlob({ count }: { count: number }) {
+/**
+ * The floating daily-brief button: a rotated green blob with a counter. It
+ * only exists while there is something new — DailyBrief decides that.
+ */
+export function DailyBriefBlob({ count, onOpen }: { count: number; onOpen: () => void }) {
   return (
-    <a className="blob" href="/daily">
+    <button className="blob" type="button" onClick={onOpen} aria-label={`הסיכום היומי שלי: ${count} עדכונים חדשים`}>
       <span>
-        לרייזאפ
+        לסיכום
         <br />
         היומי שלי
         <br />←
       </span>
-      {count > 0 ? <span className="blob-count">{count}</span> : null}
-    </a>
+      <span className="blob-count">{count}</span>
+    </button>
   );
 }

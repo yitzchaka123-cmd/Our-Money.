@@ -2,15 +2,18 @@
 
 import { useState } from 'react';
 
-import { DailyBriefBlob } from '@/app/dashboard/components/Blob';
+import { DailyBrief } from '@/app/dashboard/components/DailyBrief';
 import { EnvelopeList } from '@/app/dashboard/components/EnvelopeList';
 import { HeroCard } from '@/app/dashboard/components/HeroCard';
+import { InsightCards } from '@/app/dashboard/components/InsightCards';
 import { RefreshButton } from '@/app/dashboard/components/RefreshButton';
 import { SearchSheet } from '@/app/dashboard/components/SearchSheet';
 import { SetupStepsBanner } from '@/app/dashboard/components/SetupSteps';
 import { Shell } from '@/app/dashboard/components/Shell';
 import { WalletsSheet } from '@/app/dashboard/components/WalletsSheet';
+import { EMPTY_BRIEF, type BriefData } from '@/lib/dashboard/brief';
 import type { DashboardData } from '@/lib/dashboard/data';
+import type { Insight } from '@/lib/dashboard/insights';
 import { isoDateInIsrael } from '@/lib/dates';
 import { monthLabel } from '@/lib/money';
 
@@ -22,8 +25,20 @@ export function DashboardView({
   data,
   sessionMemberId = null,
   expandAll = false,
+  brief = EMPTY_BRIEF,
+  insights = [],
+  briefStep,
+  insightOpenKey,
 }: {
   data: DashboardData;
+  /** The daily brief for whoever is signed in. */
+  brief?: BriefData;
+  /** Insight cards for the current month. */
+  insights?: Insight[];
+  /** Preview-only: the brief deck open at this card. */
+  briefStep?: number;
+  /** Preview-only: this insight's popup open. */
+  insightOpenKey?: string;
   /** Who is signed in — the default "who" on a new cash entry. */
   sessionMemberId?: string | null;
   /** Preview-only: renders every breakdown open so it can be screenshotted. */
@@ -46,6 +61,7 @@ export function DashboardView({
       onOpenWallets={() => setWalletsOpen(true)}
     >
       <div className="app">
+        <InsightCards insights={insights} initialOpenKey={insightOpenKey} />
         <div className="steps-section">
           {data.syncBanner && (
             <div className={`sync-banner ${data.syncBanner.tone}`} role="status">
@@ -88,7 +104,14 @@ export function DashboardView({
         </div>
       </div>
 
-      <DailyBriefBlob count={data.briefCount} />
+      <DailyBrief
+        brief={brief}
+        envelopes={data.envelopeChoices}
+        members={data.members}
+        wallets={data.wallet.wallets}
+        sessionMemberId={sessionMemberId}
+        initialStep={briefStep}
+      />
 
       {walletsOpen ? (
         <WalletsSheet

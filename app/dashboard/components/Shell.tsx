@@ -203,7 +203,7 @@ export function DrawerContent({
           <Coins />
           <span className="drawer-label">תזרים חודשי</span>
         </a>
-        <a className="drawer-link" href="/daily">
+        <a className="drawer-link" href="/dashboard?brief=1">
           <Cards />
           <span className="drawer-label">הרייזאפ היומי</span>
           {briefCount > 0 ? <span className="drawer-badge">{briefCount}</span> : null}
