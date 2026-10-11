@@ -2,7 +2,6 @@ import type Anthropic from '@anthropic-ai/sdk';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
-  ASSISTANT_MODEL,
   HISTORY_TURNS,
   MAX_QUESTION_LENGTH,
   NO_ANSWER,
@@ -15,6 +14,9 @@ import {
   type AssistantClient,
   type ChatTurn,
 } from '@/lib/assistant/prompt';
+
+process.env.AI_MODEL = 'test-model';
+const ASSISTANT_MODEL = 'test-model';
 
 type BetaMessage = Anthropic.Beta.Messages.BetaMessage;
 type CreateParams = Anthropic.Beta.Messages.MessageCreateParamsNonStreaming;

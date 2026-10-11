@@ -7,8 +7,6 @@ import { env } from '@/lib/env';
 import { activeCategories, CATCH_ALL_CATEGORY } from '@/lib/intake/categories';
 import type { Confidence } from '@/lib/types';
 
-const MODEL = 'claude-opus-5';
-
 /**
  * Short messages with a tiny schema — 4k leaves generous room for adaptive
  * thinking without ever being the reason a parse gets truncated.
@@ -148,7 +146,7 @@ export async function parseIntake(
   const schema = buildSchema(categories, wallets);
 
   const response = await anthropic().messages.parse({
-    model: MODEL,
+    model: env.aiModel,
     max_tokens: MAX_TOKENS,
     system: [
       {

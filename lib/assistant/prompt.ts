@@ -6,12 +6,13 @@
 
 import type Anthropic from '@anthropic-ai/sdk';
 
+import { env } from '@/lib/env';
+
 type BetaMessage = Anthropic.Beta.Messages.BetaMessage;
 type BetaMessageParam = Anthropic.Beta.Messages.BetaMessageParam;
 type BetaTool = Anthropic.Beta.Messages.BetaTool;
 type CreateParams = Anthropic.Beta.Messages.MessageCreateParamsNonStreaming;
 
-export const ASSISTANT_MODEL = 'claude-opus-5-5';
 
 /** Short answers; the cap leaves room for adaptive thinking on top. */
 const MAX_TOKENS = 4000;
@@ -89,7 +90,7 @@ export function buildRequest({
   question: string;
 }): CreateParams {
   return {
-    model: ASSISTANT_MODEL,
+    model: env.aiModel,
     max_tokens: MAX_TOKENS,
     betas: ['server-side-fallback-2026-07-01'],
     // A declined answer is retried on a fallback model inside the same call.

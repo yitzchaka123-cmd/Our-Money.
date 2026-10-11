@@ -209,6 +209,7 @@ export default async function setup(): Promise<() => Promise<void>> {
   process.env.TELEGRAM_WEBHOOK_SECRET = 'integration-webhook-secret';
   process.env.TELEGRAM_ALLOWED_USER_IDS = '111,222';
   process.env.ANTHROPIC_API_KEY = 'integration-anthropic-key';
+  process.env.AI_MODEL = 'integration-model';
   process.env.OPENAI_API_KEY = 'integration-openai-key';
   process.env.RISEUP_PAT = 'integration-riseup-pat';
 

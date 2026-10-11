@@ -57,6 +57,10 @@ export const env = {
   get anthropicApiKey(): string {
     return required('ANTHROPIC_API_KEY', 'Used for the AI intake parsing.');
   },
+  /** Which Claude model the bot and the assistant use. Kept out of the code on purpose. */
+  get aiModel(): string {
+    return required('AI_MODEL', 'The Claude model id for the bot and the assistant.');
+  },
   get intakeEffort(): 'low' | 'medium' | 'high' {
     const raw = optional('INTAKE_EFFORT', 'low');
     return raw === 'medium' || raw === 'high' ? raw : 'low';
