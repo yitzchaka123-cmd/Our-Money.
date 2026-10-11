@@ -569,11 +569,17 @@ export async function deleteTransfer(id: string): Promise<ActionResult> {
 /** The "refresh from RiseUp" button. A tap on refresh within this long of the last pull reuses it. */
 const MANUAL_REFRESH_FLOOR_MS = 30 * 1000;
 
-export async function refreshFromRiseup(): Promise<{ ok: boolean; error: string | null; envelopes: number }> {
+export async function refreshFromRiseup(): Promise<{
+  ok: boolean;
+  error: string | null;
+  envelopes: number;
+  /** Why no pull happened: one just finished, or one is still running. */
+  skipped?: 'fresh' | 'running';
+}> {
   if (!(await sessionMember())) return { ok: false, error: SESSION_EXPIRED_MESSAGE, envelopes: 0 };
   const outcome = await syncIfStale(MANUAL_REFRESH_FLOOR_MS);
   refreshPages();
-  if (outcome.skipped) return { ok: true, error: null, envelopes: 0 };
+  if (outcome.skipped) return { ok: true, error: null, envelopes: 0, skipped: outcome.reason };
   const { result } = outcome;
   if (!result.error) return { ok: true, error: null, envelopes: result.envelopesUpserted };
   // The raw error is in the sync log; the couple gets a sentence they can act on.

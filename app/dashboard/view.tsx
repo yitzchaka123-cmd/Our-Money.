@@ -7,8 +7,8 @@ import { EnvelopeList } from '@/app/dashboard/components/EnvelopeList';
 import { HeroCard } from '@/app/dashboard/components/HeroCard';
 import { RefreshButton } from '@/app/dashboard/components/RefreshButton';
 import { SearchSheet } from '@/app/dashboard/components/SearchSheet';
+import { SetupStepsBanner } from '@/app/dashboard/components/SetupSteps';
 import { Shell } from '@/app/dashboard/components/Shell';
-import { ChevronLeft, Clover } from '@/app/dashboard/components/icons';
 import type { DashboardData } from '@/lib/dashboard/data';
 import { isoDateInIsrael } from '@/lib/dates';
 import { monthLabel } from '@/lib/money';
@@ -50,15 +50,7 @@ export function DashboardView({
               <RefreshButton />
             </div>
           )}
-          <div className="steps-banner">
-            <Clover />
-            <span>
-              השלמת <strong>2 צעדים</strong> והתחלת לצמוח!
-            </span>
-            <span style={{ marginInlineStart: 'auto' }}>
-              <ChevronLeft size={20} />
-            </span>
-          </div>
+          <SetupStepsBanner steps={data.setupSteps} preferredName={data.preferredName} />
         </div>
 
         <div className="section">

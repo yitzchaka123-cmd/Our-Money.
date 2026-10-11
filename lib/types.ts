@@ -6,6 +6,8 @@ export interface HouseholdMember {
   id: string;
   telegram_user_id: number;
   display_name: string;
+  /** What the member asked to be called; null until they choose. */
+  preferred_name?: string | null;
   is_active: boolean;
 }
 
