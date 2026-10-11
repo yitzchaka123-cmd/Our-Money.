@@ -127,13 +127,51 @@ export function envelopeName(envelope: RiseupEnvelope): string {
 }
 
 /**
- * The planned figure. `balancedAmount` and `originalAmount` are documented
- * inconsistently (each is described as the plan in one place and the actual in
- * another), so prefer the first that is present and treat it as a magnitude.
+ * Where the plan may sit, in order. Only the first two are documented, and in
+ * the real data every tracker and the income envelope come back with a zero
+ * `balancedAmount` while RiseUp's own app shows a goal — so a zero is not
+ * trusted while another field holds a number. Each sync records which of these
+ * fields exist and whether they are zero (`sync_runs.envelope_shape`), so the
+ * list can be narrowed to the real one.
  */
+export const PLANNED_FIELDS = [
+  'balancedAmount',
+  'originalAmount',
+  'amount',
+  'plannedAmount',
+  'goal',
+  'budget',
+  'expectedAmount',
+  'predictedAmount',
+  'customPrediction',
+] as const;
+
+function numeric(value: unknown): number {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+}
+
+/** The planned figure: the first non-zero candidate field, as a magnitude. */
 export function plannedAmount(envelope: RiseupEnvelope): number {
-  const raw = envelope.balancedAmount ?? envelope.originalAmount ?? 0;
-  return Math.abs(Number(raw) || 0);
+  const fields = envelope as unknown as Record<string, unknown>;
+  for (const field of PLANNED_FIELDS) {
+    const value = numeric(fields[field]);
+    if (value !== 0) return Math.abs(value);
+  }
+  return 0;
+}
+
+/**
+ * Income that already arrived is income expected: RiseUp's income envelope
+ * never expects less than what came in, and with no plan at all it expects
+ * exactly that.
+ */
+export function plannedForType(type: EnvelopeType, planned: number, actual: number): number {
+  return type === 'variableIncome' ? Math.max(planned, actual) : planned;
 }
 
 export function normalizeEnvelope(
@@ -141,13 +179,15 @@ export function normalizeEnvelope(
   position: number,
 ): NormalizedEnvelope {
   const actuals = (envelope.actuals ?? []).map(normalizeActual);
+  const type = KNOWN_TYPES.has(envelope.type) ? envelope.type : 'trackingCategory';
+  // Summed rather than read off the envelope: the actuals are unambiguous.
+  const actualIls = round(actuals.reduce((total, a) => total + a.amountIls, 0));
   return {
     envelopeId: envelope.id,
-    type: KNOWN_TYPES.has(envelope.type) ? envelope.type : 'trackingCategory',
+    type,
     name: envelopeName(envelope),
-    plannedIls: round(plannedAmount(envelope)),
-    // Summed rather than read off the envelope: the actuals are unambiguous.
-    actualIls: round(actuals.reduce((total, a) => total + a.amountIls, 0)),
+    plannedIls: round(plannedForType(type, plannedAmount(envelope), actualIls)),
+    actualIls,
     position,
     actuals,
   };

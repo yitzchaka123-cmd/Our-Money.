@@ -132,6 +132,27 @@ describe('RiseUp sync', () => {
     expect((await syncRiseup()).newTopups).toHaveLength(0);
   });
 
+  it('records the shape of the budget it saw, without a single amount', async () => {
+    const { syncRiseup } = await import('@/lib/riseup/sync');
+    riseup.budget = {
+      envelopes: [
+        { id: `${MONTH}#trackingCategory#v2-default-il-expense-category-13`, type: 'trackingCategory', balancedAmount: 0, originalAmount: -2850, actuals: [] },
+        { id: `${MONTH}#variableIncome`, type: 'variableIncome', balancedAmount: 0, actuals: [] },
+      ],
+    };
+    expect((await syncRiseup()).error).toBeNull();
+
+    const [row] = sql<{ status: string; envelope_shape: { envelopes: Record<string, { count: number; fields: Record<string, string> }> } }>(
+      'select status, envelope_shape from sync_runs',
+    );
+    expect(row?.status).toBe('succeeded');
+    expect(row?.envelope_shape.envelopes.trackingCategory).toEqual({
+      count: 1,
+      fields: { actuals: 'array', balancedAmount: 'number:zero', id: 'string', originalAmount: 'number:nonzero', type: 'string' },
+    });
+    expect(JSON.stringify(row?.envelope_shape)).not.toContain('2850');
+  });
+
   it('records why a sync failed, and the dashboard says so', async () => {
     const { syncRiseup } = await import('@/lib/riseup/sync');
     const { RiseupAuthError } = await import('@/lib/riseup/client');

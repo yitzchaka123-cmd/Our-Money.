@@ -12,6 +12,7 @@ import { isoDateInIsrael } from '@/lib/dates';
 import { monthBounds, walletBalances, walletState } from '@/lib/reconcile';
 import {
   ENVELOPE_TITLES,
+  plannedForType,
   sortEnvelopes,
   type NormalizedActual,
   type NormalizedEnvelope,
@@ -363,12 +364,13 @@ function toNormalized(
 ): NormalizedEnvelope {
   const actuals = actualsByEnvelope.get(row.envelope_id) ?? [];
   const type = row.envelope_type as EnvelopeType;
+  const actualIls = round(actuals.reduce((sum, a) => sum + a.amountIls, 0));
   return {
     envelopeId: row.envelope_id,
     type,
     name: row.name ?? ENVELOPE_TITLES[type] ?? row.envelope_id,
-    plannedIls: Number(row.planned_ils),
-    actualIls: round(actuals.reduce((sum, a) => sum + a.amountIls, 0)),
+    plannedIls: plannedForType(type, Number(row.planned_ils), actualIls),
+    actualIls,
     position: row.position,
     actuals,
   };
