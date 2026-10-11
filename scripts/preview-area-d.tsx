@@ -14,14 +14,16 @@ import type { ReactElement } from 'react';
 
 import { renderToStaticMarkup } from 'react-dom/server';
 
+import { AccountFilterSheet } from '../app/dashboard/components/AccountFilterSheet';
 import { AddTrackerButton, AddTrackerSheet } from '../app/dashboard/components/AddTrackerSheet';
+import { DashboardView } from '../app/dashboard/view';
 import { EnvelopeCard } from '../app/dashboard/components/EnvelopeCard';
 import { EnvelopeMenu } from '../app/dashboard/components/EnvelopeMenu';
 import { ExpectedIncomePopup, MoveIncomesPopup } from '../app/dashboard/components/IncomeSheets';
 import { TrackerHistorySheet } from '../app/dashboard/components/TrackerHistorySheet';
 import { EditTargetPopup, HidePopup, RenamePopup } from '../app/dashboard/components/TrackerSheets';
 import type { HistoryPoint } from '../lib/dashboard/actions';
-import type { EnvelopeView } from '../lib/dashboard/data';
+import type { DashboardData, EnvelopeView } from '../lib/dashboard/data';
 import type { NormalizedActual } from '../lib/riseup/envelopes';
 
 export const MONTH = '2026-10';
@@ -103,6 +105,41 @@ const cashIncomeEnvelope: EnvelopeView = {
     actual('cash-income:a', `${MONTH}-03`, 350, 'מתנה מסבתא', { isIncome: true, source: 'cash', cash: { id: 'a', kind: 'income', memberName: 'שרה', inputKind: 'web', status: 'confirmed', walletId: null } }),
     actual('cash-income:b', `${MONTH}-09`, 300, 'שיעור פרטי', { isIncome: true, source: 'cash', cash: { id: 'b', kind: 'income', memberName: 'שרה', inputKind: 'web', status: 'confirmed', walletId: null } }),
   ],
+};
+
+const variable: EnvelopeView = {
+  ...income,
+  key: 'variable',
+  envelopeId: 'variable',
+  type: 'variable',
+  title: 'הוצאות משתנות',
+  actual: 152.1,
+  expected: 2400,
+  actuals: [
+    actual('v1', `${MONTH}-01`, 60, 'באג בית שמש', { source: 'card', accountNumberHash: '0848' }),
+    actual('v2', `${MONTH}-04`, 92.1, 'שופרסל דיל', { source: 'card', accountNumberHash: '7722' }),
+  ],
+};
+
+const dashboard: DashboardData = {
+  month: MONTH,
+  months: [MONTH, '2026-09'],
+  userName: 'יצחק',
+  greeting: 'יצחק',
+  lastUpdated: null,
+  lastSyncAt: null,
+  syncBanner: null,
+  forecast: -10217,
+  variableRemaining: 2247.9,
+  totalActualExpenses: 152.1,
+  totalExpectedExpenses: 3120,
+  envelopes: [variable, tracker, income],
+  plans: [],
+  envelopeChoices: [],
+  savingsEnvelopeId: null,
+  wallet: { balance: 0, wallets: [], withdrawn: 0, income: 0, spent: 0, movements: [] },
+  members: [{ id: 'm1', display_name: 'יצחק' }],
+  briefCount: 0,
 };
 
 const incomeHistory: HistoryPoint[] = [
@@ -228,6 +265,23 @@ export const screens: Record<string, () => ReactElement> = {
       <MoveIncomesPopup envelopes={[income, cashIncomeEnvelope]} month={MONTH} months={[MONTH, '2026-09']} onClose={noop} />
     </>
   ),
+  filter: () => (
+    <>
+      {background(income)}
+      <AccountFilterSheet
+        accounts={[
+          { key: 'card:7722', label: 'לאומי קארד 7722', cash: false },
+          { key: 'card:0848', label: 'לאומי קארד 0848', cash: false },
+          { key: 'bank:674', label: 'בנק לאומי 674-1908922', cash: false },
+          { key: 'cash', label: 'מזומן', cash: true },
+        ]}
+        hidden={new Set(['card:0848'])}
+        onApply={noop}
+        onClose={noop}
+      />
+    </>
+  ),
+  'filter-chip': () => <DashboardView data={dashboard} sessionMemberId="m1" previewHiddenAccounts={['card:0848']} />,
   hide: () => (
     <>
       {background(tracker)}

@@ -488,3 +488,59 @@
   border-color: #dedede;
   background: #f4f4f4;
 }
+
+/* --- account filter ("חשבונות להצגה") ------------------------------------- */
+.filter-sheet .sheet-title {
+  margin-bottom: 8px;
+}
+
+.filter-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 8px;
+  font-size: 19px;
+  cursor: pointer;
+}
+
+.filter-row--all {
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--hairline);
+  margin-bottom: 12px;
+}
+
+.filter-list {
+  margin-bottom: 18px;
+}
+
+.filter-sheet .tip-box p {
+  margin: 0;
+}
+
+.filter-sheet .btn {
+  margin-bottom: 8px;
+}
+
+.filter-chip-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px var(--page-gutter) 0;
+  max-width: var(--max-width);
+  margin: 0 auto;
+}
+
+.filter-chip {
+  border-radius: 999px;
+  background: #e8ecfd;
+  color: var(--primary);
+  font-size: 14px;
+  font-weight: 700;
+  padding: 6px 14px;
+}
+
+.filter-chip-clear {
+  font-size: 14px;
+  color: var(--primary);
+  text-decoration: underline;
+}
