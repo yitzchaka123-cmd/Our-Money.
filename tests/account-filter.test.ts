@@ -47,10 +47,15 @@ const data = {
 describe('account filter', () => {
   it('lists each card and account once, with cash last', () => {
     expect(listAccounts(data.envelopes)).toEqual([
-      { key: 'leumiCard:cc5910', label: 'cc5910', cash: false },
+      { key: 'leumiCard:cc5910', label: 'לאומי קארד', cash: false },
       { key: 'leumi:b1234', label: 'עו״ש לאומי', cash: false },
       { key: CASH_ACCOUNT, label: 'מזומן', cash: true },
     ]);
+  });
+
+  it('names each account the way the rest of the app does, never by its code', () => {
+    const named = [envelope('variable', [row('v1', 100, { ...card, accountName: 'כרטיס 0848' })], 1000)];
+    expect(listAccounts(named)[0]).toEqual({ key: 'leumiCard:cc5910', label: 'כרטיס 0848', cash: false });
   });
 
   it('changes nothing when every account is shown', () => {

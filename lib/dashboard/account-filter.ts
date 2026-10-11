@@ -1,3 +1,4 @@
+import { accountDisplayName } from '@/lib/dashboard/accounts';
 import type { DashboardData, EnvelopeView } from '@/lib/dashboard/data';
 import type { NormalizedActual } from '@/lib/riseup/envelopes';
 import type { EnvelopeType } from '@/lib/types';
@@ -23,9 +24,17 @@ export function accountKey(actual: NormalizedActual): string {
   return `${actual.source ?? ''}:${actual.accountNumberHash ?? actual.accountNickname ?? ''}`;
 }
 
+/**
+ * The account's name as the rest of the app shows it (lib/dashboard/accounts.ts):
+ * the loader's friendly name — your name for it, RiseUp's nickname, or the
+ * provider — never RiseUp's opaque code.
+ */
 export function accountLabel(actual: NormalizedActual): string {
   if (actual.cash || actual.source === 'cash') return 'מזומן';
-  return actual.accountNickname ?? actual.accountNumberHash ?? actual.source ?? 'חשבון';
+  return (
+    actual.accountName ??
+    accountDisplayName({ source: actual.source, hash: actual.accountNumberHash, nickname: actual.accountNickname }, [])
+  );
 }
 
 /** Every account seen in this month's rows, cards and banks first, then cash. */
