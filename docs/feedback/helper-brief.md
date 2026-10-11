@@ -5,7 +5,7 @@ the full list with the user's exact words is in `docs/feedback/<date>-videoN.md`
 
 ## Work
 1. Work in your own git worktree and branch. Never push. Never edit anything under `docs/feedback/`.
-2. Tests first: for each item write or extend a failing test (vitest, `tests/unit/...`), then make it pass.
+2. Tests first: for each item write or extend a failing test (vitest, `tests/<name>.test.ts`; integration tests in `tests/integration/*.int.test.ts`), then make it pass.
 3. **Commit after every item**, message in plain English starting with the item number,
    e.g. `V1-09: Show fixed expenses as one card grouped by category`. No AI model names anywhere.
 4. Keep a short progress note in `.helper-progress.md` at the worktree root (item → done / blocked + why).
@@ -19,18 +19,18 @@ the full list with the user's exact words is in `docs/feedback/<date>-videoN.md`
 Heavy checks share one machine. Wrap each in the lock:
 
     flock /tmp/our-money-checks.lock npx tsc --noEmit -p .
-    flock /tmp/our-money-checks.lock npx vitest run tests/unit
+    flock /tmp/our-money-checks.lock npx vitest run
     flock /tmp/our-money-checks.lock npm run test:integration      # only if you touched lib/ or migrations
 
-For screenshots start the dev server on your own port (helper A 3101, B 3102, C 3103, D 3104, E 3105):
-`PORT=31xx npx next dev -p 31xx` and use `scripts/ui-shots.sh` (it renders inside a fixed-width iframe
-because headless Chrome's window size does not set the layout viewport). Take shots at 390×844 and 360×800,
-open them and look at them. Save to `.shots/` in your worktree (not committed) and mention them in your report.
-The dashboard needs data: use the integration-test seed or the screenshot fixture the script already uses.
+Screenshots: `scripts/preview-dashboard.tsx` renders the dashboard to static HTML from a fixture, and
+`scripts/ui-shots.sh <outdir>` shoots it in Chromium inside a fixed-width iframe (headless Chrome's window
+size does not set the layout viewport). Extend the fixture / add a preview mode for what you build, shoot
+at phone widths 390 and 360, OPEN the images and look at them. If you need a live server, use your own
+port (A 3101, B 3102, C 3103, D 3104, E 3105). Save shots to `.shots/` in your worktree (not committed).
 
 ## Database
 - Our tables live in schema `money` of a SHARED free Supabase project. Never touch another schema.
-- A change needs a new file `supabase/migrations/00NN_<name>.sql` (next free number). It must pass
+- A change needs a new migration file with the number the lead gave you (A 0003, B 0004, C 0005, D 0006, E 0007). It must pass
   `scripts/lib/migration-guard.ts` (only `money`, no extensions, no auth, no global defaults) and keep
   the server-only lock (new functions: `revoke execute ... from public`). Do NOT apply it — the lead applies it.
 - Keep it lean: no raw JSON dumps, no large tables.
