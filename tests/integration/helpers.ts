@@ -42,6 +42,7 @@ export function resetDb(): void {
     truncate cash_spends, cash_topups, cash_transfers, cash_plan_skips, cash_plans,
              riseup_envelope_actuals, riseup_envelopes, riseup_transactions, sync_runs,
              login_codes, login_failures, cash_wallets, household_members cascade;
+    truncate account_labels;
     insert into cash_wallets (name, is_default, position) values ('ארנק ראשי', true, 0);
   `);
   signOut();

@@ -1,4 +1,6 @@
 import { envelopeChoices, resolveEnvelopeForCategory, type EnvelopeRef } from '@/lib/cash/envelopes';
+import { loadAccountLabels } from '@/lib/dashboard/account-labels';
+import { accountNamer, type AccountLabel, type AccountRef } from '@/lib/dashboard/accounts';
 import {
   expectedWithCash,
   planEnvelope,
@@ -133,6 +135,8 @@ export interface MonthRows {
   plans: CashPlan[];
   skippedPlanIds: ReadonlySet<string>;
   memberNames: Map<string, string>;
+  /** The couple's names for cards and accounts; without them, provider names. */
+  accountLabels?: AccountLabel[];
 }
 
 /**
@@ -144,7 +148,7 @@ export function assembleMonth(rows: MonthRows): {
   envelopes: EnvelopeView[];
   riseupEnvelopes: NormalizedEnvelope[];
 } {
-  const actualsByEnvelope = groupActuals(rows.actualRows);
+  const actualsByEnvelope = groupActuals(rows.actualRows, rows.accountLabels ?? []);
   const riseupEnvelopes = rows.envelopeRows.map((row) => toNormalized(row, actualsByEnvelope));
 
   const occurrences = planOccurrences(
@@ -198,6 +202,7 @@ export async function loadDashboard(month: string, sessionMemberId: string | nul
     { data: allTopups },
     { data: members },
     syncState,
+    accountLabels,
     { data: monthList },
     { data: walletRows },
     { data: allTransfers },
@@ -225,6 +230,7 @@ export async function loadDashboard(month: string, sessionMemberId: string | nul
     supabase.from('cash_topups').select('*').eq('is_dismissed', false),
     supabase.from('household_members').select('id, display_name'),
     loadSyncState(),
+    loadAccountLabels(),
     supabase.from('riseup_envelopes').select('month'),
     supabase.from('cash_wallets').select('*').eq('is_archived', false).order('position').order('created_at'),
     supabase.from('cash_transfers').select('*').eq('is_dismissed', false),
@@ -255,6 +261,7 @@ export async function loadDashboard(month: string, sessionMemberId: string | nul
     plans,
     skippedPlanIds: new Set(((skipRows ?? []) as { plan_id: string }[]).map((r) => r.plan_id)),
     memberNames,
+    accountLabels,
   });
 
   const totals = monthTotals(envelopes);
@@ -321,8 +328,12 @@ export interface ActualRow {
   category_label: string | null;
 }
 
-function groupActuals(rows: ActualRow[]): Map<string, NormalizedActual[]> {
+function groupActuals(rows: ActualRow[], labels: AccountLabel[]): Map<string, NormalizedActual[]> {
   const grouped = new Map<string, NormalizedActual[]>();
+  const accountOf = (row: ActualRow): AccountRef => ({ source: row.source, hash: row.account_number_hash, nickname: row.account_nickname });
+  // Every row's card or account reads the same way: your name for it, else
+  // RiseUp's nickname, else the provider — never RiseUp's opaque code.
+  const nameAccount = accountNamer(rows.map(accountOf), labels);
   for (const row of rows) {
     // An ATM withdrawal is cash changing location, not spending. The wallet
     // accounts for that money and the cash entries say what it bought, so it
@@ -339,6 +350,7 @@ function groupActuals(rows: ActualRow[]): Map<string, NormalizedActual[]> {
         isIncome: row.is_income,
         accountNickname: row.account_nickname,
         accountNumberHash: row.account_number_hash,
+        accountName: nameAccount(accountOf(row)),
         source: row.source,
         isInstallment: row.is_installment,
         paymentNumber: row.payment_number,

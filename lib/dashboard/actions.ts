@@ -8,6 +8,8 @@ import {
   type ActualRow,
   type EnvelopeRow,
 } from '@/lib/dashboard/data';
+import { loadAccountLabels } from '@/lib/dashboard/account-labels';
+import { accountNamer, type AccountRef } from '@/lib/dashboard/accounts';
 import { db } from '@/lib/db/client';
 import { monthBounds } from '@/lib/reconcile';
 import type { CashSpend, CashTopup, EnvelopeType } from '@/lib/types';
@@ -169,7 +171,7 @@ export async function searchTransactions(filters: SearchFilters): Promise<Loaded
   const cardQuery = () => {
     let query = supabase
       .from('riseup_envelope_actuals')
-      .select('transaction_id, transaction_date, business_name, amount_ils, is_income, category_label, account_nickname, account_number_hash, month')
+      .select('transaction_id, transaction_date, business_name, amount_ils, is_income, category_label, account_nickname, account_number_hash, source, month')
       .gte('month', filters.fromMonth)
       .lte('month', filters.toMonth)
       .order('transaction_date', { ascending: false })
@@ -222,8 +224,16 @@ export async function searchTransactions(filters: SearchFilters): Promise<Loaded
     return { ok: false, error: 'החיפוש נכשל. נסו שוב.' };
   }
 
+  const cardRows = (card.data ?? []) as Record<string, unknown>[];
+  const cardAccount = (row: Record<string, unknown>): AccountRef => ({
+    source: (row.source as string | null) ?? null,
+    hash: (row.account_number_hash as string | null) ?? null,
+    nickname: (row.account_nickname as string | null) ?? null,
+  });
+  const nameAccount = accountNamer(cardRows.map(cardAccount), cardRows.length > 0 ? await loadAccountLabels() : []);
+
   const hits: SearchHit[] = [
-    ...((card.data ?? []) as Record<string, unknown>[]).map((row): SearchHit => ({
+    ...cardRows.map((row): SearchHit => ({
       key: `card:${row.transaction_id as string}:${row.month as string}`,
       source: 'card',
       kind: row.is_income ? 'income' : 'spend',
@@ -236,7 +246,7 @@ export async function searchTransactions(filters: SearchFilters): Promise<Loaded
       memberId: null,
       walletId: null,
       fromBank: false,
-      detail: (row.account_nickname as string | null) ?? (row.account_number_hash ? `כרטיס ${row.account_number_hash as string}` : null),
+      detail: nameAccount(cardAccount(row)),
     })),
     ...((spends.data ?? []) as CashSpend[]).map((s): SearchHit => ({
       key: `spend:${s.id}`,

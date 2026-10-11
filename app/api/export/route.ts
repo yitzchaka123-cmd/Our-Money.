@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { sessionMember } from '@/lib/auth/member';
 import type { CashPlan } from '@/lib/cash/plans';
+import { loadAccountLabels } from '@/lib/dashboard/account-labels';
 import { assembleMonth, currentMonth, toPlans, type ActualRow, type EnvelopeRow } from '@/lib/dashboard/data';
 import { db } from '@/lib/db/client';
 import { toCsv } from '@/lib/export/csv';
@@ -70,6 +71,7 @@ export async function GET(request: Request): Promise<Response> {
   const defaultWallet = walletList.find((w) => w.is_default)?.name ?? '';
   const walletName = (id: string | null) => (id ? (walletNames.get(id) ?? '') : defaultWallet);
   const planList = toPlans(plans.data as CashPlan[] | null);
+  const accountLabels = await loadAccountLabels();
 
   const rows: Array<Array<string | number | null>> = [
     ['תאריך', 'חודש תזרים', 'מעטפה', 'סוג', 'סכום', 'תיאור', 'קטגוריה', 'אמצעי', 'ארנק', 'מי', 'סטטוס'],
@@ -87,6 +89,7 @@ export async function GET(request: Request): Promise<Response> {
       plans: planList,
       skippedPlanIds: new Set(((skips.data ?? []) as { plan_id: string; month: string }[]).filter((s) => s.month === month).map((s) => s.plan_id)),
       memberNames,
+      accountLabels,
     });
 
     for (const view of views) {
@@ -100,7 +103,7 @@ export async function GET(request: Request): Promise<Response> {
           actual.amountIls,
           actual.businessName,
           actual.categoryLabel,
-          cash ? 'מזומן' : actual.accountNickname || (actual.accountNumberHash ? `כרטיס ${actual.accountNumberHash}` : 'RiseUp'),
+          cash ? 'מזומן' : actual.accountName || actual.accountNickname || 'RiseUp',
           cash ? walletName(cash.walletId) : '',
           cash?.memberName ?? '',
           cash?.status === 'needs_review' ? 'ממתין לאישור' : '',

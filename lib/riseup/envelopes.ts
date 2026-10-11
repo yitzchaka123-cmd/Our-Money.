@@ -19,6 +19,8 @@ export interface NormalizedActual {
   paymentNumber: number | null;
   totalPayments: number | null;
   categoryLabel: string | null;
+  /** How the card or account reads on screen (lib/dashboard/accounts.ts); set by the loader. */
+  accountName?: string | null;
   /** Set when the row is a cash entry of ours rather than a RiseUp charge. */
   cash?: {
     id: string;
