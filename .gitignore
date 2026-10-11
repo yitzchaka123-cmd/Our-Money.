@@ -10,3 +10,6 @@ build/
 next-env.d.ts
 .DS_Store
 coverage/
+.claude/worktrees/
+.shots/
+ui-shots/
