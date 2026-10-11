@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { RegisterServiceWorker } from '@/app/RegisterServiceWorker';
 
 import './globals.css';
+import './wallets-accounts.css';
 
 export const metadata: Metadata = {
   title: 'המזומן שלנו',

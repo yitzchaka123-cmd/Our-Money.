@@ -170,9 +170,9 @@ function WalletRow({
           />
         ) : (
           <button type="button" className="wallet-name" onClick={() => setEditing(true)}>
-            {wallet.name}
-            {wallet.isDefault ? <span className="pill">ברירת מחדל</span> : null}
-            {wallet.memberName ? <span className="pill">{wallet.memberName}</span> : null}
+            <span className="wallet-row-name">{wallet.name}</span>
+            {wallet.isDefault ? <span className="wallet-tag">ברירת מחדל</span> : null}
+            {wallet.memberName ? <span className="wallet-tag">{wallet.memberName}</span> : null}
           </button>
         )}
         <Amount value={wallet.balance} className={wallet.balance < 0 ? 'wallet-balance is-negative' : 'wallet-balance'} />

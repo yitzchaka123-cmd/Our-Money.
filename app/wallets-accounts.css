@@ -1,0 +1,29 @@
+/* ---------------------------------------------------------------------------
+   Wallets, accounts, settings, drawer and loading — kept apart from
+   globals.css so the shared file stays small. Uses the tokens defined there.
+   --------------------------------------------------------------------------- */
+
+/* --- wallets sheet: name and its tags ----------------------------------- */
+.wallet-name {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.wallet-row-name {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+/* A small pill, so "ארנק ראשי" and "ברירת מחדל" never read as one word. */
+.wallet-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 9px;
+  border-radius: 999px;
+  background: #eef0fe;
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 20px;
+  white-space: nowrap;
+}
