@@ -141,6 +141,30 @@ describe('tracker overrides against the real schema', () => {
     expect((await loadDashboard(SEP, yitzchak)).envelopes.find((e) => e.type === 'cashIncome')?.actual).toBe(300);
   });
 
+  it('applies our target and name to a tracker RiseUp splits by the week, shown as one card', async () => {
+    // A second week of the same tracker in October.
+    const week2 = `${OCT}#trackingCategory#${KEY}#1`;
+    await db().from('riseup_envelopes').insert({ month: OCT, envelope_id: week2, envelope_type: 'trackingCategory', name: 'רכב', planned_ils: 150, actual_ils: 80, position: 6 });
+    await db().from('riseup_envelope_actuals').insert({ month: OCT, envelope_id: week2, transaction_id: `${OCT}-wash`, transaction_date: `${OCT}-12`, business_name: 'שטיפת רכב', amount_ils: 80, category_label: 'רכב' });
+
+    const before = (await loadDashboard(OCT, yitzchak)).envelopes.filter((e) => e.trackerKey === KEY);
+    expect(before).toHaveLength(1);
+    expect(before[0]).toMatchObject({ actual: 330, expected: 3000, weekly: true });
+
+    await renameTracker(KEY, 'האוטו');
+    await setTrackerTarget(KEY, 1000, OCT, false);
+    const after = (await loadDashboard(OCT, yitzchak)).envelopes.filter((e) => e.trackerKey === KEY);
+    expect(after).toHaveLength(1);
+    expect(after[0]).toMatchObject({ title: 'האוטו', actual: 330, expected: 1000, weekly: true });
+    expect(after[0]!.override).toMatchObject({ riseupTarget: 3000, renamed: true, retargeted: true });
+
+    const history = await envelopeHistory(OCT, 'trackingCategory', 'האוטו', 2, KEY, 'רכב');
+    expect(history.ok && history.data.map((p) => [p.month, p.actual, p.expected])).toEqual([
+      [SEP, 400, 1000],
+      [OCT, 330, 1000],
+    ]);
+  });
+
   it("reads a tracker's months by its key, and falls back to transactions by label", async () => {
     await renameTracker(KEY, 'האוטו');
     await db().from('riseup_transactions').insert({ transaction_id: 'aug-fuel', cashflow_month: '2026-08', amount_ils: 610, is_income: false, category_label: 'רכב' });

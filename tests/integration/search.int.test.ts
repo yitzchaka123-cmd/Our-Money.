@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { addCashEntry } from '@/lib/cash/actions';
+import { setWalletBalance } from '@/lib/cash/wallet-actions';
 import { searchTransactions, type SearchHit } from '@/lib/dashboard/actions';
+import { renameTracker } from '@/lib/dashboard/tracker-actions';
 import { db } from '@/lib/db/client';
 
-import { resetDb, seedMember, seedMonth, signIn, signOut } from './helpers';
+import { resetDb, seedMember, seedMonth, signIn, signOut, sql } from './helpers';
 
 const SEP = '2026-09';
 const OCT = '2026-10';
@@ -88,6 +90,44 @@ describe('search across all months', () => {
     const dates = seen.map((h) => h.date);
     expect([...dates].sort().reverse()).toEqual(dates);
     expect(seen.filter((h) => h.source === 'card')).toHaveLength(3);
+  });
+
+  it('never shows a wallet balance adjustment, only real entries', async () => {
+    await addCashEntry({ kind: 'withdrawal', amountIls: 300, category: '', note: 'יתרה מהבנק', date: `${OCT}-02`, envelopeId: null, memberId: null, walletId: null });
+    const [wallet] = sql<{ id: string }>('select id from cash_wallets where is_default');
+    // Stored as an 'adjustment' top-up with the note "עדכון יתרה".
+    expect((await setWalletBalance(wallet!.id, 250, `${OCT}-03`)).ok).toBe(true);
+    expect(sql("select count(*)::int as n from cash_topups where source = 'adjustment'")).toEqual([{ n: 1 }]);
+
+    const result = await searchTransactions('יתרה');
+    if (!result.ok) throw new Error(result.error);
+    expect(result.data.hits.map((h) => h.title)).toEqual(['יתרה מהבנק']);
+  });
+
+  it('names a tracker as the dashboard does: our own name first, never a raw id', async () => {
+    const key = 'v2-default-il-expense-category-13';
+    const carId = `${OCT}#trackingCategory#${key}#0`;
+    await db()
+      .from('riseup_envelopes')
+      .insert({ month: OCT, envelope_id: carId, envelope_type: 'trackingCategory', name: carId, planned_ils: 2850, actual_ils: 250, position: 5 });
+    await db().from('riseup_envelope_actuals').insert({
+      month: OCT,
+      envelope_id: carId,
+      transaction_id: `${OCT}-fuel`,
+      transaction_date: `${OCT}-06`,
+      business_name: 'פז',
+      amount_ils: 250,
+      category_label: 'רכב',
+    });
+
+    const named = await searchTransactions('פז');
+    if (!named.ok) throw new Error(named.error);
+    expect(named.data.hits[0]).toMatchObject({ envelopeType: 'trackingCategory', envelopeTitle: 'רכב' });
+
+    expect((await renameTracker(key, 'האוטו')).ok).toBe(true);
+    const renamed = await searchTransactions('פז');
+    if (!renamed.ok) throw new Error(renamed.error);
+    expect(renamed.data.hits[0]).toMatchObject({ envelopeTitle: 'האוטו' });
   });
 
   it('treats filter syntax in a query as plain text', async () => {
