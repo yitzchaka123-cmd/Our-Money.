@@ -9,6 +9,7 @@ import {
   type EnvelopeRow,
 } from '@/lib/dashboard/data';
 import { db } from '@/lib/db/client';
+import { toOverrides, type TrackerOverrideRow } from '@/lib/dashboard/trackers';
 import { monthBounds } from '@/lib/reconcile';
 import type { CashSpend, CashTopup, EnvelopeType } from '@/lib/types';
 
@@ -25,6 +26,11 @@ export interface HistoryPoint {
   cash: number;
   /** False when that month has no envelope with this identity. */
   present: boolean;
+  /**
+   * The month had no such tracker, so `actual` is the month's spending with
+   * the tracker's category label, read off RiseUp's transactions.
+   */
+  fromTransactions?: boolean;
 }
 
 export type Loaded<T> = { ok: true; data: T } | { ok: false; error: string };
@@ -51,6 +57,10 @@ export async function envelopeHistory(
   type: EnvelopeType,
   title: string,
   count = 6,
+  /** A tracker's month-to-month key (see lib/dashboard/trackers.ts). */
+  key: string | null = null,
+  /** A tracker's category label, for months that had no such tracker. */
+  label: string | null = null,
 ): Promise<Loaded<HistoryPoint[]>> {
   if (!(await sessionMember())) return { ok: false, error: EXPIRED };
   if (!/^\d{4}-\d{2}$/.test(month)) return { ok: false, error: 'חודש לא תקין.' };
@@ -60,7 +70,7 @@ export async function envelopeHistory(
   const to = monthBounds(months[months.length - 1]!).to;
   const supabase = db();
 
-  const [envelopes, actuals, spends, topups, plans, skips, members] = await Promise.all([
+  const [envelopes, actuals, spends, topups, plans, skips, members, overrides, transactions] = await Promise.all([
     supabase.from('riseup_envelopes').select('*').in('month', months),
     supabase.from('riseup_envelope_actuals').select('*').in('month', months),
     supabase.from('cash_spends').select('*').neq('status', 'deleted').gte('spent_at', from).lte('spent_at', to),
@@ -68,6 +78,16 @@ export async function envelopeHistory(
     supabase.from('cash_plans').select('*').eq('is_active', true),
     supabase.from('cash_plan_skips').select('plan_id, month').in('month', months),
     supabase.from('household_members').select('id, display_name'),
+    // Errors (no migration 0006 yet) just mean no overrides.
+    supabase.from('tracker_overrides').select('*').in('month', ['', ...months]),
+    type === 'trackingCategory' && label
+      ? supabase
+          .from('riseup_transactions')
+          .select('cashflow_month, amount_ils')
+          .in('cashflow_month', months)
+          .eq('category_label', label)
+          .eq('is_income', false)
+      : Promise.resolve({ data: [], error: null }),
   ]);
   const failed = [envelopes, actuals, spends, topups, plans, skips, members].find((r) => r.error);
   if (failed?.error) {
@@ -79,6 +99,7 @@ export async function envelopeHistory(
     ((members.data ?? []) as { id: string; display_name: string }[]).map((m) => [m.id, m.display_name]),
   );
   const planList = toPlans(plans.data as CashPlan[] | null);
+  const overrideList = toOverrides(overrides.data as TrackerOverrideRow[] | null);
   const inMonth = <T,>(rows: T[] | null, key: (row: T) => string, m: string) =>
     (rows ?? []).filter((row) => key(row).startsWith(m));
 
@@ -94,12 +115,21 @@ export async function envelopeHistory(
         ((skips.data ?? []) as { plan_id: string; month: string }[]).filter((s) => s.month === m).map((s) => s.plan_id),
       ),
       memberNames,
+      overrides: overrideList,
     });
 
     const match =
       type === 'trackingCategory'
-        ? views.find((v) => v.type === type && v.title.trim() === title.trim())
+        ? (key ? views.find((v) => v.type === type && v.trackerKey === key) : undefined) ??
+          views.find((v) => v.type === type && v.title.trim() === title.trim())
         : views.find((v) => v.type === type);
+
+    if (!match && type === 'trackingCategory' && label) {
+      const fromTransactions = ((transactions.data ?? []) as { cashflow_month: string; amount_ils: number | string }[])
+        .filter((t) => t.cashflow_month === m)
+        .reduce((s, t) => s + Math.abs(Number(t.amount_ils) || 0), 0);
+      return { month: m, actual: round(fromTransactions), expected: 0, cash: 0, present: fromTransactions > 0, fromTransactions: true };
+    }
 
     return {
       month: m,

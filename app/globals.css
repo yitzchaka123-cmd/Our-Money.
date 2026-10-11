@@ -871,11 +871,12 @@ a {
   text-align: start;
 }
 
+/* The icon sits just before the label, at the row's start, as in RiseUp's
+   own menus (video frames 4:08, 5:40, 6:05). */
 .action-row .ico {
   flex: 0 0 auto;
   color: var(--ink);
-  order: 2;
-  margin-inline-start: auto;
+  display: grid;
 }
 
 .radio-row {

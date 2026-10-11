@@ -15,6 +15,7 @@ import { EnvelopeCard } from '@/app/dashboard/components/EnvelopeCard';
 import { EnvelopeMenu, type EnvelopeMenuAction } from '@/app/dashboard/components/EnvelopeMenu';
 import { BulkMoveSheet, HistorySheet, PlansListSheet } from '@/app/dashboard/components/EnvelopeSheets';
 import { newPlanDraft, PlanSheet, planToDraft, type PlanDraft } from '@/app/dashboard/components/PlanSheet';
+import { TrackerSheets, type TrackerSheetKind } from '@/app/dashboard/components/TrackerSheets';
 import { TransferSheet } from '@/app/dashboard/components/TransferSheet';
 import { TransactionSheet, type OpenTransaction } from '@/app/dashboard/components/TransactionSheet';
 import { WalletCard } from '@/app/dashboard/components/WalletCard';
@@ -71,6 +72,7 @@ export function EnvelopeList({
   const [historyFor, setHistoryFor] = useState<EnvelopeView | null>(null);
   const [bulkFor, setBulkFor] = useState<EnvelopeView | null>(null);
   const [plansOpen, setPlansOpen] = useState(false);
+  const [trackerSheet, setTrackerSheet] = useState<{ kind: TrackerSheetKind; envelope: EnvelopeView } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [, start] = useTransition();
 
@@ -95,7 +97,9 @@ export function EnvelopeList({
     const envelopeId = income ? null : envelope.envelopeId;
     if (pick === 'add-cash') openNew(income ? 'income' : 'spend', envelopeId);
     if (pick === 'add-plan') setPlanDraft(newPlanDraft(income ? 'income' : 'spend', month, today, sessionMemberId, envelopeId));
-    if (pick === 'history') setHistoryFor(envelope);
+    if (pick === 'history' && envelope.type === 'trackingCategory') setTrackerSheet({ kind: 'tracker-history', envelope });
+    else if (pick === 'history') setHistoryFor(envelope);
+    if (pick === 'edit-target' || pick === 'rename' || pick === 'hide') setTrackerSheet({ kind: pick, envelope });
     if (pick === 'bulk-move') setBulkFor(envelope);
     if (pick === 'plans') setPlansOpen(true);
   };
@@ -251,6 +255,15 @@ export function EnvelopeList({
 
       {menuFor ? (
         <EnvelopeMenu envelope={menuFor} onPick={(pick) => onMenuPick(menuFor, pick)} onClose={() => setMenuFor(null)} />
+      ) : null}
+      {trackerSheet ? (
+        <TrackerSheets
+          kind={trackerSheet.kind}
+          envelope={trackerSheet.envelope}
+          month={month}
+          onSwitch={(kind) => setTrackerSheet({ kind, envelope: trackerSheet.envelope })}
+          onClose={() => setTrackerSheet(null)}
+        />
       ) : null}
       {historyFor ? <HistorySheet envelope={historyFor} month={month} onClose={() => setHistoryFor(null)} /> : null}
       {bulkFor ? <BulkMoveSheet envelope={bulkFor} envelopes={envelopeChoices} onClose={() => setBulkFor(null)} /> : null}

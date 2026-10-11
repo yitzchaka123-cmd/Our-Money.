@@ -17,6 +17,15 @@ import {
   type NormalizedEnvelope,
 } from '@/lib/riseup/envelopes';
 import { syncBanner, type SyncBanner } from '@/lib/riseup/banner';
+import {
+  prepareTrackers,
+  settleTrackers,
+  toOverrides,
+  trackerKey,
+  type OverrideInfo,
+  type TrackerOverride,
+  type TrackerOverrideRow,
+} from '@/lib/dashboard/trackers';
 import { loadSyncState } from '@/lib/riseup/sync';
 import { matchesWithdrawalName } from '@/lib/riseup/withdrawals';
 import type { CashSpend, CashTopup, CashTransfer, CashWallet, EnvelopeType, HouseholdMember } from '@/lib/types';
@@ -33,6 +42,10 @@ export interface EnvelopeView {
   /** Expected cash not yet paid (or received) this month. */
   pending: PendingPlanView[];
   pendingTotal: number;
+  /** Trackers: the key that stays the same from month to month. */
+  trackerKey?: string | null;
+  /** Set when our own override (money.tracker_overrides) changed this envelope. */
+  override?: OverrideInfo;
 }
 
 export interface PendingPlanView {
@@ -132,6 +145,8 @@ export interface MonthRows {
   plans: CashPlan[];
   skippedPlanIds: ReadonlySet<string>;
   memberNames: Map<string, string>;
+  /** Our tracker and expected-income overrides; RiseUp's API is read-only. */
+  overrides?: TrackerOverride[];
 }
 
 /**
@@ -144,7 +159,14 @@ export function assembleMonth(rows: MonthRows): {
   riseupEnvelopes: NormalizedEnvelope[];
 } {
   const actualsByEnvelope = groupActuals(rows.actualRows);
-  const riseupEnvelopes = rows.envelopeRows.map((row) => toNormalized(row, actualsByEnvelope));
+  const overrides = rows.overrides ?? [];
+  // RiseUp's envelopes as named and planned automatically, then ours on top.
+  const prepared = prepareTrackers(
+    rows.envelopeRows.map((row) => toNormalized(row, actualsByEnvelope)),
+    overrides,
+    rows.month,
+  );
+  const riseupEnvelopes = prepared.envelopes;
 
   const occurrences = planOccurrences(
     rows.plans,
@@ -153,7 +175,12 @@ export function assembleMonth(rows: MonthRows): {
     rows.skippedPlanIds,
   );
 
-  const merged = mergeCashIntoEnvelopes(riseupEnvelopes, rows.spends, rows.memberNames);
+  const merged = settleTrackers(
+    mergeCashIntoEnvelopes(riseupEnvelopes, rows.spends, rows.memberNames),
+    overrides,
+    prepared.info,
+    rows.month,
+  );
   const cashIncome = cashIncomeEnvelope(
     rows.topups,
     rows.memberNames,
@@ -164,8 +191,12 @@ export function assembleMonth(rows: MonthRows): {
     occurrences,
     rows.plans,
     rows.memberNames,
-  );
-  return { envelopes, riseupEnvelopes };
+  ).map((view) => {
+    const info = prepared.info.get(view.key);
+    return info ? { ...view, override: info } : view;
+  });
+  const shown = new Set(merged.map((e) => e.envelopeId));
+  return { envelopes, riseupEnvelopes: riseupEnvelopes.filter((e) => shown.has(e.envelopeId)) };
 }
 
 /** Income minus every expected expense — RiseUp's headline number. */
@@ -203,6 +234,7 @@ export async function loadDashboard(month: string, sessionMemberId: string | nul
     { data: monthTransfers },
     { data: planRows },
     { data: skipRows },
+    { data: overrideRows },
   ] = await Promise.all([
     supabase.from('riseup_envelopes').select('*').eq('month', month).order('position'),
     supabase.from('riseup_envelope_actuals').select('*').eq('month', month),
@@ -235,6 +267,8 @@ export async function loadDashboard(month: string, sessionMemberId: string | nul
       .lte('occurred_at', to),
     supabase.from('cash_plans').select('*').eq('is_active', true).order('day_of_month'),
     supabase.from('cash_plan_skips').select('plan_id').eq('month', month),
+    // Until migration 0006 is applied this errors, and there are simply no overrides.
+    supabase.from('tracker_overrides').select('*').in('month', ['', month]),
   ]);
 
   const wallets = (walletRows ?? []) as CashWallet[];
@@ -254,6 +288,7 @@ export async function loadDashboard(month: string, sessionMemberId: string | nul
     plans,
     skippedPlanIds: new Set(((skipRows ?? []) as { plan_id: string }[]).map((r) => r.plan_id)),
     memberNames,
+    overrides: toOverrides(overrideRows as TrackerOverrideRow[] | null),
   });
 
   const totals = monthTotals(envelopes);
@@ -399,6 +434,7 @@ function toView(envelope: NormalizedEnvelope): EnvelopeView {
     showRemaining: envelope.type === 'trackingCategory' || envelope.type === 'riseupGoal',
     pending: [],
     pendingTotal: 0,
+    trackerKey: envelope.type === 'trackingCategory' ? trackerKey(envelope.envelopeId) : null,
   };
 }
 

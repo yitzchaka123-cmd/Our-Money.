@@ -236,7 +236,9 @@ const fixture: DashboardData = {
   briefCount: 8,
 };
 
-const css = readFileSync(new URL('../app/globals.css', import.meta.url), 'utf8');
+const css = ['../app/globals.css', '../app/dashboard/trackers-search.css']
+  .map((file) => readFileSync(new URL(file, import.meta.url), 'utf8'))
+  .join('\n');
 const target = process.argv[2] ?? 'dashboard-preview.html';
 const expandAll = process.argv[3] === 'expanded';
 
