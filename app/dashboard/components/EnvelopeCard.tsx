@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import { Amount } from '@/app/dashboard/components/Amount';
 import { ChevronDown, Kebab, Mic } from '@/app/dashboard/components/icons';
+import { barRatio } from '@/lib/dashboard/bar';
 import { buildBuckets, type Bucket } from '@/lib/dashboard/buckets';
 import type { PendingPlanView } from '@/lib/dashboard/data';
 import type { NormalizedActual } from '@/lib/riseup/envelopes';
@@ -98,9 +99,9 @@ export function EnvelopeCard({
   const [open, setOpen] = useState(defaultOpen);
   const text = labels(type);
 
-  // A bar with nothing planned still reads as "spent everything planned",
-  // which is how RiseUp renders a fully-consumed variable envelope.
-  const ratio = expected > 0 ? Math.min(actual / expected, 1) : 1;
+  // Empty when nothing is planned or spent; full (over budget) when money went
+  // out with nothing planned.
+  const ratio = barRatio(actual, expected);
   // Cash already promised is not free to spend, even before it goes out.
   const remaining = Math.max(expected - actual - pendingTotal, 0);
   const buckets = buildBuckets(type, actuals, { today, month });
