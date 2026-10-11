@@ -19,6 +19,7 @@ import {
 import { syncBanner, type SyncBanner } from '@/lib/riseup/banner';
 import { loadSyncState } from '@/lib/riseup/sync';
 import { matchesWithdrawalName } from '@/lib/riseup/withdrawals';
+import { greetingName, memberName } from '@/lib/profile/names';
 import type { CashSpend, CashTopup, CashTransfer, CashWallet, EnvelopeType, HouseholdMember } from '@/lib/types';
 
 export interface EnvelopeView {
@@ -222,7 +223,7 @@ export async function loadDashboard(month: string, sessionMemberId: string | nul
       .order('occurred_at', { ascending: false }),
     supabase.from('cash_spends').select('*').neq('status', 'deleted'),
     supabase.from('cash_topups').select('*').eq('is_dismissed', false),
-    supabase.from('household_members').select('id, display_name'),
+    supabase.from('household_members').select('id, display_name, preferred_name, telegram_user_id'),
     loadSyncState(),
     supabase.from('riseup_envelopes').select('month'),
     supabase.from('cash_wallets').select('*').eq('is_archived', false).order('position').order('created_at'),
@@ -238,7 +239,9 @@ export async function loadDashboard(month: string, sessionMemberId: string | nul
   ]);
 
   const wallets = (walletRows ?? []) as CashWallet[];
-  const memberList = (members ?? []) as Pick<HouseholdMember, 'id' | 'display_name'>[];
+  const memberRows = (members ?? []) as Pick<HouseholdMember, 'id' | 'display_name' | 'preferred_name' | 'telegram_user_id'>[];
+  // Everywhere a member is named, it is the name they chose (if they chose one).
+  const memberList = memberRows.map((m) => ({ id: m.id, display_name: memberName(m) }));
   const memberNames = new Map(memberList.map((m) => [m.id, m.display_name]));
 
   const spends = (monthSpends ?? []) as CashSpend[];
@@ -258,7 +261,7 @@ export async function loadDashboard(month: string, sessionMemberId: string | nul
 
   const totals = monthTotals(envelopes);
   const variable = envelopes.find((e) => e.type === 'variable');
-  const me = memberList.find((m) => m.id === sessionMemberId) ?? memberList[0];
+  const me = memberRows.find((m) => m.id === sessionMemberId) ?? memberRows[0];
 
   const lastSyncAt = syncState.lastSuccessAt;
 
@@ -268,8 +271,9 @@ export async function loadDashboard(month: string, sessionMemberId: string | nul
       ((monthList ?? []) as { month: string }[]).map((row) => row.month),
       month,
     ),
-    userName: me?.display_name ?? 'שלום',
-    greeting: (me?.display_name ?? '').split(' ')[0] || 'שלום',
+    userName: me ? memberName(me) : 'שלום',
+    // Never the Telegram account's name: until they choose one, just "היי".
+    greeting: greetingName(me),
     lastUpdated: formatUpdated(lastSyncAt),
     lastSyncAt,
     syncBanner: syncBanner(syncState),
