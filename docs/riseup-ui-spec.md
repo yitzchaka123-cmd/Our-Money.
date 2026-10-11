@@ -132,8 +132,18 @@ In RiseUp the order down the page is: an insight **carousel**, its page dots
 from the page), a 2px full-width rule, the `השלמת 2 צעדים` banner on a white
 band, and only then this hero card as a normal card.
 
-Our Money has no insight cards of its own, so it drops the carousel and its
-dots rather than faking four slides, and starts at the banner.
+Our Money builds its own insight cards from the couple's numbers
+(`lib/dashboard/insights.ts`) and keeps RiseUp's place for them, above the banner.
+When there is nothing true to say the carousel and its dots are not drawn.
+
+Each card (video 1, 3:00–3:30): white, radius 20px; a ~106px top band in the
+info wash with a flat drawing; a small round `X` at its top-left; 18px text with
+a bold opening; a full-width primary button. The cards snap one per screen with
+the neighbours peeking at the edges. `X` hides it and shows a navy snackbar
+under the app bar, `ההודעה לא תוצג יותר` with `ביטול`. Tapping opens a centred
+popup: a blue head with the title in white 23px/700 and a white `X`, body at
+17px, `מה עכשיו?` in bold, a primary button, a hairline, then the question in
+link blue and two outlined answer buttons with coin faces (`כן!` / `לא`).
 
 ---
 

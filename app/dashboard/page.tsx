@@ -4,6 +4,7 @@ import { SignedOut } from '@/app/SignedOut';
 import { SESSION_COOKIE, verifySessionToken } from '@/lib/auth/session';
 import { loadBriefSafely } from '@/lib/dashboard/brief-load';
 import { currentMonth, loadDashboard } from '@/lib/dashboard/data';
+import { loadInsightsSafely } from '@/lib/dashboard/insights-load';
 import { syncIfStale } from '@/lib/riseup/sync';
 import { DashboardView } from '@/app/dashboard/view';
 
@@ -32,12 +33,14 @@ export default async function DashboardPage({
   await refreshIfStale();
 
   const [data, brief] = await Promise.all([loadDashboard(month, session.memberId), loadBriefSafely(session.memberId)]);
+  const insights = await loadInsightsSafely(data, session.memberId);
 
   return (
     <DashboardView
       // The drawer's badge and the blob show the same, true count.
       data={{ ...data, briefCount: brief.count }}
       brief={brief}
+      insights={insights}
       sessionMemberId={session.memberId}
     />
   );
