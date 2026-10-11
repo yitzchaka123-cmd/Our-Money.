@@ -64,11 +64,12 @@ export function DailyBrief({
   // A card that was edited shows its new figures once the page refreshes.
   const current = item ? (brief.items.find((i) => i.key === item.key) ?? item) : null;
 
-  // Before the deck is read the blob shows the server's count; after, only
-  // what is still waiting for review.
-  const count = finished
-    ? deck.filter((i) => i.needsReview && !confirmed.has(i.key)).length
-    : brief.count;
+  // Once the deck is read, the blob shows only what still waits for review —
+  // until the page's data refreshes and the server's count takes over again.
+  const count =
+    finished && brief.asOf === asOf
+      ? deck.filter((i) => i.needsReview && !confirmed.has(i.key)).length
+      : brief.count;
 
   const openDeck = () => {
     setDeck(brief.items);
