@@ -1,4 +1,6 @@
 import { envelopeChoices, resolveEnvelopeForCategory, type EnvelopeRef } from '@/lib/cash/envelopes';
+import { loadAccountLabels } from '@/lib/dashboard/account-labels';
+import { accountNamer, type AccountLabel, type AccountRef } from '@/lib/dashboard/accounts';
 import {
   expectedWithCash,
   planEnvelope,
@@ -64,7 +66,8 @@ export interface PendingPlanView {
 
 export interface WalletMovement {
   id: string;
-  kind: 'withdrawal' | 'income' | 'spend' | 'transfer';
+  /** 'adjustment': "there is really X in this wallet" — its amount is signed. */
+  kind: 'withdrawal' | 'income' | 'spend' | 'transfer' | 'adjustment';
   amountIls: number;
   date: string;
   label: string;
@@ -149,6 +152,8 @@ export interface MonthRows {
   memberNames: Map<string, string>;
   /** Names learned in other months, for trackers stored without one. */
   names?: NameBook | null;
+  /** The couple's names for cards and accounts; without them, provider names. */
+  accountLabels?: AccountLabel[];
 }
 
 /**
@@ -160,7 +165,7 @@ export function assembleMonth(rows: MonthRows): {
   envelopes: EnvelopeView[];
   riseupEnvelopes: NormalizedEnvelope[];
 } {
-  const actualsByEnvelope = groupActuals(rows.actualRows);
+  const actualsByEnvelope = groupActuals(rows.actualRows, rows.accountLabels ?? []);
   // One fixed card and one card per tracker, as RiseUp shows them.
   const { envelopes: riseupEnvelopes, aliases } = mergeRiseupEnvelopes(
     rows.envelopeRows.map((row) => toNormalized(row, actualsByEnvelope, rows.names)),
@@ -218,6 +223,7 @@ export async function loadDashboard(month: string, sessionMemberId: string | nul
     { data: allTopups },
     { data: members },
     syncState,
+    accountLabels,
     { data: monthList },
     { data: walletRows },
     { data: allTransfers },
@@ -246,6 +252,7 @@ export async function loadDashboard(month: string, sessionMemberId: string | nul
     supabase.from('cash_topups').select('*').eq('is_dismissed', false),
     supabase.from('household_members').select('id, display_name, preferred_name, telegram_user_id'),
     loadSyncState(),
+    loadAccountLabels(),
     supabase.from('riseup_envelopes').select('month'),
     supabase.from('cash_wallets').select('*').eq('is_archived', false).order('position').order('created_at'),
     supabase.from('cash_transfers').select('*').eq('is_dismissed', false),
@@ -280,6 +287,7 @@ export async function loadDashboard(month: string, sessionMemberId: string | nul
     skippedPlanIds: new Set(((skipRows ?? []) as { plan_id: string }[]).map((r) => r.plan_id)),
     memberNames,
     names,
+    accountLabels,
   });
 
   const totals = monthTotals(envelopes);
@@ -358,8 +366,12 @@ export interface ActualRow {
   category_label: string | null;
 }
 
-function groupActuals(rows: ActualRow[]): Map<string, NormalizedActual[]> {
+function groupActuals(rows: ActualRow[], labels: AccountLabel[]): Map<string, NormalizedActual[]> {
   const grouped = new Map<string, NormalizedActual[]>();
+  const accountOf = (row: ActualRow): AccountRef => ({ source: row.source, hash: row.account_number_hash, nickname: row.account_nickname });
+  // Every row's card or account reads the same way: your name for it, else
+  // RiseUp's nickname, else the provider — never RiseUp's opaque code.
+  const nameAccount = accountNamer(rows.map(accountOf), labels);
   for (const row of rows) {
     // An ATM withdrawal is cash changing location, not spending. The wallet
     // accounts for that money and the cash entries say what it bought, so it
@@ -376,6 +388,7 @@ function groupActuals(rows: ActualRow[]): Map<string, NormalizedActual[]> {
         isIncome: row.is_income,
         accountNickname: row.account_nickname,
         accountNumberHash: row.account_number_hash,
+        accountName: nameAccount(accountOf(row)),
         source: row.source,
         isInstallment: row.is_installment,
         paymentNumber: row.payment_number,
@@ -726,13 +739,15 @@ function buildWallet({
   const movements: WalletMovement[] = [
     ...monthTopups.map((t): WalletMovement => ({
       id: t.id,
-      kind: t.source === 'cash_income' ? 'income' : 'withdrawal',
+      kind: t.source === 'cash_income' ? 'income' : t.source === 'adjustment' ? 'adjustment' : 'withdrawal',
       amountIls: Number(t.amount_ils),
       date: t.occurred_at,
       label:
         t.source === 'cash_income'
           ? t.note || t.category || 'הכנסה במזומן'
-          : t.note || t.business_name || 'משיכת מזומן',
+          : t.source === 'adjustment'
+            ? t.note || 'עדכון יתרה'
+            : t.note || t.business_name || 'משיכת מזומן',
       memberName: t.member_id ? (memberNames.get(t.member_id) ?? null) : null,
       category: t.category,
       walletId: t.wallet_id ?? fallbackId,
@@ -773,7 +788,7 @@ function buildWallet({
   return {
     balance: state.unaccounted,
     wallets: summaries,
-    withdrawn: round(monthTopups.filter((t) => t.source !== 'cash_income').reduce((s, t) => s + Number(t.amount_ils), 0)),
+    withdrawn: round(monthTopups.filter((t) => t.source === 'riseup_withdrawal' || t.source === 'manual').reduce((s, t) => s + Number(t.amount_ils), 0)),
     income: round(monthTopups.filter((t) => t.source === 'cash_income').reduce((s, t) => s + Number(t.amount_ils), 0)),
     spent: round(monthSpends.reduce((s, x) => s + Number(x.amount_ils), 0)),
     movements,

@@ -9,6 +9,7 @@ import { RefreshButton } from '@/app/dashboard/components/RefreshButton';
 import { SearchSheet } from '@/app/dashboard/components/SearchSheet';
 import { SetupStepsBanner } from '@/app/dashboard/components/SetupSteps';
 import { Shell } from '@/app/dashboard/components/Shell';
+import { WalletsSheet } from '@/app/dashboard/components/WalletsSheet';
 import type { DashboardData } from '@/lib/dashboard/data';
 import { isoDateInIsrael } from '@/lib/dates';
 import { monthLabel } from '@/lib/money';
@@ -31,6 +32,7 @@ export function DashboardView({
   const today = isoDateInIsrael();
   const monthName = monthLabel(data.month).split(' ')[0] ?? data.month;
   const [search, setSearch] = useState<'search' | 'filter' | null>(null);
+  const [walletsOpen, setWalletsOpen] = useState(false);
 
   return (
     <Shell
@@ -41,6 +43,7 @@ export function DashboardView({
       briefCount={data.briefCount}
       onSearch={() => setSearch('search')}
       onFilter={() => setSearch('filter')}
+      onOpenWallets={() => setWalletsOpen(true)}
     >
       <div className="app">
         <div className="steps-section">
@@ -86,6 +89,15 @@ export function DashboardView({
       </div>
 
       <DailyBriefBlob count={data.briefCount} />
+
+      {walletsOpen ? (
+        <WalletsSheet
+          wallets={data.wallet.wallets}
+          members={data.members}
+          movements={data.wallet.movements}
+          onClose={() => setWalletsOpen(false)}
+        />
+      ) : null}
 
       {search ? (
         <SearchSheet

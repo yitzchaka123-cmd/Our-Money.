@@ -74,4 +74,34 @@ describe('walletBalances', () => {
     const total = perWallet.reduce((s, b) => s + b.balance, 0);
     expect(total).toBe(walletState(topups, spends).unaccounted);
   });
+
+  it('counts a balance adjustment, signed, in its own wallet only (V1-04)', () => {
+    const balances = walletBalances(
+      [main, sara],
+      [
+        topup(1000, { wallet_id: 'w-main' }),
+        topup(-150, { wallet_id: 'w-main', source: 'adjustment' }),
+        topup(80, { wallet_id: 'w-sara', source: 'adjustment' }),
+      ],
+      [spend(100, { wallet_id: 'w-main' })],
+      [],
+    );
+    expect(balances.map((b) => b.balance)).toEqual([750, 80]);
+    const total = balances.reduce((s, b) => s + b.balance, 0);
+    expect(total).toBe(
+      walletState([topup(1000), topup(-150, { source: 'adjustment' }), topup(80, { source: 'adjustment' })], [spend(100)]).unaccounted,
+    );
+  });
+
+  it('folds a removed wallet into the default, transfers included, so the total never moves (V1-04)', () => {
+    // "שרה" was removed once it was empty: 300 came in by transfer and 300
+    // was spent from it. Its rows still exist; only the wallet is gone.
+    const balances = walletBalances(
+      [main],
+      [topup(1000, { wallet_id: 'w-main' })],
+      [spend(300, { wallet_id: 'w-sara' })],
+      [transfer(300, 'w-main', 'w-sara')],
+    );
+    expect(balances).toEqual([{ walletId: 'w-main', in: 1300, out: 600, balance: 700 }]);
+  });
 });

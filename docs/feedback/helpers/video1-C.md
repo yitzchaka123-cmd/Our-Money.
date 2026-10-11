@@ -1,0 +1,11 @@
+# Helper C progress (video 1)
+
+| Item | Status | Note |
+|---|---|---|
+| #5 wallet name / default tag | done | name and tags are separate elements; tag is a small pill (app/wallets-accounts.css) |
+| #4 wallet settings | done | WalletSettingsSheet (add money, set amount = signed 'adjustment' row in cash_topups, rename, default, remove only when empty — archived if it has history); add-money row on the wallet card; migration 0005 (not applied) |
+| #7 card / account names | done | lib/dashboard/accounts.ts (provider names, accountDisplayName, accountNamer, summarizeAccounts); money.account_labels in 0005; names applied in the loader (assembleMonth), EnvelopeCard merchantLine, search detail, export; setAccountLabel action. Naming UI is on the accounts page (#23) |
+| #23 accounts page | done | app/accounts: AccountsView (bank and card sections, one card per account: name, provider, this month charges + count, credits), name editor in each card foot, cash card, one honest line about balances. Previews: scripts/preview-c.tsx + scripts/ui-shots-c.sh |
+| #24 drawer | done | Shell.tsx DrawerContent: תזרים חודשי, הרייזאפ היומי (/daily for now), מצב העו״ש והאשראי, ארנקים (opens WalletsSheet via view.tsx), הגדרות, sync, התנתקות (new POST /api/auth/logout); export links removed from the drawer (export moved to settings) |
+| #25 settings page | done | app/settings (SettingsView + NameEditor): your name editable via setPreferredName (minimal lib/profile/actions.ts — B owns the real one), connected accounts by name (read only, link to /accounts), Telegram members, read-only line, export links, sign out. preferred_name column added in 0005 with "if not exists" |
+| #26 loading skeleton | done | app/dashboard/loading.tsx: grey app bar, month bar, banner, hero card and two envelope cards with a CSS shimmer (off under reduced motion) |

@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { Amount } from '@/app/dashboard/components/Amount';
 import { ChevronDown, Kebab, Mic } from '@/app/dashboard/components/icons';
 import { barRatio } from '@/lib/dashboard/bar';
+import { providerName } from '@/lib/dashboard/accounts';
 import { buildBuckets, type Bucket } from '@/lib/dashboard/buckets';
 import type { PendingPlanView } from '@/lib/dashboard/data';
 import type { NormalizedActual, UpcomingCharge } from '@/lib/riseup/envelopes';
@@ -363,8 +364,11 @@ export function merchantLine(actual: NormalizedActual): string {
   if (actual.cash) {
     return [actual.businessName, actual.cash.memberName].filter(Boolean).join(' · ');
   }
-  const account = actual.accountNickname ?? actual.accountNumberHash;
-  return [actual.businessName, account ? `כרטיס ${account}` : null]
-    .filter(Boolean)
-    .join(' ');
+  // RiseUp only sends an opaque code per card, so the code is never shown on
+  // its own: the loader's name, else RiseUp's nickname, else the provider.
+  const account =
+    actual.accountName ??
+    actual.accountNickname ??
+    (actual.source || actual.accountNumberHash ? providerName(actual.source) : null);
+  return [actual.businessName, account].filter(Boolean).join(' ');
 }

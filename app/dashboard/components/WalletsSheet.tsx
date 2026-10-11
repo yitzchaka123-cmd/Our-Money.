@@ -3,29 +3,42 @@
 import { useState, useTransition } from 'react';
 
 import { Amount } from '@/app/dashboard/components/Amount';
+import { ChevronLeft } from '@/app/dashboard/components/icons';
 import { Sheet } from '@/app/dashboard/components/Sheet';
-import {
-  archiveWallet,
-  createWallet,
-  renameWallet,
-  setDefaultWallet,
-  transferBetweenWallets,
-} from '@/lib/cash/actions';
-import type { WalletSummary } from '@/lib/dashboard/data';
+import { WalletSettingsSheet, type WalletPanel } from '@/app/dashboard/components/WalletSettingsSheet';
+import { createWallet, transferBetweenWallets } from '@/lib/cash/actions';
+import type { WalletMovement, WalletSummary } from '@/lib/dashboard/data';
 import { isoDateInIsrael } from '@/lib/dates';
 import type { HouseholdMember } from '@/lib/types';
 
-/** Manage wallets, and move cash between them. */
+/** Where the wallets sheet opens: the list, or straight into one wallet's settings. */
+export interface WalletsSheetFocus {
+  walletId?: string;
+  panel?: WalletPanel;
+}
+
+/**
+ * Manage wallets, and move cash between them. Tapping a wallet opens its own
+ * settings screen (WalletSettingsSheet).
+ */
 export function WalletsSheet({
   wallets,
   members,
+  movements = [],
+  focus = null,
   onClose,
 }: {
   wallets: WalletSummary[];
   members: Pick<HouseholdMember, 'id' | 'display_name'>[];
+  /** This month's wallet movements; the settings screen lists its balance updates. */
+  movements?: WalletMovement[];
+  focus?: WalletsSheetFocus | null;
   onClose: () => void;
 }) {
   const [tab, setTab] = useState<'list' | 'transfer'>('list');
+  const [settings, setSettings] = useState<{ walletId: string; panel: WalletPanel | null } | null>(
+    focus?.walletId ? { walletId: focus.walletId, panel: focus.panel ?? null } : null,
+  );
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -48,6 +61,20 @@ export function WalletsSheet({
   const [date, setDate] = useState(isoDateInIsrael());
   const [note, setNote] = useState('');
 
+  const settingsWallet = settings ? wallets.find((w) => w.id === settings.walletId) : undefined;
+  if (settings && settingsWallet) {
+    return (
+      <WalletSettingsSheet
+        key={settingsWallet.id}
+        wallet={settingsWallet}
+        adjustments={movements.filter((m) => m.kind === 'adjustment' && m.walletId === settingsWallet.id)}
+        initialPanel={settings.panel}
+        onBack={() => setSettings(null)}
+        onClose={onClose}
+      />
+    );
+  }
+
   return (
     <Sheet open onClose={onClose} labelledBy="wallets-title">
       <div className="sheet-body">
@@ -63,8 +90,9 @@ export function WalletsSheet({
         {tab === 'list' ? (
           <>
             {wallets.map((w) => (
-              <WalletRow key={w.id} wallet={w} pending={pending} run={run} canArchive={wallets.length > 1} />
+              <WalletRow key={w.id} wallet={w} onOpen={() => setSettings({ walletId: w.id, panel: null })} />
             ))}
+            <p className="field-hint wallet-list-hint">לחצו על ארנק כדי להוסיף לו כסף, לעדכן כמה יש בו, לשנות שם או להסיר.</p>
 
             <div className="wallet-new">
               <label className="field">
@@ -141,54 +169,18 @@ export function WalletsSheet({
   );
 }
 
-function WalletRow({
-  wallet,
-  pending,
-  run,
-  canArchive,
-}: {
-  wallet: WalletSummary;
-  pending: boolean;
-  run: (task: () => Promise<{ ok: boolean; error?: string }>) => void;
-  canArchive: boolean;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [name, setName] = useState(wallet.name);
-
+function WalletRow({ wallet, onOpen }: { wallet: WalletSummary; onOpen: () => void }) {
   return (
-    <div className="wallet-row">
-      <div className="wallet-row-main">
-        {editing ? (
-          <input
-            className="wallet-rename"
-            type="text"
-            value={name}
-            autoFocus
-            onChange={(e) => setName(e.target.value)}
-            onBlur={() => { setEditing(false); if (name.trim() && name !== wallet.name) run(() => renameWallet(wallet.id, name)); }}
-            onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-          />
-        ) : (
-          <button type="button" className="wallet-name" onClick={() => setEditing(true)}>
-            {wallet.name}
-            {wallet.isDefault ? <span className="pill">ברירת מחדל</span> : null}
-            {wallet.memberName ? <span className="pill">{wallet.memberName}</span> : null}
-          </button>
-        )}
+    <button type="button" className="wallet-row wallet-row--button" onClick={onOpen} aria-label={`הגדרות ${wallet.name}`}>
+      <span className="wallet-row-main">
+        <span className="wallet-name">
+          <span className="wallet-row-name">{wallet.name}</span>
+          {wallet.isDefault ? <span className="wallet-tag">ברירת מחדל</span> : null}
+          {wallet.memberName ? <span className="wallet-tag">{wallet.memberName}</span> : null}
+        </span>
         <Amount value={wallet.balance} className={wallet.balance < 0 ? 'wallet-balance is-negative' : 'wallet-balance'} />
-      </div>
-      <div className="wallet-row-actions">
-        {!wallet.isDefault ? (
-          <button type="button" className="link-btn" disabled={pending} onClick={() => run(() => setDefaultWallet(wallet.id))}>
-            להפוך לברירת מחדל
-          </button>
-        ) : null}
-        {!wallet.isDefault && canArchive ? (
-          <button type="button" className="link-btn link-btn--danger" disabled={pending} onClick={() => run(() => archiveWallet(wallet.id))}>
-            לארכב
-          </button>
-        ) : null}
-      </div>
-    </div>
+        <span className="wallet-row-chev" aria-hidden="true"><ChevronLeft size={20} /></span>
+      </span>
+    </button>
   );
 }

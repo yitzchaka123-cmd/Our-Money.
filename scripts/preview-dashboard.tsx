@@ -259,7 +259,7 @@ const fixture: DashboardData = {
   preferredName: 'יצחק',
 };
 
-const css = ['../app/globals.css', '../app/assistant-and-setup.css']
+const css = ['../app/globals.css', '../app/assistant-and-setup.css', '../app/wallets-accounts.css']
   .map((file) => readFileSync(new URL(file, import.meta.url), 'utf8'))
   .join('\n');
 const target = process.argv[2] ?? 'dashboard-preview.html';

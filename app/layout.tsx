@@ -5,6 +5,7 @@ import { RegisterServiceWorker } from '@/app/RegisterServiceWorker';
 
 import './globals.css';
 import './assistant-and-setup.css';
+import './wallets-accounts.css';
 
 export const metadata: Metadata = {
   title: 'המזומן שלנו',

@@ -1,0 +1,598 @@
+/* ---------------------------------------------------------------------------
+   Wallets, accounts, settings, drawer and loading — kept apart from
+   globals.css so the shared file stays small. Uses the tokens defined there.
+   --------------------------------------------------------------------------- */
+
+/* --- wallets sheet: name and its tags ----------------------------------- */
+.wallet-name {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.wallet-row-name {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+/* A small pill, so "ארנק ראשי" and "ברירת מחדל" never read as one word. */
+.wallet-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 9px;
+  border-radius: 999px;
+  background: #eef0fe;
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 20px;
+  white-space: nowrap;
+}
+
+/* --- wallets sheet: rows open the wallet's settings --------------------- */
+.wallet-row--button {
+  display: block;
+  width: 100%;
+  text-align: start;
+  background: var(--surface);
+  color: inherit;
+}
+
+.wallet-row--button .wallet-row-main {
+  min-height: 32px;
+}
+
+.wallet-row--button .wallet-name {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.wallet-row-chev {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  flex: 0 0 auto;
+  margin-inline-start: -4px;
+}
+
+.wallet-list-hint {
+  margin: 2px 4px 0;
+}
+
+/* The wallet card's per-wallet list: each line opens that wallet. */
+.wallet-list-open {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 0;
+  background: none;
+  color: inherit;
+  text-align: start;
+  font-size: 15px;
+}
+
+/* --- wallet settings ---------------------------------------------------- */
+.wallet-back {
+  margin-inline-start: -6px;
+  margin-inline-end: 4px;
+}
+
+.wallet-settings-name {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 4px 0 6px;
+}
+
+.wallet-done {
+  background: #e3f7ea;
+  color: #0b7a30;
+  border-radius: var(--radius-row);
+  padding: 10px 14px;
+  margin: 0 0 12px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.wallet-panel {
+  padding-top: 4px;
+}
+
+.wallet-panel .picker-title {
+  margin-inline: 0;
+}
+
+.wallet-panel .chips .chip {
+  background: var(--surface);
+}
+
+.wallet-panel .chips .chip[data-selected='true'] {
+  background: var(--primary);
+}
+
+.wallet-cancel {
+  color: var(--ink-2);
+}
+
+.btn-danger-solid {
+  background: var(--alert);
+}
+
+.btn-danger-solid:active {
+  background: #e85a3b;
+}
+
+.wallet-adjustments {
+  margin-top: 18px;
+}
+
+.wallet-adjustments .picker-title {
+  margin-inline: 4px;
+  font-size: 15px;
+}
+
+.wallet-adjustment {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px 4px;
+  border-top: 1px solid var(--hairline);
+  font-size: 14px;
+}
+
+.wallet-adjustment .date {
+  color: var(--muted);
+}
+
+.wallet-adjustment .is-negative {
+  color: var(--alert);
+}
+
+.wallet-adjustment .is-positive {
+  color: var(--income);
+}
+
+/* --- accounts page ("מצב העו״ש והאשראי") ------------------------------- */
+.accounts-honest {
+  margin: -8px var(--page-gutter) 16px;
+  color: var(--ink-2);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.accounts-page .section-label {
+  margin-top: 6px;
+}
+
+.accounts-total {
+  margin: 0 var(--page-gutter) 14px;
+  font-size: 15px;
+}
+
+.account-card .card-body {
+  padding-bottom: 20px;
+}
+
+.account-updated {
+  margin: 0 0 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.account-provider {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.account-sub {
+  margin: 0;
+  font-size: 15px;
+  color: var(--ink-2);
+}
+
+.account-figure-label {
+  margin: 14px 0 0;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.account-figure.is-zero {
+  color: var(--ink);
+}
+
+.account-card .account-figure {
+  margin-top: 2px;
+}
+
+.account-credits {
+  margin: 6px 0 0;
+  font-size: 14px;
+  color: var(--ink-2);
+}
+
+.account-credits .amount {
+  color: var(--income);
+  font-weight: 700;
+}
+
+/* The foot: where RiseUp prints the account number, we print your name for it. */
+.account-name-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  background: none;
+  color: var(--ink);
+  text-align: start;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.account-name.is-empty {
+  color: var(--primary);
+}
+
+.account-name-edit {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+
+.account-name-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.account-name-form input {
+  flex: 1 1 140px;
+  min-width: 0;
+  font: inherit;
+  font-size: 16px;
+  padding: 9px 12px;
+  border: 1px solid #d9d9d9;
+  border-radius: 12px;
+  color: var(--ink);
+  background: var(--surface);
+}
+
+.account-name-error {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 13px;
+}
+
+.account-link {
+  display: block;
+  color: var(--primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* RiseUp's section chip is a flat tab sitting on its rule, not a pill. */
+.accounts-page .section-label {
+  align-items: flex-end;
+}
+
+.accounts-page .section-label .chip {
+  border: 0;
+  border-radius: 4px 4px 0 0;
+  padding: 3px 10px 2px;
+  font-size: 15px;
+  gap: 6px;
+}
+
+/* --- side drawer -------------------------------------------------------- */
+.drawer-gear {
+  color: var(--drawer-ink);
+  text-decoration: none;
+}
+
+.drawer-nav {
+  display: flex;
+  flex-direction: column;
+  margin-top: 8px;
+}
+
+.drawer-nav .drawer-link {
+  background: none;
+  color: var(--drawer-ink);
+  border: 0;
+  cursor: pointer;
+}
+
+.drawer-rule {
+  border: 0;
+  border-top: 1px solid #e6dfcc;
+  margin: 10px 4px;
+}
+
+.drawer-form {
+  margin: 0;
+}
+
+.drawer-sync .refresh {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.drawer-sync .drawer-refresh {
+  background: none;
+  padding: 0;
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--drawer-ink);
+}
+
+/* --- settings page ------------------------------------------------------ */
+.settings-hero {
+  background: var(--primary);
+  color: #ffffff;
+  text-align: center;
+  padding: 28px var(--page-gutter) 30px;
+}
+
+.settings-avatar {
+  display: grid;
+  place-items: center;
+  width: 84px;
+  height: 84px;
+  margin: 0 auto 14px;
+  border-radius: 50%;
+  background: #1f2a8a;
+  color: #ffffff;
+  font-size: 38px;
+  font-weight: 700;
+}
+
+.settings-name {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.settings-sub {
+  margin: 2px 0 16px;
+  font-size: 16px;
+  opacity: 0.85;
+}
+
+.settings-edit-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 999px;
+  background: transparent;
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.settings-name-form {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.settings-name-form input {
+  flex: 1 1 160px;
+  max-width: 240px;
+  min-width: 0;
+  font: inherit;
+  font-size: 16px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 999px;
+  color: var(--ink);
+}
+
+.settings-save {
+  padding: 8px 18px;
+  border: 1px solid #ffffff;
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.settings-name-error {
+  flex-basis: 100%;
+  margin: 4px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.settings-group {
+  margin: 0 var(--page-gutter);
+  padding: 18px 0 6px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.settings-group-title {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 2px;
+  background: none;
+  color: var(--ink);
+  text-align: start;
+  text-decoration: none;
+}
+
+.settings-row + .settings-row {
+  border-top: 1px solid #f2f2f2;
+}
+
+.settings-ico {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: var(--primary);
+}
+
+.settings-row-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.settings-row-title {
+  font-size: 17px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.settings-row-sub {
+  font-size: 14px;
+  color: var(--ink-2);
+}
+
+.settings-link .settings-row-title {
+  color: var(--ink);
+}
+
+.settings-chev {
+  color: var(--ink);
+  flex: 0 0 auto;
+}
+
+.settings-you {
+  display: inline-block;
+  margin-inline-start: 8px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #eef0fe;
+  color: var(--primary);
+  font-size: 12px;
+  vertical-align: middle;
+}
+
+.settings-empty {
+  margin: 6px 0 10px;
+  color: var(--ink-2);
+  font-size: 15px;
+}
+
+.settings-logout {
+  border-bottom: 0;
+}
+
+/* --- loading skeleton (app/dashboard/loading.tsx) ----------------------- */
+.skel-appbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.skel-icons {
+  display: flex;
+  gap: 18px;
+}
+
+.skel-monthbar {
+  height: 60px;
+  display: grid;
+  place-items: center;
+  border-bottom: 1px solid var(--hairline);
+  background: var(--surface);
+}
+
+.skel-top {
+  padding-top: 22px;
+  padding-bottom: 22px;
+}
+
+.skel-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+  padding: var(--card-pad);
+  min-height: 190px;
+}
+
+.skel-card--hero {
+  min-height: 230px;
+}
+
+.skel-dot,
+.skel-line {
+  display: block;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #f1f1ef 0%, #f1f1ef 35%, #fafaf9 50%, #f1f1ef 65%, #f1f1ef 100%);
+  background-size: 300% 100%;
+  animation: skel-shimmer 1.4s ease-in-out infinite;
+}
+
+.skel-dot {
+  width: 24px;
+  height: 24px;
+}
+
+.skel-line {
+  width: 100%;
+  height: 14px;
+}
+
+.skel-line--banner {
+  height: 56px;
+  border-radius: var(--radius-row);
+}
+
+.skel-line--title {
+  height: 20px;
+}
+
+.skel-line--figure {
+  width: 55%;
+  height: 44px;
+  align-self: center;
+  margin-top: 6px;
+}
+
+.skel-line--pill {
+  width: 46%;
+  height: 34px;
+  align-self: center;
+}
+
+.skel-line--bar {
+  height: 16px;
+  margin-top: auto;
+}
+
+@keyframes skel-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skel-dot,
+  .skel-line {
+    animation: none;
+  }
+}

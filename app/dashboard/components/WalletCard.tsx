@@ -17,11 +17,16 @@ export function WalletCard({
   onOpenMovement,
   onManage,
   onAddWithdrawal,
+  onAddMoney,
+  onOpenWallet,
 }: {
   wallet: WalletView;
   onOpenMovement?: (movement: WalletMovement) => void;
   onManage?: () => void;
   onAddWithdrawal?: () => void;
+  /** Add money to a wallet, or set how much is in it — the wallet's own settings. */
+  onAddMoney?: () => void;
+  onOpenWallet?: (walletId: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const several = wallet.wallets.length > 1;
@@ -42,8 +47,10 @@ export function WalletCard({
           <ul className="wallet-list">
             {wallet.wallets.map((w) => (
               <li key={w.id}>
-                <span className="wallet-list-name">{w.name}</span>
-                <Amount value={w.balance} className={w.balance < 0 ? 'wallet-list-balance is-negative' : 'wallet-list-balance'} />
+                <button type="button" className="wallet-list-open" onClick={() => onOpenWallet?.(w.id)} aria-label={`הגדרות ${w.name}`}>
+                  <span className="wallet-list-name">{w.name}</span>
+                  <Amount value={w.balance} className={w.balance < 0 ? 'wallet-list-balance is-negative' : 'wallet-list-balance'} />
+                </button>
               </li>
             ))}
           </ul>
@@ -77,14 +84,15 @@ export function WalletCard({
             >
               <span className="date">{shortDate(m.date)}</span>
               <span className="amount">
-                <span className="flow-sign" aria-hidden="true">{m.kind === 'spend' ? '−' : m.kind === 'transfer' ? '⇄' : '+'}</span>
-                <Amount value={m.amountIls} />
+                <span className="flow-sign" aria-hidden="true">{flowSign(m)}</span>
+                <Amount value={m.kind === 'adjustment' ? Math.abs(m.amountIls) : m.amountIls} />
               </span>
               <span className="kebab" aria-hidden="true"><span /><span /><span /></span>
               <span className="merchant">
                 {m.label}
                 {m.memberName ? ` · ${m.memberName}` : ''}
                 {m.kind === 'withdrawal' ? ' · משיכה' : ''}
+                {m.kind === 'adjustment' && m.label !== 'עדכון יתרה' ? ' · עדכון יתרה' : ''}
                 {several && m.walletName && m.kind !== 'transfer' ? ` · ${m.walletName}` : ''}
               </span>
             </button>
@@ -92,6 +100,12 @@ export function WalletCard({
         </div>
       ) : null}
 
+      {onAddMoney ? (
+        <button className="add-row add-row--inline" type="button" onClick={onAddMoney}>
+          <span className="add-plus add-plus--income" aria-hidden="true">+</span>
+          <span>הוספת כסף לארנק</span>
+        </button>
+      ) : null}
       {onAddWithdrawal ? (
         <button className="add-row add-row--inline" type="button" onClick={onAddWithdrawal}>
           <span className="add-plus" aria-hidden="true">+</span>
@@ -106,4 +120,11 @@ export function WalletCard({
       ) : null}
     </article>
   );
+}
+
+function flowSign(m: WalletMovement): string {
+  if (m.kind === 'spend') return '−';
+  if (m.kind === 'transfer') return '⇄';
+  if (m.kind === 'adjustment') return m.amountIls < 0 ? '−' : '+';
+  return '+';
 }
