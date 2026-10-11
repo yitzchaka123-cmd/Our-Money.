@@ -7,6 +7,7 @@ import './globals.css';
 import './assistant-and-setup.css';
 import './wallets-accounts.css';
 import './brief-insights.css';
+import './dashboard/trackers-search.css';
 
 export const metadata: Metadata = {
   title: 'המזומן שלנו',

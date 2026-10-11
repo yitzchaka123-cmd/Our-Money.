@@ -2,6 +2,7 @@ import { db } from '@/lib/db/client';
 import { ENVELOPE_TITLES } from '@/lib/riseup/envelopes';
 import { env } from '@/lib/env';
 import type { EnvelopeRef } from '@/lib/cash/envelopes';
+import { CUSTOM_PREFIX, customTrackerRefs, toOverrides, type TrackerOverrideRow } from '@/lib/dashboard/trackers';
 import type { CashSpend, CashTopup, CashWallet, EnvelopeType, HouseholdMember } from '@/lib/types';
 
 /**
@@ -202,9 +203,11 @@ export async function insertCashIncomes(rows: NewCashIncome[]): Promise<CashTopu
  */
 export async function envelopeRefsForMonth(month: string): Promise<EnvelopeRef[]> {
   const supabase = db();
-  const [{ data, error }, { data: actuals }] = await Promise.all([
+  const [{ data, error }, { data: actuals }, { data: overrideRows }] = await Promise.all([
     supabase.from('riseup_envelopes').select('envelope_id, envelope_type, name').eq('month', month),
     supabase.from('riseup_envelope_actuals').select('envelope_id, category_label').eq('month', month).not('category_label', 'is', null),
+    // Trackers we added ourselves; errors (no migration 0006 yet) mean none.
+    supabase.from('tracker_overrides').select('*').like('tracker_key', `${CUSTOM_PREFIX}%`),
   ]);
   if (error) throw new Error(`Failed to load envelopes: ${error.message}`);
 
@@ -214,7 +217,7 @@ export async function envelopeRefsForMonth(month: string): Promise<EnvelopeRef[]
     labels.set(id, (labels.get(id) ?? new Set()).add(row.category_label as string));
   }
 
-  return (data ?? []).map((row) => {
+  const riseup = (data ?? []).map((row) => {
     const type = row.envelope_type as EnvelopeType;
     return {
       envelopeId: row.envelope_id as string,
@@ -223,6 +226,7 @@ export async function envelopeRefsForMonth(month: string): Promise<EnvelopeRef[]
       categoryLabels: [...(labels.get(row.envelope_id as string) ?? [])],
     };
   });
+  return [...riseup, ...customTrackerRefs(toOverrides(overrideRows as TrackerOverrideRow[] | null), month, riseup)];
 }
 
 export async function listWallets(): Promise<CashWallet[]> {

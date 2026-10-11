@@ -80,9 +80,9 @@ describe('card and account names (V1-07)', () => {
 
   it('uses the same name in search results', async () => {
     await setAccountLabel('leumicard', 'cc5910', 'כרטיס 0848');
-    const result = await searchTransactions({ query: 'באג', fromMonth: MONTH, toMonth: MONTH, source: 'all', walletId: null });
+    const result = await searchTransactions('באג');
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.data.map((h) => h.detail)).toEqual(['כרטיס 0848']);
+    if (result.ok) expect(result.data.hits.map((h) => h.detail)).toEqual(['כרטיס 0848']);
   });
 
   it('lists every account with this month’s charges', async () => {
