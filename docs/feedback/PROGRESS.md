@@ -19,8 +19,8 @@ Read this first after any stop.
 | Helper | Items | Migration | State |
 |---|---|---|---|
 | A data and order | 10, 11, 12, 13, 14, 15 | 0003 | merged 4245a32, 0003 applied, pushed. #12 needs one sync to read envelope_shape (cron 17:00 UTC) |
-| B top bar, assistant | 1, 2, 8, 9 | 0004 | running |
-| C wallets, accounts, settings | 4, 5, 7, 23, 24, 25, 26 | 0005 | running |
+| B top bar, assistant | 1, 2, 8, 9 | 0004 | merged 08f4fa0, 0004 applied, pushed; model id moved to AI_MODEL setting (Vercel) |
+| C wallets, accounts, settings | 4, 5, 7, 23, 24, 25, 26 | 0005 | merged 48ecdfd, 0005 applied, pushed, deploy READY |
 | D search, filter, menus | 17, 18, 19, 20, 21, 22 | 0006 | running |
 | E daily brief, insights | 3, 16 | 0007 | running |
 
