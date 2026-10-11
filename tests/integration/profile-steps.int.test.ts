@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { loadDashboard } from '@/lib/dashboard/data';
+import { db } from '@/lib/db/client';
 import { setPreferredName } from '@/lib/profile/actions';
 
 import { resetDb, seedMember, seedMonth, signIn, signOut, sql } from './helpers';
@@ -46,5 +47,25 @@ describe('the name on the greeting', () => {
   it('refuses a name that is too long', async () => {
     const result = await setPreferredName('א'.repeat(60));
     expect(result.ok).toBe(false);
+  });
+});
+
+describe('the setup checklist', () => {
+  const missing = async () =>
+    (await loadDashboard(MONTH, member)).setupSteps.filter((s) => !s.done).map((s) => s.id);
+
+  it('starts with RiseUp, the name and the wallet missing (the member reached us through the bot)', async () => {
+    expect(await missing()).toEqual(['riseup', 'name', 'wallet']);
+  });
+
+  it('crosses each step off from the data itself', async () => {
+    await db().from('sync_runs').insert({ status: 'succeeded', finished_at: new Date().toISOString() });
+    await setPreferredName('יצחק');
+    // A withdrawal the bank reported says nothing about what was in the wallet before.
+    await db().from('cash_topups').insert({ amount_ils: 200, occurred_at: `${MONTH}-05`, source: 'riseup_withdrawal' });
+    expect(await missing()).toEqual(['wallet']);
+
+    await db().from('cash_topups').insert({ amount_ils: 350, occurred_at: `${MONTH}-06`, source: 'manual' });
+    expect(await missing()).toEqual([]);
   });
 });

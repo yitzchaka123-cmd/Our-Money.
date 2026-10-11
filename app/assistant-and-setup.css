@@ -64,3 +64,140 @@
     animation: none;
   }
 }
+
+/* --- setup steps: banner and checklist ----------------------------------- */
+.steps-section:empty {
+  display: none;
+}
+
+button.steps-banner {
+  width: calc(100% - 2 * var(--page-gutter));
+  text-align: start;
+  color: var(--ink);
+}
+
+.steps-sheet {
+  padding-bottom: 8px;
+}
+
+.steps-count {
+  margin: -8px 8px 10px;
+  font-size: 14px;
+  color: var(--ink-2);
+}
+
+.steps-progress {
+  height: 8px;
+  margin: 0 8px 20px;
+  border-radius: 999px;
+  background: #ece9fb;
+  overflow: hidden;
+}
+
+.steps-progress > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  /* The same lilac as the banner's flower, a step deeper. */
+  background: #8d93f7;
+  margin-inline-start: 0;
+}
+
+.steps-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.step-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-row);
+  background: var(--surface);
+}
+
+.step-mark {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--primary);
+  border: 2px solid var(--primary);
+}
+
+.step-row[data-done='true'] .step-mark {
+  background: var(--income);
+  border-color: var(--income);
+  color: #ffffff;
+}
+
+.step-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.step-title {
+  margin: 2px 0 2px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.step-row[data-done='true'] .step-title {
+  color: var(--ink-2);
+}
+
+.step-hint {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+
+.step-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin-top: 12px;
+}
+
+.step-actions .form-error {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 14px;
+}
+
+.step-link {
+  display: inline-block;
+  margin-top: 10px;
+  color: var(--primary);
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.step-actions .step-link {
+  margin-top: 0;
+}
+
+.name-form {
+  margin-top: 12px;
+}
+
+.name-form .field {
+  margin-bottom: 10px;
+}
+
+.name-form .btn {
+  padding: 12px;
+}

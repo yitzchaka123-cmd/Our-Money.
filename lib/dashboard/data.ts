@@ -20,6 +20,7 @@ import { syncBanner, type SyncBanner } from '@/lib/riseup/banner';
 import { loadSyncState } from '@/lib/riseup/sync';
 import { matchesWithdrawalName } from '@/lib/riseup/withdrawals';
 import { greetingName, memberName } from '@/lib/profile/names';
+import { setupSteps, walletBalanceSet, type SetupStep } from '@/lib/dashboard/steps';
 import type { CashSpend, CashTopup, CashTransfer, CashWallet, EnvelopeType, HouseholdMember } from '@/lib/types';
 
 export interface EnvelopeView {
@@ -114,6 +115,10 @@ export interface DashboardData {
   wallet: WalletView;
   members: Pick<HouseholdMember, 'id' | 'display_name'>[];
   briefCount: number;
+  /** The setup checklist behind the purple banner; all done hides it. */
+  setupSteps: SetupStep[];
+  /** The signed-in member's chosen name, for the checklist's name form. */
+  preferredName: string | null;
 }
 
 const EXPENSE_TYPES = new Set<EnvelopeType>(['variable', 'fixed', 'trackingCategory', 'riseupGoal']);
@@ -300,6 +305,17 @@ export async function loadDashboard(month: string, sessionMemberId: string | nul
     }),
     members: memberList,
     briefCount: spends.filter((s) => s.status === 'needs_review').length,
+    setupSteps: setupSteps({
+      lastSyncAt,
+      telegramLinked: Boolean(me && Number(me.telegram_user_id) > 0),
+      preferredName: me?.preferred_name ?? null,
+      walletBalanceSet: walletBalanceSet({
+        topups: (allTopups ?? []) as CashTopup[],
+        spends: (allSpends ?? []).length,
+        transfers: (allTransfers ?? []).length,
+      }),
+    }),
+    preferredName: me?.preferred_name ?? null,
   };
 }
 

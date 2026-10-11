@@ -17,6 +17,7 @@ import { DashboardView } from '../app/dashboard/view';
 import { previewOverlay } from './preview-overlays';
 import type { DashboardData, EnvelopeView } from '../lib/dashboard/data';
 import type { NormalizedActual } from '../lib/riseup/envelopes';
+import { setupSteps } from '../lib/dashboard/steps';
 
 function actual(
   id: string,
@@ -235,6 +236,13 @@ const fixture: DashboardData = {
     { id: 'm2', display_name: 'שרה' },
   ],
   briefCount: 8,
+  setupSteps: setupSteps({
+    lastSyncAt: '2026-09-15T04:36:00Z',
+    telegramLinked: true,
+    preferredName: 'יצחק',
+    walletBalanceSet: false,
+  }),
+  preferredName: 'יצחק',
 };
 
 const css = ['../app/globals.css', '../app/assistant-and-setup.css']
