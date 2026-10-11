@@ -16,6 +16,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 
 import { AccountsView } from '../app/accounts/AccountsView';
 import { DrawerContent } from '../app/dashboard/components/Shell';
+import DashboardLoading from '../app/dashboard/loading';
 import { WalletsSheet } from '../app/dashboard/components/WalletsSheet';
 import { SettingsView } from '../app/settings/SettingsView';
 import { summarizeAccounts } from '../lib/dashboard/accounts';
@@ -85,6 +86,7 @@ export const screens: Record<string, () => ReactElement> = {
       }}
     />
   ),
+  loading: () => <DashboardLoading />,
   accounts: () => (
     <AccountsView data={{ month: '2026-10', updated: '11.10.26, 11:20', accounts, cash: { balance: 515, walletCount: 3 } }} />
   ),
