@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useCallback, useState, type ReactNode } from 'react';
 
+import { AssistantSheet } from '@/app/dashboard/components/AssistantSheet';
 import { RefreshButton } from '@/app/dashboard/components/RefreshButton';
 import { Sheet } from '@/app/dashboard/components/Sheet';
 import { SyncButton } from '@/app/dashboard/components/SyncButton';
@@ -42,6 +43,8 @@ export function Shell({
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [monthSheetOpen, setMonthSheetOpen] = useState(false);
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  const closeAssistant = useCallback(() => setAssistantOpen(false), []);
 
   // months arrive newest-first, so the *next* month sits at the lower index.
   const index = months.indexOf(month);
@@ -68,7 +71,7 @@ export function Shell({
           </button>
           <SyncButton />
         </div>
-        <button className="icon-btn" type="button" aria-label="העוזר החכם">
+        <button className="icon-btn" type="button" aria-label="העוזר שלנו" onClick={() => setAssistantOpen(true)}>
           <SparkleBubble />
         </button>
       </header>
@@ -106,6 +109,8 @@ export function Shell({
       </nav>
 
       {children}
+
+      <AssistantSheet open={assistantOpen} onClose={closeAssistant} />
 
       <Sheet open={monthSheetOpen} onClose={() => setMonthSheetOpen(false)}>
         <MonthPicker month={month} months={months} />
