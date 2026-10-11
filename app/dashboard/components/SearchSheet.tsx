@@ -313,7 +313,15 @@ export function SearchSheet({
         />
       ) : null}
       {current?.cash && action === 'split' ? (
-        <SplitSheet actual={current} kind={kind} envelopes={envelopes} onClose={closeAndRefresh} />
+        <SplitSheet
+          actual={current}
+          kind={kind}
+          envelopes={envelopes}
+          envelopeType={open?.txn.envelopeType}
+          envelopeTitle={open?.txn.envelopeTitle}
+          currentEnvelopeId={open?.txn.envelopeId ?? null}
+          onClose={closeAndRefresh}
+        />
       ) : null}
       {current?.cash && action === 'month' ? (
         <MoveMonthSheet actual={current} kind={kind} months={months} onClose={closeAndRefresh} />

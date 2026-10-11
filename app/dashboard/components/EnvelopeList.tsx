@@ -254,7 +254,7 @@ export function EnvelopeList({
           onClose={closeAll}
         />
       ) : null}
-      {current?.cash && action === 'split' ? <SplitSheet actual={current} kind={currentKind} envelopes={envelopeChoices} onClose={closeAll} /> : null}
+      {current?.cash && action === 'split' ? <SplitSheet actual={current} kind={currentKind} envelopes={envelopeChoices} envelopeType={openTxn?.envelopeType} envelopeTitle={openTxn?.envelopeTitle} currentEnvelopeId={openTxn?.envelopeId ?? null} onClose={closeAll} /> : null}
       {current?.cash && action === 'month' ? <MoveMonthSheet actual={current} kind={currentKind} months={months} onClose={closeAll} /> : null}
 
       {draft ? (

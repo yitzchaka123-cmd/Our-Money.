@@ -689,3 +689,114 @@
   font-size: 15px;
   color: var(--ink);
 }
+
+/* --- split ("איך לפצל את ההוצאה?") ----------------------------------------- */
+.split-head {
+  position: relative;
+  padding-top: 56px;
+}
+
+.split-head .popup-close {
+  color: inherit;
+}
+
+.split-title {
+  margin: 26px 0 0;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.split-body {
+  padding-top: 8px;
+}
+
+.split-section {
+  padding: 18px 0 8px;
+}
+
+.split-section h3 {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0 0 14px;
+}
+
+.split-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.split-amount input {
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.split-field {
+  display: block;
+  margin-bottom: 14px;
+}
+
+.split-field > span:first-child:not(.amount-box) {
+  display: block;
+  font-size: 15px;
+  margin-bottom: 6px;
+}
+
+.split-rest .amount-box input {
+  font-size: 32px;
+}
+
+.split-rest .field-hint {
+  margin: -6px 4px 16px;
+}
+
+.split-picker {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1.5px solid var(--ink);
+  border-radius: 14px;
+  padding: 10px 14px;
+}
+
+.split-picker select {
+  flex: 1;
+  min-width: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 18px;
+  color: var(--ink);
+}
+
+.split-input {
+  width: 100%;
+  border: 1px solid #d9d9d9;
+  border-radius: 14px;
+  padding: 16px;
+  font: inherit;
+  font-size: 18px;
+}
+
+.split-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 120px;
+  margin: 10px 0;
+  border: 1.5px dashed #9fb0f6;
+  border-radius: 6px;
+  color: var(--primary);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.split-rest {
+  border-top: 10px solid var(--surface-sunken);
+  margin: 0 calc(-1 * var(--page-gutter));
+  padding-inline: var(--page-gutter);
+}

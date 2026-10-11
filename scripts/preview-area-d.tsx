@@ -24,6 +24,7 @@ import { TrackerHistorySheet } from '../app/dashboard/components/TrackerHistoryS
 import { EditTargetPopup, HidePopup, RenamePopup } from '../app/dashboard/components/TrackerSheets';
 import type { HistoryPoint, SearchHit } from '../lib/dashboard/actions';
 import { SearchSheet } from '../app/dashboard/components/SearchSheet';
+import { SplitSheet } from '../app/dashboard/components/CashActionSheets';
 import type { DashboardData, EnvelopeView } from '../lib/dashboard/data';
 import type { NormalizedActual } from '../lib/riseup/envelopes';
 
@@ -177,6 +178,24 @@ const searchHits: SearchHit[] = [
   hit('s4', '2026-07-21', 89.9, 'באג בית שמש', 'variable'),
 ];
 
+const splitProps = {
+  actual: actual('cash:x', `${MONTH}-01`, 60, 'מכולת בפינה', {
+    source: 'cash',
+    categoryLabel: 'מזון וצריכה',
+    cash: { id: 'x', kind: 'spend' as const, memberName: 'יצחק', inputKind: 'web' as const, status: 'confirmed' as const, walletId: null },
+  }),
+  kind: 'spend' as const,
+  envelopes: [
+    { envelopeId: 'var', type: 'variable' as const, name: 'הוצאות משתנות' },
+    { envelopeId: 'fix', type: 'fixed' as const, name: 'הוצאות קבועות' },
+    { envelopeId: 'track-pharm', type: 'trackingCategory' as const, name: 'פארמה' },
+  ],
+  envelopeType: 'variable' as const,
+  envelopeTitle: 'הוצאות משתנות',
+  currentEnvelopeId: 'var',
+  onClose: noop,
+};
+
 const incomeHistory: HistoryPoint[] = [
   { month: '2026-06', actual: 7400, expected: 7400, cash: 0, present: true },
   { month: '2026-07', actual: 7635, expected: 7635, cash: 0, present: true },
@@ -321,6 +340,21 @@ export const screens: Record<string, () => ReactElement> = {
   'search-loading': () => <SearchSheet {...searchProps} initialQuery="באג" initialPhase="loading" />,
   'search-results': () => (
     <SearchSheet {...searchProps} initialQuery="באג" initialPhase="done" initialHits={searchHits} initialNext={{ card: 3, spend: 1, topup: 0 }} />
+  ),
+  split: () => (
+    <>
+      {background(tracker)}
+      <SplitSheet {...splitProps} />
+    </>
+  ),
+  'split-filled': () => (
+    <>
+      {background(tracker)}
+      <SplitSheet
+        {...splitProps}
+        initialRows={[{ amountText: '25', envelopeId: 'track-pharm', category: 'פארמה' }]}
+      />
+    </>
   ),
   hide: () => (
     <>

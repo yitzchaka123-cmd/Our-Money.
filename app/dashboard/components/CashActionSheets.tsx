@@ -3,6 +3,8 @@
 import { useState, useTransition } from 'react';
 
 import { Amount } from '@/app/dashboard/components/Amount';
+import { shortDate } from '@/app/dashboard/components/EnvelopeCard';
+import { ChevronDown, Close } from '@/app/dashboard/components/icons';
 import { Sheet } from '@/app/dashboard/components/Sheet';
 import {
   moveCashEntryToMonth,
@@ -10,11 +12,12 @@ import {
   splitCashEntry,
   updateCashNote,
   type CashKind,
-  type SplitPart,
 } from '@/lib/cash/actions';
 import type { EnvelopeRef } from '@/lib/cash/envelopes';
-import { monthLabel } from '@/lib/money';
+import { checkSplit, splitParts, type SplitRow } from '@/lib/cash/split';
+import { formatAmount, monthLabel } from '@/lib/money';
 import type { NormalizedActual } from '@/lib/riseup/envelopes';
+import type { EnvelopeType } from '@/lib/types';
 
 /**
  * The sub-sheets behind RiseUp's transaction actions, for cash rows: note,
@@ -119,89 +122,170 @@ export function MoveEnvelopeSheet({
   );
 }
 
-export function SplitSheet({ actual, kind, envelopes, onClose }: BaseProps & { envelopes: EnvelopeRef[] }) {
+/**
+ * RiseUp's "איך לפצל את ההוצאה?": the original on top in the envelope's
+ * colour, then the parts you take out (amount and where it goes), "לפצל
+ * לעוד הוצאה" for another, and "מה שנשאר" — filled in by itself and not
+ * editable. Saving is off until the parts add up with something left over.
+ */
+export function SplitSheet({
+  actual,
+  kind,
+  envelopes,
+  envelopeType = 'variable',
+  envelopeTitle = '',
+  currentEnvelopeId = null,
+  initialRows,
+  onClose,
+}: BaseProps & {
+  envelopes: EnvelopeRef[];
+  envelopeType?: EnvelopeType;
+  envelopeTitle?: string;
+  currentEnvelopeId?: string | null;
+  /** Preview only: parts already typed. */
+  initialRows?: SplitRow[];
+}) {
   const total = actual.amountIls;
-  const [parts, setParts] = useState<SplitPart[]>([
-    { amountIls: Math.round((total / 2) * 10) / 10, category: actual.categoryLabel ?? '', envelopeId: null, note: null },
-    { amountIls: Math.round((total - Math.round((total / 2) * 10) / 10) * 10) / 10, category: actual.categoryLabel ?? '', envelopeId: null, note: null },
-  ]);
+  const original = actual.categoryLabel ?? '';
+  const originalNote = actual.businessName === actual.categoryLabel ? null : actual.businessName || null;
+  const spend = kind === 'spend';
+  const [rows, setRows] = useState<SplitRow[]>(
+    initialRows ?? [{ amountText: '', envelopeId: currentEnvelopeId, category: original }],
+  );
+  const [rest, setRest] = useState({ envelopeId: currentEnvelopeId, category: original, note: originalNote ?? '' });
   const { pending, error, run } = useRun(onClose);
+  const check = checkSplit(total, rows);
+  const touched = rows.some((r) => r.amountText.trim() !== '');
 
-  const sum = Math.round(parts.reduce((s, p) => s + (Number(p.amountIls) || 0), 0) * 100) / 100;
-  const remainder = Math.round((total - sum) * 100) / 100;
-  const patch = (i: number, next: Partial<SplitPart>) =>
-    setParts((ps) => ps.map((p, j) => (j === i ? { ...p, ...next } : p)));
+  const patch = (i: number, next: Partial<SplitRow>) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...next } : r)));
+  const pick = (envelopeId: string, category: string) => {
+    const env = envelopes.find((e) => e.envelopeId === envelopeId) ?? null;
+    // A tracker IS its category; the big envelopes keep the label it had.
+    return { envelopeId: env?.envelopeId ?? null, category: env?.type === 'trackingCategory' ? env.name : category || original };
+  };
+  const typeOf = (envelopeId: string | null) => envelopes.find((e) => e.envelopeId === envelopeId)?.type ?? envelopeType;
+  const word = spend ? 'הוצאה' : 'הכנסה';
+
+  const where = (value: { envelopeId: string | null; category: string }, onChange: (v: { envelopeId: string | null; category: string }) => void) =>
+    spend && envelopes.length > 0 ? (
+      <label className="split-field">
+        <span>קטגוריה</span>
+        <span className="split-picker">
+          <span className="picker-icon" data-type={typeOf(value.envelopeId)} aria-hidden="true">
+            {typeOf(value.envelopeId) === 'variable' ? '⟳' : typeOf(value.envelopeId) === 'fixed' ? '⌂' : '◉'}
+          </span>
+          <select value={value.envelopeId ?? ''} onChange={(e) => onChange(pick(e.target.value, value.category))}>
+            {value.envelopeId ? null : <option value="">לפי הקטגוריה ({value.category || 'משתנה'})</option>}
+            {envelopes.map((env) => (
+              <option key={env.envelopeId} value={env.envelopeId}>
+                {env.type === 'variable' ? 'משתנה' : env.name}
+              </option>
+            ))}
+          </select>
+          <ChevronDown size={20} />
+        </span>
+      </label>
+    ) : (
+      <label className="split-field">
+        <span>קטגוריה</span>
+        <input type="text" className="split-input" value={value.category} onChange={(e) => onChange({ ...value, category: e.target.value })} />
+      </label>
+    );
 
   return (
-    <Sheet open onClose={onClose} labelledBy="cash-action-title">
-      <Head actual={actual} title={kind === 'income' ? 'לפצל את ההכנסה' : 'לפצל את ההוצאה'} />
-      <div className="sheet-body">
-        {parts.map((part, i) => (
-          <div className="split-part" key={i}>
-            <label className="field split-amount">
-              <span>סכום</span>
+    <Sheet open onClose={onClose} labelledBy="split-title">
+      <div className="envelope" data-type={envelopeType}>
+        <div className="sheet-head split-head" data-on-dark={envelopeType !== 'variable'}>
+          <button className="popup-close" type="button" aria-label="סגירה" onClick={onClose}>
+            <Close size={22} />
+          </button>
+          <p className="label">{envelopeType === 'variable' ? 'משתנה' : envelopeTitle || (spend ? 'הוצאה' : 'הכנסה')}</p>
+          <Amount value={total} className="figure" />
+          <p className="meta">{actual.businessName}</p>
+          {actual.cash?.memberName ? <p className="meta">מזומן · {actual.cash.memberName}</p> : <p className="meta">מזומן</p>}
+          <p className="meta">{shortDate(actual.transactionDate)}</p>
+          <h2 className="split-title" id="split-title">
+            איך לפצל את ה{word}?
+          </h2>
+        </div>
+      </div>
+
+      <div className="sheet-body split-body">
+        {rows.map((row, i) => (
+          <section key={i} className="split-section">
+            <div className="split-section-head">
+              <h3>
+                {word} {i + 1}
+              </h3>
+              {rows.length > 1 ? (
+                <button className="link-btn" type="button" onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))}>
+                  להסיר
+                </button>
+              ) : null}
+            </div>
+            <label className="amount-box split-amount">
               <input
-                type="number" inputMode="decimal" min="0" step="0.1"
-                value={part.amountIls}
-                onChange={(e) => patch(i, { amountIls: Number(e.target.value) })}
+                inputMode="decimal"
+                placeholder={`סכום ה${word}`}
+                aria-label={`סכום ה${word} ${i + 1}`}
+                value={row.amountText}
+                onChange={(e) => patch(i, { amountText: e.target.value })}
               />
+              <span className="cur" aria-hidden="true">₪</span>
             </label>
-            {kind === 'spend' && envelopes.length > 0 ? (
-              <label className="field">
-                <span>מעטפה</span>
-                <select
-                  value={part.envelopeId ?? ''}
-                  onChange={(e) => {
-                    const env = envelopes.find((x) => x.envelopeId === e.target.value) ?? null;
-                    patch(i, {
-                      envelopeId: env?.envelopeId ?? null,
-                      category: env?.type === 'trackingCategory' ? env.name : part.category,
-                    });
-                  }}
-                >
-                  <option value="">לפי הקטגוריה</option>
-                  {envelopes.map((env) => (
-                    <option key={env.envelopeId} value={env.envelopeId}>{env.name}</option>
-                  ))}
-                </select>
-              </label>
-            ) : null}
-            <label className="field">
-              <span>קטגוריה</span>
-              <input type="text" value={part.category} onChange={(e) => patch(i, { category: e.target.value })} />
-            </label>
-            {parts.length > 2 ? (
-              <button className="btn-ghost split-remove" type="button" onClick={() => setParts((ps) => ps.filter((_, j) => j !== i))}>
-                להסיר חלק
-              </button>
-            ) : null}
-          </div>
+            {where(row, (v) => patch(i, v))}
+          </section>
         ))}
 
         <button
-          className="add-row add-row--inline"
+          className="split-more"
           type="button"
-          onClick={() => setParts((ps) => [...ps, { amountIls: Math.max(remainder, 0), category: actual.categoryLabel ?? '', envelopeId: null, note: null }])}
+          onClick={() => setRows((rs) => [...rs, { amountText: '', envelopeId: currentEnvelopeId, category: original }])}
         >
           <span className="add-plus" aria-hidden="true">+</span>
-          <span>עוד חלק</span>
+          <span>לפצל לעוד {word}</span>
         </button>
 
-        <p className={remainder === 0 ? 'split-total ok' : 'split-total'}>
-          {remainder === 0 ? 'החלקים מסתכמים בדיוק לסכום המקורי ✓' : (
-            <>
-              נשאר לחלק: <Amount value={remainder} /> מתוך <Amount value={total} />
-            </>
-          )}
-        </p>
+        <section className="split-section split-rest">
+          <h3>מה שנשאר</h3>
+          <label className="split-field">
+            <span>סכום ה{word}</span>
+            <span className="amount-box">
+              <input readOnly disabled value={formatAmount(check.remainder).replace(' ₪', '')} aria-label="מה שנשאר" />
+              <span className="cur" aria-hidden="true">₪</span>
+            </span>
+          </label>
+          <p className="field-hint">אי אפשר לערוך את מה שנשאר — הוא מתעדכן לבד.</p>
+          {where(rest, (v) => setRest((r) => ({ ...r, ...v })))}
+          <label className="split-field">
+            <span className="visually-hidden">הערה</span>
+            <input
+              type="text"
+              className="split-input"
+              placeholder="הערה"
+              value={rest.note}
+              onChange={(e) => setRest((r) => ({ ...r, note: e.target.value }))}
+            />
+          </label>
+        </section>
+
+        {touched && check.problem ? <p className="form-error">{check.problem}</p> : null}
         {error ? <p className="form-error">{error}</p> : null}
         <button
           className="btn"
           type="button"
-          disabled={pending || remainder !== 0}
-          onClick={() => run(() => splitCashEntry(actual.cash!.id, kind, parts))}
+          disabled={pending || !check.ok}
+          onClick={() =>
+            run(() =>
+              splitCashEntry(
+                actual.cash!.id,
+                kind,
+                splitParts(total, rows, { envelopeId: rest.envelopeId, category: rest.category, note: rest.note.trim() || null }, originalNote),
+              ),
+            )
+          }
         >
-          לפצל
+          פיצול
         </button>
       </div>
     </Sheet>
