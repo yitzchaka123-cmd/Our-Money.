@@ -24,6 +24,15 @@ import { syncBanner, type SyncBanner } from '@/lib/riseup/banner';
 import { mergeRiseupEnvelopes } from '@/lib/dashboard/merge-envelopes';
 import { loadNameBook } from '@/lib/riseup/name-book';
 import { isUnresolvedName, resolveTrackerName, type NameBook } from '@/lib/riseup/tracker-names';
+import {
+  prepareTrackers,
+  settleTrackers,
+  toOverrides,
+  trackerKey,
+  type OverrideInfo,
+  type TrackerOverride,
+  type TrackerOverrideRow,
+} from '@/lib/dashboard/trackers';
 import { loadSyncState } from '@/lib/riseup/sync';
 import { matchesWithdrawalName } from '@/lib/riseup/withdrawals';
 import { greetingName, memberName } from '@/lib/profile/names';
@@ -46,6 +55,10 @@ export interface EnvelopeView {
   upcoming?: UpcomingCharge[];
   /** A tracker RiseUp keeps by the week: its breakdown is weekly. */
   weekly?: boolean;
+  /** Trackers: the key that stays the same from month to month. */
+  trackerKey?: string | null;
+  /** Set when our own override (money.tracker_overrides) changed this envelope. */
+  override?: OverrideInfo;
 }
 
 export interface PendingPlanView {
@@ -154,6 +167,8 @@ export interface MonthRows {
   names?: NameBook | null;
   /** The couple's names for cards and accounts; without them, provider names. */
   accountLabels?: AccountLabel[];
+  /** Our tracker and expected-income overrides; RiseUp's API is read-only. */
+  overrides?: TrackerOverride[];
 }
 
 /**
@@ -166,11 +181,15 @@ export function assembleMonth(rows: MonthRows): {
   riseupEnvelopes: NormalizedEnvelope[];
 } {
   const actualsByEnvelope = groupActuals(rows.actualRows, rows.accountLabels ?? []);
+  const overrides = rows.overrides ?? [];
   // One fixed card and one card per tracker, as RiseUp shows them.
-  const { envelopes: riseupEnvelopes, aliases } = mergeRiseupEnvelopes(
+  const { envelopes: mergedRiseup, aliases } = mergeRiseupEnvelopes(
     rows.envelopeRows.map((row) => toNormalized(row, actualsByEnvelope, rows.names)),
     rows.names,
   );
+  // RiseUp's envelopes as named and planned automatically, then ours on top.
+  const prepared = prepareTrackers(mergedRiseup, overrides, rows.month);
+  const riseupEnvelopes = prepared.envelopes;
 
   const occurrences = planOccurrences(
     rows.plans,
@@ -179,7 +198,12 @@ export function assembleMonth(rows: MonthRows): {
     rows.skippedPlanIds,
   );
 
-  const merged = mergeCashIntoEnvelopes(riseupEnvelopes, rows.spends, rows.memberNames, aliases);
+  const merged = settleTrackers(
+    mergeCashIntoEnvelopes(riseupEnvelopes, rows.spends, rows.memberNames, aliases),
+    overrides,
+    prepared.info,
+    rows.month,
+  );
   const cashIncome = cashIncomeEnvelope(
     rows.topups,
     rows.memberNames,
@@ -190,8 +214,12 @@ export function assembleMonth(rows: MonthRows): {
     occurrences,
     rows.plans,
     rows.memberNames,
-  );
-  return { envelopes, riseupEnvelopes };
+  ).map((view) => {
+    const info = prepared.info.get(view.key);
+    return info ? { ...view, override: info } : view;
+  });
+  const shown = new Set(merged.map((e) => e.envelopeId));
+  return { envelopes, riseupEnvelopes: riseupEnvelopes.filter((e) => shown.has(e.envelopeId)) };
 }
 
 /** Income minus every expected expense — RiseUp's headline number. */
@@ -231,6 +259,7 @@ export async function loadDashboard(month: string, sessionMemberId: string | nul
     { data: planRows },
     { data: skipRows },
     names,
+    { data: overrideRows },
   ] = await Promise.all([
     supabase.from('riseup_envelopes').select('*').eq('month', month).order('position'),
     supabase.from('riseup_envelope_actuals').select('*').eq('month', month),
@@ -265,6 +294,8 @@ export async function loadDashboard(month: string, sessionMemberId: string | nul
     supabase.from('cash_plans').select('*').eq('is_active', true).order('day_of_month'),
     supabase.from('cash_plan_skips').select('plan_id').eq('month', month),
     loadNameBook(),
+    // Until migration 0006 is applied this errors, and there are simply no overrides.
+    supabase.from('tracker_overrides').select('*').in('month', ['', month]),
   ]);
 
   const wallets = (walletRows ?? []) as CashWallet[];
@@ -288,6 +319,7 @@ export async function loadDashboard(month: string, sessionMemberId: string | nul
     memberNames,
     names,
     accountLabels,
+    overrides: toOverrides(overrideRows as TrackerOverrideRow[] | null),
   });
 
   const totals = monthTotals(envelopes);
@@ -461,6 +493,7 @@ function toView(envelope: NormalizedEnvelope): EnvelopeView {
     pendingTotal: 0,
     ...(envelope.upcoming?.length ? { upcoming: envelope.upcoming } : {}),
     ...(envelope.weekly ? { weekly: true } : {}),
+    trackerKey: envelope.type === 'trackingCategory' ? trackerKey(envelope.envelopeId) : null,
   };
 }
 

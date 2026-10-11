@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
+import { AccountFilterSheet } from '@/app/dashboard/components/AccountFilterSheet';
 import { DailyBrief } from '@/app/dashboard/components/DailyBrief';
 import { EnvelopeList } from '@/app/dashboard/components/EnvelopeList';
 import { HeroCard } from '@/app/dashboard/components/HeroCard';
@@ -11,6 +12,7 @@ import { SearchSheet } from '@/app/dashboard/components/SearchSheet';
 import { SetupStepsBanner } from '@/app/dashboard/components/SetupSteps';
 import { Shell } from '@/app/dashboard/components/Shell';
 import { WalletsSheet } from '@/app/dashboard/components/WalletsSheet';
+import { filterDashboard, listAccounts, parseHidden } from '@/lib/dashboard/account-filter';
 import { EMPTY_BRIEF, type BriefData } from '@/lib/dashboard/brief';
 import type { DashboardData } from '@/lib/dashboard/data';
 import type { Insight } from '@/lib/dashboard/insights';
@@ -29,6 +31,7 @@ export function DashboardView({
   insights = [],
   briefStep,
   insightOpenKey,
+  previewHiddenAccounts,
 }: {
   data: DashboardData;
   /** The daily brief for whoever is signed in. */
@@ -43,11 +46,35 @@ export function DashboardView({
   sessionMemberId?: string | null;
   /** Preview-only: renders every breakdown open so it can be screenshotted. */
   expandAll?: boolean;
+  /** Preview-only: accounts hidden by the filter, as if chosen earlier. */
+  previewHiddenAccounts?: string[];
 }) {
   const today = isoDateInIsrael();
   const monthName = monthLabel(data.month).split(' ')[0] ?? data.month;
-  const [search, setSearch] = useState<'search' | 'filter' | null>(null);
+  const [search, setSearch] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
   const [walletsOpen, setWalletsOpen] = useState(false);
+  const [hiddenAccounts, setHiddenAccounts] = useState<Set<string>>(() => new Set(previewHiddenAccounts ?? []));
+  useEffect(() => {
+    if (previewHiddenAccounts) return;
+    try {
+      setHiddenAccounts(parseHidden(window.localStorage.getItem(HIDDEN_ACCOUNTS_KEY)));
+    } catch {
+      // Storage blocked: every account shows.
+    }
+  }, [previewHiddenAccounts]);
+  const applyHidden = (next: Set<string>) => {
+    setHiddenAccounts(next);
+    try {
+      window.localStorage.setItem(HIDDEN_ACCOUNTS_KEY, JSON.stringify([...next]));
+    } catch {
+      // Storage blocked: the choice lasts until the page reloads.
+    }
+  };
+  const accounts = listAccounts(data.envelopes);
+  const filtering = accounts.some((a) => hiddenAccounts.has(a.key));
+  // RiseUp's "חשבונות להצגה": a view of the same data, nothing stored server-side.
+  const shown = filtering ? filterDashboard(data, hiddenAccounts) : data;
 
   return (
     <Shell
@@ -56,8 +83,8 @@ export function DashboardView({
       userName={data.userName}
       lastUpdated={data.lastUpdated}
       briefCount={data.briefCount}
-      onSearch={() => setSearch('search')}
-      onFilter={() => setSearch('filter')}
+      onSearch={() => setSearch(true)}
+      onFilter={() => setFilterOpen(true)}
       onOpenWallets={() => setWalletsOpen(true)}
     >
       <div className="app">
@@ -72,12 +99,23 @@ export function DashboardView({
           <SetupStepsBanner steps={data.setupSteps} preferredName={data.preferredName} />
         </div>
 
+        {filtering ? (
+          <div className="filter-chip-row">
+            <button className="filter-chip" type="button" onClick={() => setFilterOpen(true)}>
+              מסונן · {accounts.filter((a) => hiddenAccounts.has(a.key)).length} מוסתרים
+            </button>
+            <button className="filter-chip-clear" type="button" onClick={() => applyHidden(new Set())}>
+              הצגת הכול
+            </button>
+          </div>
+        ) : null}
+
         <div className="section">
           <HeroCard
             greeting={data.greeting}
             monthName={monthName}
-            forecast={data.forecast}
-            variableRemaining={data.variableRemaining}
+            forecast={shown.forecast}
+            variableRemaining={shown.variableRemaining}
           />
         </div>
 
@@ -86,7 +124,7 @@ export function DashboardView({
             <EmptyState />
           ) : (
             <EnvelopeList
-              envelopes={data.envelopes}
+              envelopes={shown.envelopes}
               plans={data.plans}
               envelopeChoices={data.envelopeChoices}
               savingsEnvelopeId={data.savingsEnvelopeId}
@@ -96,7 +134,7 @@ export function DashboardView({
               sessionMemberId={sessionMemberId}
               month={data.month}
               today={today}
-              totalActualExpenses={data.totalActualExpenses}
+              totalActualExpenses={shown.totalActualExpenses}
               totalExpectedExpenses={data.totalExpectedExpenses}
               expandAll={expandAll}
             />
@@ -122,20 +160,30 @@ export function DashboardView({
         />
       ) : null}
 
+      {filterOpen ? (
+        <AccountFilterSheet
+          accounts={accounts}
+          hidden={hiddenAccounts}
+          onApply={applyHidden}
+          onClose={() => setFilterOpen(false)}
+        />
+      ) : null}
+
       {search ? (
         <SearchSheet
-          month={data.month}
-          focus={search}
           envelopes={data.envelopeChoices}
+          months={data.months}
           members={data.members}
           wallets={data.wallet.wallets}
           sessionMemberId={sessionMemberId}
-          onClose={() => setSearch(null)}
+          onClose={() => setSearch(false)}
         />
       ) : null}
     </Shell>
   );
 }
+
+const HIDDEN_ACCOUNTS_KEY = 'our-money:hidden-accounts';
 
 function EmptyState() {
   return (
