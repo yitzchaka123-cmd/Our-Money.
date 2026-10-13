@@ -203,7 +203,14 @@ const october: BriefEnvelope[] = [
     type: 'fixed',
     title: 'הוצאות קבועות',
     planned: 5000,
-    actuals: [actual('elec', '2026-10-06', 768.99, 'בזק (ENERGY בזק ג׳ן)', { categoryLabel: 'חשמל', accountNumberHash: '7722' })],
+    actuals: [
+      actual('elec', '2026-10-06', 768.99, 'בזק (ENERGY בזק ג׳ן)', {
+        categoryLabel: 'חשמל',
+        accountNumberHash: 'cc5910',
+        source: 'leumicard',
+        accountName: 'לאומי קארד 2',
+      }),
+    ],
   },
   {
     envelopeId: 'inc',
@@ -268,7 +275,8 @@ describe('buildBrief', () => {
       amountIls: 768.99,
       business: 'בזק (ENERGY בזק ג׳ן)',
       date: '2026-10-06',
-      account: 'כרטיס 7722',
+      // The card's name as the dashboard shows it — never RiseUp's code.
+      account: 'לאומי קארד 2',
       needsReview: false,
     });
     expect(insightText(elec!.insight!)).toContain('גבוהה ב-86.19 ₪ מהרגיל');
@@ -277,6 +285,17 @@ describe('buildBrief', () => {
   it('shows who logged a cash entry and from which wallet', () => {
     const cash = buildBrief(source()).items[1]!;
     expect(cash).toMatchObject({ kind: 'cash-spend', label: 'מזומן · הוצאות משתנות · תחבורה', account: 'מזומן · ארנק ראשי', memberName: 'שרה' });
+  });
+
+  it("never shows RiseUp's opaque card code, even for a charge not in any envelope yet", () => {
+    const brief = buildBrief(
+      source({
+        newRiseup: [row('new', '2026-10-09', 50, 'קפה', '2026-10-09T08:00:00Z', { account_number_hash: 'cc5910' })],
+        cashSpends: [],
+      }),
+    );
+    expect(brief.items[0]!.account).toBeNull();
+    expect(JSON.stringify(brief.items[0]!.account)).not.toContain('cc5910');
   });
 
   it('labels income with its account', () => {

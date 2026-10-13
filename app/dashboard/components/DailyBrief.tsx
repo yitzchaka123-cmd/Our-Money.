@@ -10,7 +10,9 @@ import { Close } from '@/app/dashboard/components/icons';
 import { confirmCashSpends } from '@/lib/cash/actions';
 import type { EnvelopeRef } from '@/lib/cash/envelopes';
 import { finishBrief } from '@/lib/dashboard/brief-actions';
+import { briefDraft } from '@/lib/dashboard/entry-drafts';
 import { proseAmount, type BriefData, type BriefItem, type RichText } from '@/lib/dashboard/brief';
+import { cardsLeftAfter, openingStep } from '@/lib/dashboard/brief-deck';
 import type { WalletSummary } from '@/lib/dashboard/data';
 import type { HouseholdMember } from '@/lib/types';
 
@@ -74,16 +76,18 @@ export function DailyBrief({
   const openDeck = () => {
     setDeck(brief.items);
     setAsOf(brief.asOf);
-    setStep(0);
-    setFinished(false);
+    setStep(openingStep(brief.items.length));
+    // Nothing new: the deck opens at "סיימנו להיום" with nothing to mark read.
+    setFinished(brief.items.length === 0);
     setConfirmed(new Set());
     setError(null);
     setOpen(true);
   };
 
-  // "/dashboard?brief=1" opens straight into the deck — for links from elsewhere.
+  // "/dashboard?brief=1" opens straight into the deck — for links from elsewhere,
+  // like the drawer. With nothing new it opens at the end card, not nothing.
   useEffect(() => {
-    if (initialStep !== undefined || brief.count === 0) return;
+    if (initialStep !== undefined) return;
     if (new URLSearchParams(window.location.search).get('brief') === '1') openDeck();
     // Only on arrival.
   }, []);
@@ -180,21 +184,8 @@ export function DailyBrief({
       });
       return;
     }
-    const kind = target.kind === 'cash-spend' ? 'spend' : target.kind === 'cash-income' ? 'income' : 'withdrawal';
-    const id = target.key.slice(target.key.indexOf(':') + 1);
-    const note = target.actual.businessName === target.actual.categoryLabel ? '' : target.actual.businessName;
-    setDraft({
-      id,
-      kind,
-      fromBank: false,
-      amountIls: target.amountIls,
-      category: target.actual.categoryLabel ?? '',
-      note: kind === 'withdrawal' && note === 'משיכת מזומן' ? '' : note,
-      date: target.date ?? '',
-      envelopeId: kind === 'spend' ? target.envelopeId : null,
-      memberId: members.find((m) => m.display_name === target.memberName)?.id ?? sessionMemberId,
-      walletId: target.actual.cash?.walletId ?? null,
-    });
+    // The member who logged it stays theirs: matched by id, never by name.
+    setDraft(briefDraft(target, sessionMemberId));
   };
 
   const transform = leaving
@@ -206,7 +197,8 @@ export function DailyBrief({
       : undefined;
 
   const behind = [step + 1, step + 2].filter((s) => s <= endStep);
-  const remaining = item ? deck.length - step + 1 : 0;
+  // Item cards after this one: the first of three says "נשארו עוד 2", as in RiseUp.
+  const remaining = item ? cardsLeftAfter(step, deck.length) : 0;
   const reviewPending = current?.needsReview && !confirmed.has(current.key);
 
   return (
@@ -258,7 +250,8 @@ export function DailyBrief({
                     להמשיך
                   </button>
                 )}
-                <span className="brief-left">נשארו עוד {remaining}</span>
+                {/* Empty on the last card, keeping the buttons where they were. */}
+                <span className="brief-left">{remaining > 0 ? `נשארו עוד ${remaining}` : ''}</span>
                 <button className="brief-btn" type="button" onClick={() => edit(current)}>
                   לערוך
                 </button>

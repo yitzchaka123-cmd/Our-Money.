@@ -8,6 +8,7 @@ import { envelopeChoices, type EnvelopeRef } from '@/lib/cash/envelopes';
 import type { WalletSummary } from '@/lib/dashboard/data';
 import { db } from '@/lib/db/client';
 import { isoDateInIsrael } from '@/lib/dates';
+import { memberNameMap } from '@/lib/profile/names';
 import { ENVELOPE_TITLES } from '@/lib/riseup/envelopes';
 import type { CashSpend, CashWallet, EnvelopeType } from '@/lib/types';
 
@@ -38,12 +39,13 @@ export default async function DailyPage() {
       .eq('status', 'confirmed')
       .order('created_at', { ascending: false })
       .limit(15),
-    supabase.from('household_members').select('id, display_name'),
+    supabase.from('household_members').select('id, display_name, preferred_name'),
     supabase.from('riseup_envelopes').select('envelope_id, envelope_type, name').eq('month', today.slice(0, 7)),
     supabase.from('cash_wallets').select('*').eq('is_archived', false).order('position'),
   ]);
 
-  const memberList = (members ?? []) as { id: string; display_name: string }[];
+  const memberNames = memberNameMap((members ?? []) as { id: string; display_name: string; preferred_name: string | null }[]);
+  const memberList = [...memberNames].map(([id, name]) => ({ id, display_name: name }));
   const toReview = (pending ?? []) as CashSpend[];
   const refs: EnvelopeRef[] = (envelopeRows ?? []).map((row) => ({
     envelopeId: row.envelope_id as string,

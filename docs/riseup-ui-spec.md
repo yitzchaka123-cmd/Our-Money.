@@ -267,7 +267,7 @@ Tapping the blob dims the page (~74% dark) and lays a deck over it — not a she
   `כרטיס 7722` / `חשבון 674-1908922`. Under the panel one insight sentence in dark
   green, its amount bold in green.
 - Under the deck: `להמשיך` (right, outlined white, fills green when pressed),
-  `נשארו עוד N` (counts this card), `לערוך` (left, outlined).
+  `נשארו עוד N` (the item cards after this one: the first of three says 2), `לערוך` (left, outlined).
 - End card: yellow sunburst, an illustration, `סיימנו להיום`,
   `אלה כל העדכונים כרגע. ניפגש מחר!`, hint `גררו את הכרטיס למטה כדי לסיים`.
 

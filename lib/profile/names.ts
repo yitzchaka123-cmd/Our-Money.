@@ -17,9 +17,30 @@ export function greetingName(member: NamedMember | undefined | null): string {
   return member?.preferred_name?.trim() ?? '';
 }
 
+/**
+ * The signed-in member, by id — or nobody. Never another member as a stand-in:
+ * greeting someone else by name is worse than saying just "היי".
+ */
+export function signedInMember<T extends { id: string }>(rows: T[], sessionMemberId: string | null): T | undefined {
+  return sessionMemberId ? rows.find((m) => m.id === sessionMemberId) : undefined;
+}
+
+/** The drawer header: the chosen name, else just "היי" — never the Telegram one. */
+export function drawerName(member: NamedMember | undefined | null): string {
+  return greetingName(member) || 'היי';
+}
+
 /** A label for lists (who logged this): the chosen name, else the Telegram one. */
 export function memberName(member: NamedMember): string {
   return member.preferred_name?.trim() || member.display_name;
+}
+
+/**
+ * Member id → the name to show for them. Matching is always by id: two
+ * screens that build names differently must never disagree about who is who.
+ */
+export function memberNameMap(rows: Array<NamedMember & { id: string }>): Map<string, string> {
+  return new Map(rows.map((m) => [m.id, memberName(m)]));
 }
 
 export type NameCheck = { ok: true; value: string | null } | { ok: false; error: string };

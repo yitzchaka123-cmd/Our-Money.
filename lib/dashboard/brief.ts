@@ -232,9 +232,11 @@ export interface BriefItem {
   envelopeId: string | null;
   business: string;
   date: string | null;
-  /** "כרטיס 7722", "חשבון 674-1908922", "מזומן · ארנק ראשי". */
+  /** "לאומי קארד 2", "כרטיס 0848", "חשבון 674-1908922", "מזומן · ארנק ראשי" — never a RiseUp code. */
   account: string | null;
   memberName: string | null;
+  /** Who logged it — what an edit keeps. Null for RiseUp rows; every loader sets it. */
+  memberId?: string | null;
   needsReview: boolean;
   insight: BriefInsight | null;
   /** The row as the dashboard knows it, so "לערוך" opens the same sheet. */
@@ -312,10 +314,17 @@ export function briefLabel(type: EnvelopeType, title: string, category: string |
   return isCash && type !== 'cashIncome' ? `מזומן · ${withCategory}` : withCategory;
 }
 
-function accountLabel(nickname: string | null, hash: string | null): string | null {
+/**
+ * The account line of a RiseUp card: the name the dashboard gives the account
+ * (the couple's name, RiseUp's nickname, or the provider). A charge not in any
+ * envelope yet falls back to RiseUp's nickname or a real account number —
+ * never the opaque code ("cc5910") RiseUp uses to tell cards apart.
+ */
+function accountLabel(found: NormalizedActual | undefined, nickname: string | null, hash: string | null): string | null {
+  if (found?.accountName) return found.accountName;
+  if (nickname?.trim()) return nickname.trim();
   if (hash && hash.includes('-')) return `חשבון ${hash}`;
-  const id = nickname ?? hash;
-  return id ? `כרטיס ${id}` : null;
+  return null;
 }
 
 function findEnvelope(
@@ -366,8 +375,9 @@ function riseupItem(row: RiseupRow, src: BriefSource): BriefItem {
     isIncome,
     business: row.business_name ?? '',
     date: row.transaction_date,
-    account: accountLabel(row.account_nickname, row.account_number_hash),
+    account: accountLabel(undefined, row.account_nickname, row.account_number_hash),
     memberName: null,
+    memberId: null,
     needsReview: false,
     seenAt: row.first_seen_at,
   };
@@ -414,6 +424,7 @@ function riseupItem(row: RiseupRow, src: BriefSource): BriefItem {
 
   return {
     ...base,
+    account: accountLabel(found?.actual, row.account_nickname, row.account_number_hash),
     label: briefLabel(type, title, category, false),
     envelopeType: type,
     envelopeTitle: title,
@@ -463,6 +474,7 @@ function spendItem(spend: CashSpend, src: BriefSource): BriefItem {
     cash: {
       id: spend.id,
       kind: 'spend',
+      memberId: spend.member_id,
       memberName,
       inputKind: spend.input_kind,
       status: needsReview ? 'needs_review' : 'confirmed',
@@ -488,6 +500,7 @@ function spendItem(spend: CashSpend, src: BriefSource): BriefItem {
     date: spend.spent_at,
     account: walletLine(src, spend.wallet_id),
     memberName,
+    memberId: spend.member_id,
     needsReview,
     insight: needsReview ? { rule: 'needs-review', text: REVIEW_TEXT } : tracker,
     actual,
@@ -516,6 +529,7 @@ function topupItem(topup: CashTopup, src: BriefSource): BriefItem {
     date: topup.occurred_at,
     account: walletLine(src, topup.wallet_id),
     memberName,
+    memberId: topup.member_id ?? null,
     needsReview: false,
     insight: null,
     actual: {
@@ -533,7 +547,7 @@ function topupItem(topup: CashTopup, src: BriefSource): BriefItem {
       totalPayments: null,
       categoryLabel: topup.category,
       cash: income
-        ? { id: topup.id, kind: 'income', memberName, inputKind: topup.input_kind ?? 'text', status: 'confirmed', walletId: topup.wallet_id }
+        ? { id: topup.id, kind: 'income', memberId: topup.member_id ?? null, memberName, inputKind: topup.input_kind ?? 'text', status: 'confirmed', walletId: topup.wallet_id }
         : undefined,
     },
     seenAt: topup.created_at ?? topup.occurred_at,

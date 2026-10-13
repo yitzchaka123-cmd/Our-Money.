@@ -108,9 +108,23 @@ describe('planEnvelope', () => {
 describe('expectedWithCash', () => {
   const base = { riseupPlanned: 5000, riseupActual: 3000, cashActual: 0, planCommitted: 0, pending: 0 };
 
-  it("leaves RiseUp's plan alone when no cash is involved", () => {
+  it("keeps RiseUp's plan when no cash is involved and spending is inside it", () => {
     expect(expectedWithCash({ ...base, type: 'variable' })).toBe(5000);
-    expect(expectedWithCash({ ...base, type: 'fixed', riseupActual: 6000 })).toBe(5000);
+    expect(expectedWithCash({ ...base, type: 'fixed' })).toBe(5000);
+  });
+
+  it('expects what was really spent once spending passes the plan, cash or not', () => {
+    expect(expectedWithCash({ ...base, type: 'fixed', riseupActual: 6000 })).toBe(6000);
+    expect(expectedWithCash({ ...base, type: 'trackingCategory', riseupActual: 5400 })).toBe(5400);
+    expect(expectedWithCash({ ...base, type: 'riseupGoal', riseupActual: 5100 })).toBe(5100);
+    expect(expectedWithCash({ ...base, type: 'variableIncome', riseupActual: 7000 })).toBe(7000);
+  });
+
+  it('counts variable spending when RiseUp sends no plan for it', () => {
+    // RiseUp leaves the variable envelope without a plan: 0 expected, 2300 spent.
+    expect(
+      expectedWithCash({ type: 'variable', riseupPlanned: 0, riseupActual: 2300, cashActual: 0, planCommitted: 0, pending: 0 }),
+    ).toBe(2300);
   });
 
   it('absorbs cash inside a variable budget until it is overspent', () => {

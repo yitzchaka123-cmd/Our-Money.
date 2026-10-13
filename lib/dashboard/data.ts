@@ -35,7 +35,7 @@ import {
 } from '@/lib/dashboard/trackers';
 import { loadSyncState } from '@/lib/riseup/sync';
 import { matchesWithdrawalName } from '@/lib/riseup/withdrawals';
-import { greetingName, memberName } from '@/lib/profile/names';
+import { drawerName, greetingName, memberNameMap, signedInMember } from '@/lib/profile/names';
 import { setupSteps, walletBalanceSet, type SetupStep } from '@/lib/dashboard/steps';
 import type { CashSpend, CashTopup, CashTransfer, CashWallet, EnvelopeType, HouseholdMember } from '@/lib/types';
 
@@ -85,6 +85,8 @@ export interface WalletMovement {
   date: string;
   label: string;
   memberName: string | null;
+  /** Who logged it — what an edit keeps. Every loader sets it. */
+  memberId?: string | null;
   category: string | null;
   walletId: string | null;
   walletName: string | null;
@@ -301,8 +303,8 @@ export async function loadDashboard(month: string, sessionMemberId: string | nul
   const wallets = (walletRows ?? []) as CashWallet[];
   const memberRows = (members ?? []) as Pick<HouseholdMember, 'id' | 'display_name' | 'preferred_name' | 'telegram_user_id'>[];
   // Everywhere a member is named, it is the name they chose (if they chose one).
-  const memberList = memberRows.map((m) => ({ id: m.id, display_name: memberName(m) }));
-  const memberNames = new Map(memberList.map((m) => [m.id, m.display_name]));
+  const memberNames = memberNameMap(memberRows);
+  const memberList = memberRows.map((m) => ({ id: m.id, display_name: memberNames.get(m.id)! }));
 
   const spends = (monthSpends ?? []) as CashSpend[];
   const topups = (monthTopups ?? []) as CashTopup[];
@@ -324,7 +326,7 @@ export async function loadDashboard(month: string, sessionMemberId: string | nul
 
   const totals = monthTotals(envelopes);
   const variable = envelopes.find((e) => e.type === 'variable');
-  const me = memberRows.find((m) => m.id === sessionMemberId) ?? memberRows[0];
+  const me = signedInMember(memberRows, sessionMemberId);
 
   const lastSyncAt = syncState.lastSuccessAt;
 
@@ -334,7 +336,8 @@ export async function loadDashboard(month: string, sessionMemberId: string | nul
       ((monthList ?? []) as { month: string }[]).map((row) => row.month),
       month,
     ),
-    userName: me ? memberName(me) : 'שלום',
+    // The drawer header, like the greeting: the chosen name or just "היי".
+    userName: drawerName(me),
     // Never the Telegram account's name: until they choose one, just "היי".
     greeting: greetingName(me),
     lastUpdated: formatUpdated(lastSyncAt),
@@ -676,6 +679,7 @@ export function spendToActual(spend: CashSpend, memberNames: Map<string, string>
     cash: {
       id: spend.id,
       kind: 'spend',
+      memberId: spend.member_id,
       memberName: memberNames.get(spend.member_id) ?? null,
       inputKind: spend.input_kind,
       status: spend.status === 'needs_review' ? 'needs_review' : 'confirmed',
@@ -702,6 +706,7 @@ function incomeToActual(topup: CashTopup, memberNames: Map<string, string>): Nor
     cash: {
       id: topup.id,
       kind: 'income',
+      memberId: topup.member_id ?? null,
       memberName: topup.member_id ? (memberNames.get(topup.member_id) ?? null) : null,
       inputKind: topup.input_kind ?? 'text',
       status: 'confirmed',
@@ -736,7 +741,8 @@ function cashIncomeEnvelope(
 // The cash bank
 // ---------------------------------------------------------------------------
 
-function buildWallet({
+/** Exported for the tests. */
+export function buildWallet({
   wallets,
   allTopups,
   allSpends,
@@ -782,6 +788,7 @@ function buildWallet({
             ? t.note || 'עדכון יתרה'
             : t.note || t.business_name || 'משיכת מזומן',
       memberName: t.member_id ? (memberNames.get(t.member_id) ?? null) : null,
+      memberId: t.member_id ?? null,
       category: t.category,
       walletId: t.wallet_id ?? fallbackId,
       walletName: nameOf(t.wallet_id),
@@ -795,6 +802,7 @@ function buildWallet({
       date: s.spent_at,
       label: s.note || s.category,
       memberName: memberNames.get(s.member_id) ?? null,
+      memberId: s.member_id,
       category: s.category,
       walletId: s.wallet_id ?? fallbackId,
       walletName: nameOf(s.wallet_id),
@@ -808,6 +816,7 @@ function buildWallet({
       date: x.occurred_at,
       label: `${walletName.get(x.from_wallet_id) ?? '?'} ← ${walletName.get(x.to_wallet_id) ?? '?'}`,
       memberName: x.member_id ? (memberNames.get(x.member_id) ?? null) : null,
+      memberId: x.member_id ?? null,
       category: x.note,
       walletId: x.to_wallet_id,
       walletName: walletName.get(x.to_wallet_id) ?? null,

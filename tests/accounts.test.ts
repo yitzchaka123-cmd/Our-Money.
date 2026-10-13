@@ -26,8 +26,10 @@ describe('provider names (V1-07)', () => {
     expect(providerName('otsarHahayal')).toBe('בנק אוצר החייל');
   });
 
-  it('describes an unknown provider plainly instead of hiding it', () => {
-    expect(providerName('newbank', 'bankAccount')).toBe('בנק newbank');
+  it('describes an unknown provider in plain Hebrew, never its raw English id', () => {
+    expect(providerName('newbank', 'bankAccount')).toBe('חשבון בנק');
+    expect(providerName('someNewCard', 'creditCard')).toBe('כרטיס');
+    expect(providerName('mysteryProvider')).toBe('חשבון');
     expect(providerName(null, 'creditCard')).toBe('כרטיס אשראי');
     expect(providerName(null)).toBe('חשבון');
   });
@@ -47,14 +49,38 @@ describe('accountDisplayName (V1-07)', () => {
     expect(accountDisplayName({ source: 'leumicard', hash: 'aa1111' }, labels)).toBe('לאומי קארד');
   });
 
-  it('adds the short code only when two accounts share a provider', () => {
+  it('numbers unnamed accounts that share a provider — never shows the code', () => {
     const siblings = [
-      { source: 'isracard', hash: 'ab1234' },
-      { source: 'isracard', hash: 'cd5678' },
+      { source: 'leumicard', hash: 'cc5910' },
+      { source: 'leumicard', hash: 'aa1111' },
       { source: 'leumiBank', hash: 'ef9012' },
     ];
-    expect(accountDisplayName(siblings[0]!, [], siblings)).toBe('ישראכרט · ab1234');
+    // Stable order by code: aa1111 is 1, cc5910 is 2, whatever order they arrive in.
+    expect(accountDisplayName(siblings[0]!, [], siblings)).toBe('לאומי קארד 2');
+    expect(accountDisplayName(siblings[1]!, [], siblings)).toBe('לאומי קארד 1');
+    expect(accountDisplayName(siblings[1]!, [], [...siblings].reverse())).toBe('לאומי קארד 1');
     expect(accountDisplayName(siblings[2]!, [], siblings)).toBe('בנק לאומי');
+    for (const s of siblings) expect(accountDisplayName(s, [], siblings)).not.toMatch(/cc5910|aa1111|ef9012/);
+  });
+
+  it('needs no number once the other card has a name of its own', () => {
+    const siblings = [
+      { source: 'leumicard', hash: 'cc5910' },
+      { source: 'leumicard', hash: 'aa1111' },
+    ];
+    // "כרטיס 0848" is the couple's name for cc5910, so aa1111 is the only unnamed one.
+    expect(accountDisplayName(siblings[1]!, labels, siblings)).toBe('לאומי קארד');
+    const namer = accountNamer(siblings, labels);
+    expect(siblings.map((s) => namer(s))).toEqual(['כרטיס 0848', 'לאומי קארד']);
+  });
+
+  it('numbers two unknown cards in Hebrew too', () => {
+    const siblings = [
+      { source: 'newCardCo', hash: 'x2', sourceType: 'creditCard' },
+      { source: 'newCardCo', hash: 'x1', sourceType: 'creditCard' },
+    ];
+    const namer = accountNamer(siblings, []);
+    expect(siblings.map((s) => namer(s))).toEqual(['כרטיס 2', 'כרטיס 1']);
   });
 
   it('never shows the raw code with "כרטיס" in front of it', () => {

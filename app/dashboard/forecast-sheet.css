@@ -1,0 +1,94 @@
+/* --- "איך חישבנו את הצפי?" — the forecast card's ⋮ sheet ----------------- */
+
+/* The ⋮ is four-pixel dots: give it a finger-sized target without moving it. */
+.hero-kebab {
+  padding: 10px;
+  margin: -10px;
+}
+
+.forecast-intro {
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--ink-2);
+  margin: -8px 8px 14px;
+}
+
+.forecast-lines {
+  list-style: none;
+  margin: 0;
+  padding: 0 8px;
+}
+
+.forecast-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.forecast-dot {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.forecast-dot[data-hue='income'] { background: var(--income); }
+.forecast-dot[data-hue='cash'] { background: var(--income-track); border: 2px solid var(--income); }
+.forecast-dot[data-hue='fixed'] { background: var(--fixed); }
+.forecast-dot[data-hue='tracking'] { background: var(--tracking); }
+.forecast-dot[data-hue='variable'] { background: var(--variable); }
+.forecast-dot[data-hue='goal'] { background: var(--goal); }
+
+.forecast-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 16px;
+}
+
+.forecast-sub {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.forecast-figure {
+  flex: 0 0 auto;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.forecast-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 6px 8px 0;
+  padding: 16px 0 6px;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.forecast-total .forecast-figure {
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.forecast-total.is-negative .forecast-figure {
+  color: var(--alert);
+}
+
+.forecast-cash {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+  margin: 4px 8px 20px;
+}
+
+.forecast-done {
+  margin-bottom: 8px;
+}

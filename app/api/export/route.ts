@@ -6,6 +6,7 @@ import { loadAccountLabels } from '@/lib/dashboard/account-labels';
 import { assembleMonth, currentMonth, toPlans, type ActualRow, type EnvelopeRow } from '@/lib/dashboard/data';
 import { db } from '@/lib/db/client';
 import { toCsv } from '@/lib/export/csv';
+import { memberNameMap } from '@/lib/profile/names';
 import { monthBounds } from '@/lib/reconcile';
 import type { CashSpend, CashTopup, CashTransfer, CashWallet } from '@/lib/types';
 
@@ -56,7 +57,7 @@ export async function GET(request: Request): Promise<Response> {
     supabase.from('cash_transfers').select('*').eq('is_dismissed', false).gte('occurred_at', start).lte('occurred_at', end),
     supabase.from('cash_plans').select('*').eq('is_active', true),
     supabase.from('cash_plan_skips').select('plan_id, month').in('month', months),
-    supabase.from('household_members').select('id, display_name'),
+    supabase.from('household_members').select('id, display_name, preferred_name'),
     supabase.from('cash_wallets').select('*'),
   ]);
   const failed = [envelopes, actuals, spends, topups, transfers, plans, skips, members, wallets].find((r) => r.error);
@@ -65,7 +66,7 @@ export async function GET(request: Request): Promise<Response> {
     return NextResponse.json({ ok: false, error: 'export failed' }, { status: 500 });
   }
 
-  const memberNames = new Map(((members.data ?? []) as { id: string; display_name: string }[]).map((m) => [m.id, m.display_name]));
+  const memberNames = memberNameMap((members.data ?? []) as { id: string; display_name: string; preferred_name: string | null }[]);
   const walletList = (wallets.data ?? []) as CashWallet[];
   const walletNames = new Map(walletList.map((w) => [w.id, w.name]));
   const defaultWallet = walletList.find((w) => w.is_default)?.name ?? '';

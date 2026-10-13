@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { greetingName, memberName, normalizePreferredName } from '@/lib/profile/names';
+import { drawerName, greetingName, signedInMember, memberName, normalizePreferredName } from '@/lib/profile/names';
 
 describe('greetingName', () => {
   it('uses the name the member chose', () => {
@@ -12,6 +12,36 @@ describe('greetingName', () => {
     expect(greetingName({ display_name: 'Nehemiah Tg', preferred_name: '   ' })).toBe('');
     expect(greetingName({ display_name: 'Nehemiah Tg' })).toBe('');
     expect(greetingName(undefined)).toBe('');
+  });
+});
+
+describe('drawerName', () => {
+  it('shows the chosen name in the drawer header', () => {
+    expect(drawerName({ display_name: 'Nehemiah Tg', preferred_name: 'יצחק' })).toBe('יצחק');
+  });
+
+  it('says just "היי" until a name is chosen — never the Telegram name', () => {
+    expect(drawerName({ display_name: 'Nehemiah Tg', preferred_name: null })).toBe('היי');
+    expect(drawerName({ display_name: 'Nehemiah Tg', preferred_name: '  ' })).toBe('היי');
+    expect(drawerName(undefined)).toBe('היי');
+  });
+});
+
+describe('signedInMember', () => {
+  const rows = [
+    { id: 'a', display_name: 'A', preferred_name: 'יצחק' },
+    { id: 'b', display_name: 'B', preferred_name: 'שרה' },
+  ];
+
+  it('finds the signed-in member by id', () => {
+    expect(signedInMember(rows, 'b')?.preferred_name).toBe('שרה');
+  });
+
+  it('never stands in another member when the signed-in one is missing', () => {
+    expect(signedInMember(rows, 'missing')).toBeUndefined();
+    expect(signedInMember(rows, null)).toBeUndefined();
+    expect(greetingName(signedInMember(rows, 'missing'))).toBe('');
+    expect(drawerName(signedInMember(rows, null))).toBe('היי');
   });
 });
 

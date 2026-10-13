@@ -6,8 +6,10 @@ import {
   type HistoryTxn,
   type RiseupRow,
 } from '@/lib/dashboard/brief';
+import { loadAccountLabels } from '@/lib/dashboard/account-labels';
 import { assembleMonth, type ActualRow, type EnvelopeRow } from '@/lib/dashboard/data';
 import { db } from '@/lib/db/client';
+import { memberNameMap } from '@/lib/profile/names';
 import { monthBounds } from '@/lib/reconcile';
 import type { CashSpend, CashTopup, CashWallet } from '@/lib/types';
 
@@ -69,7 +71,7 @@ export async function loadBrief(memberId: string, now = new Date()): Promise<Bri
       .gt('created_at', seenUntil)
       .then((r) => must(r, 'new cash income')),
     supabase.from('cash_wallets').select('*').then((r) => must(r, 'wallets')),
-    supabase.from('household_members').select('id, display_name').then((r) => must(r, 'members')),
+    supabase.from('household_members').select('id, display_name, preferred_name').then((r) => must(r, 'members')),
     fetchAll<{ transaction_id: string; transaction_date: string | null; business_name: string | null; amount_ils: number | string | null; is_income: boolean | null }>(
       (from, to) =>
         supabase
@@ -84,7 +86,8 @@ export async function loadBrief(memberId: string, now = new Date()): Promise<Bri
 
   const riseupRows = (newRiseup ?? []) as RiseupRow[];
   const spends = dedupe([...((newSpends ?? []) as CashSpend[]), ...((reviewSpends ?? []) as CashSpend[])]);
-  const memberNames = new Map(((memberRows ?? []) as { id: string; display_name: string }[]).map((m) => [m.id, m.display_name]));
+  // The name each member chose, as on the dashboard — never the Telegram one when they chose.
+  const memberNames = memberNameMap((memberRows ?? []) as { id: string; display_name: string; preferred_name: string | null }[]);
 
   const withdrawalIds = riseupRows.filter((r) => r.is_withdrawal).map((r) => r.transaction_id);
   const withdrawalTopups = withdrawalIds.length
@@ -135,7 +138,7 @@ export async function loadBriefSafely(memberId: string): Promise<BriefData> {
 async function monthEnvelopes(month: string, memberNames: Map<string, string>): Promise<BriefEnvelope[]> {
   const supabase = db();
   const { from, to } = monthBounds(month);
-  const [envelopeRows, actualRows, spends] = await Promise.all([
+  const [envelopeRows, actualRows, spends, accountLabels] = await Promise.all([
     supabase.from('riseup_envelopes').select('*').eq('month', month).then((r) => must(r, 'envelopes')),
     supabase.from('riseup_envelope_actuals').select('*').eq('month', month).then((r) => must(r, 'envelope actuals')),
     supabase
@@ -145,6 +148,8 @@ async function monthEnvelopes(month: string, memberNames: Map<string, string>): 
       .gte('spent_at', from)
       .lte('spent_at', to)
       .then((r) => must(r, 'month cash')),
+    // The couple's names for their cards, so a card reads as on the dashboard.
+    loadAccountLabels(),
   ]);
 
   const { envelopes, riseupEnvelopes } = assembleMonth({
@@ -156,6 +161,7 @@ async function monthEnvelopes(month: string, memberNames: Map<string, string>): 
     plans: [],
     skippedPlanIds: new Set(),
     memberNames,
+    accountLabels,
   });
   const planned = new Map(riseupEnvelopes.map((e) => [e.envelopeId, e.plannedIls]));
 

@@ -95,6 +95,40 @@ describe('card and account names (V1-07)', () => {
     ]);
   });
 
+  it('numbers two unnamed cards from the same provider instead of showing their codes (V1-check-6)', async () => {
+    const { error } = await db().from('riseup_envelope_actuals').insert({
+      month: MONTH,
+      envelope_id: `${MONTH}-var`,
+      transaction_id: `${MONTH}-second-card`,
+      transaction_date: `${MONTH}-02`,
+      billing_date: `${MONTH}-02`,
+      business_name: 'סופר',
+      amount_ils: 30,
+      is_income: false,
+      source: 'leumicard',
+      account_number_hash: 'aa1111',
+    });
+    if (error) throw new Error(error.message);
+
+    const data = await loadDashboard(MONTH, yitzchak);
+    const names = data.envelopes
+      .flatMap((e) => e.actuals)
+      .filter((a) => a.source === 'leumicard')
+      .map((a) => [a.accountNumberHash, a.accountName]);
+    expect(names).toEqual(
+      expect.arrayContaining([
+        ['aa1111', 'לאומי קארד 1'],
+        ['cc5910', 'לאומי קארד 2'],
+      ]),
+    );
+    expect(JSON.stringify(names.map((n) => n[1]))).not.toMatch(/cc5910|aa1111/);
+
+    // Once one is named, the other is just "לאומי קארד" again.
+    await setAccountLabel('leumicard', 'cc5910', 'כרטיס 0848');
+    const after = (await loadDashboard(MONTH, yitzchak)).envelopes.flatMap((e) => e.actuals).filter((a) => a.source === 'leumicard');
+    expect(new Set(after.map((a) => a.accountName))).toEqual(new Set(['כרטיס 0848', 'לאומי קארד']));
+  });
+
   it('needs a signed-in member and a sensible name', async () => {
     expect(await setAccountLabel('leumicard', 'cc5910', 'x'.repeat(41))).toMatchObject({ ok: false });
     signOut();
