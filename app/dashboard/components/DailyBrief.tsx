@@ -12,6 +12,7 @@ import type { EnvelopeRef } from '@/lib/cash/envelopes';
 import { finishBrief } from '@/lib/dashboard/brief-actions';
 import { briefDraft } from '@/lib/dashboard/entry-drafts';
 import { proseAmount, type BriefData, type BriefItem, type RichText } from '@/lib/dashboard/brief';
+import { openingStep } from '@/lib/dashboard/brief-deck';
 import type { WalletSummary } from '@/lib/dashboard/data';
 import type { HouseholdMember } from '@/lib/types';
 
@@ -75,16 +76,18 @@ export function DailyBrief({
   const openDeck = () => {
     setDeck(brief.items);
     setAsOf(brief.asOf);
-    setStep(0);
-    setFinished(false);
+    setStep(openingStep(brief.items.length));
+    // Nothing new: the deck opens at "סיימנו להיום" with nothing to mark read.
+    setFinished(brief.items.length === 0);
     setConfirmed(new Set());
     setError(null);
     setOpen(true);
   };
 
-  // "/dashboard?brief=1" opens straight into the deck — for links from elsewhere.
+  // "/dashboard?brief=1" opens straight into the deck — for links from elsewhere,
+  // like the drawer. With nothing new it opens at the end card, not nothing.
   useEffect(() => {
-    if (initialStep !== undefined || brief.count === 0) return;
+    if (initialStep !== undefined) return;
     if (new URLSearchParams(window.location.search).get('brief') === '1') openDeck();
     // Only on arrival.
   }, []);
