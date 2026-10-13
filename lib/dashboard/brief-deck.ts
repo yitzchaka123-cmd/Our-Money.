@@ -10,3 +10,11 @@
 export function openingStep(itemCount: number): number {
   return itemCount > 0 ? 0 : itemCount + 1;
 }
+
+/**
+ * "נשארו עוד N" under an item card: the item cards after this one, as RiseUp
+ * counts them — the first of three says "נשארו עוד 2", the last says nothing.
+ */
+export function cardsLeftAfter(step: number, itemCount: number): number {
+  return Math.max(itemCount - step, 0);
+}

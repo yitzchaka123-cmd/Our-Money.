@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import { DailyBrief } from '@/app/dashboard/components/DailyBrief';
 import { EMPTY_BRIEF, type BriefData, type BriefItem } from '@/lib/dashboard/brief';
-import { openingStep } from '@/lib/dashboard/brief-deck';
+import { cardsLeftAfter, openingStep } from '@/lib/dashboard/brief-deck';
 
 function item(key: string): BriefItem {
   return {
@@ -49,6 +49,23 @@ function render(brief: BriefData, initialStep: number): string {
     createElement(DailyBrief, { brief, envelopes: [], members: [], wallets: [], sessionMemberId: 'm1', initialStep }),
   );
 }
+
+describe('"נשארו עוד N" (V1-check-8)', () => {
+  it('counts the item cards after the current one, as RiseUp does', () => {
+    expect(cardsLeftAfter(1, 3)).toBe(2);
+    expect(cardsLeftAfter(2, 3)).toBe(1);
+    expect(cardsLeftAfter(3, 3)).toBe(0);
+  });
+
+  it('reads "נשארו עוד 2" on the first of three cards', () => {
+    expect(render(three, 1)).toContain('נשארו עוד 2');
+    expect(render(three, 2)).toContain('נשארו עוד 1');
+  });
+
+  it('says nothing about cards left on the last one', () => {
+    expect(render(three, 3)).not.toContain('נשארו עוד');
+  });
+});
 
 describe('opening the brief from the drawer (V1-check-7)', () => {
   it('starts at the intro when there is something new', () => {
