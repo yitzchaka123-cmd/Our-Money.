@@ -127,6 +127,36 @@ describe('assembleMonth', () => {
     expect(monthTotals(envelopes).forecast).toBe(12000 - 5000 - 4000);
   });
 
+  it('takes variable spending off the forecast even when RiseUp sends no plan for it', () => {
+    const envelopes = assembleMonth({
+      month: '2026-09',
+      envelopeRows: envelopeRows.map((row) => (row.envelope_id === 'var' ? { ...row, planned_ils: 0 } : row)),
+      actualRows,
+      spends: [],
+      topups: [],
+      plans: [],
+      skippedPlanIds: new Set(),
+      memberNames: names,
+    }).envelopes;
+    expect(envelopes.find((e) => e.type === 'variable')?.expected).toBe(3000);
+    expect(monthTotals(envelopes).forecast).toBe(12000 - 3000 - 4000);
+  });
+
+  it('counts a fixed envelope that went over its plan, with no cash involved', () => {
+    const envelopes = assembleMonth({
+      month: '2026-09',
+      envelopeRows,
+      actualRows: [...actualRows, actual('fix', 'f2', 1000)],
+      spends: [],
+      topups: [],
+      plans: [],
+      skippedPlanIds: new Set(),
+      memberNames: names,
+    }).envelopes;
+    expect(envelopes.find((e) => e.type === 'fixed')?.expected).toBe(4500);
+    expect(monthTotals(envelopes).forecast).toBe(12000 - 5000 - 4500);
+  });
+
   it('shows a pending cleaner in the fixed envelope and takes it off the forecast', () => {
     const envelopes = month({ plans: [plan({})] });
     const fixed = envelopes.find((e) => e.type === 'fixed')!;

@@ -139,7 +139,11 @@ export interface EnvelopeFigures {
 /**
  * The envelope's "expected" figure with cash in it.
  *
- * Nothing cash-related → RiseUp's own plan, untouched.
+ * Every branch expects at least what was really spent (or received): a plan
+ * that spending has passed — or no plan at all, as RiseUp sends for the
+ * variable envelope — must not hide that spending from the forecast.
+ *
+ * Nothing cash-related → RiseUp's plan, or what was spent if that is more.
  *
  * Budget envelopes (variable, trackers, savings) are an allowance: cash spent
  * inside the allowance uses it up rather than adding to it, so expected only
@@ -155,7 +159,7 @@ export function expectedWithCash(figures: EnvelopeFigures): number {
   const { type, riseupPlanned, riseupActual, cashActual, planCommitted, pending } = figures;
 
   if (type === 'cashIncome') return round(cashActual + pending);
-  if (cashActual === 0 && planCommitted === 0) return riseupPlanned;
+  if (cashActual === 0 && planCommitted === 0) return round(Math.max(riseupPlanned, riseupActual));
 
   if (type === 'fixed') {
     return round(Math.max(riseupPlanned, riseupActual) + cashActual + pending);
@@ -164,7 +168,7 @@ export function expectedWithCash(figures: EnvelopeFigures): number {
     return round(Math.max(riseupPlanned + planCommitted, riseupActual + cashActual + pending));
   }
   // RiseUp's own income envelope never holds cash.
-  return riseupPlanned;
+  return round(Math.max(riseupPlanned, riseupActual));
 }
 
 function round(value: number): number {
