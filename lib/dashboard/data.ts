@@ -35,7 +35,7 @@ import {
 } from '@/lib/dashboard/trackers';
 import { loadSyncState } from '@/lib/riseup/sync';
 import { matchesWithdrawalName } from '@/lib/riseup/withdrawals';
-import { greetingName, memberName, memberNameMap } from '@/lib/profile/names';
+import { drawerName, greetingName, memberNameMap } from '@/lib/profile/names';
 import { setupSteps, walletBalanceSet, type SetupStep } from '@/lib/dashboard/steps';
 import type { CashSpend, CashTopup, CashTransfer, CashWallet, EnvelopeType, HouseholdMember } from '@/lib/types';
 
@@ -336,7 +336,8 @@ export async function loadDashboard(month: string, sessionMemberId: string | nul
       ((monthList ?? []) as { month: string }[]).map((row) => row.month),
       month,
     ),
-    userName: me ? memberName(me) : 'שלום',
+    // The drawer header, like the greeting: the chosen name or just "היי".
+    userName: drawerName(me),
     // Never the Telegram account's name: until they choose one, just "היי".
     greeting: greetingName(me),
     lastUpdated: formatUpdated(lastSyncAt),

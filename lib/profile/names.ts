@@ -17,6 +17,11 @@ export function greetingName(member: NamedMember | undefined | null): string {
   return member?.preferred_name?.trim() ?? '';
 }
 
+/** The drawer header: the chosen name, else just "היי" — never the Telegram one. */
+export function drawerName(member: NamedMember | undefined | null): string {
+  return greetingName(member) || 'היי';
+}
+
 /** A label for lists (who logged this): the chosen name, else the Telegram one. */
 export function memberName(member: NamedMember): string {
   return member.preferred_name?.trim() || member.display_name;

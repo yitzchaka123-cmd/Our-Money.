@@ -78,6 +78,8 @@ describe('cash actions against the real schema', () => {
     expect(cashIncome.actual).toBe(300);
     // No chosen name yet: the greeting never borrows the Telegram name (V1-08).
     expect(data.greeting).toBe('');
+    // …and neither does the drawer header (V1-check-3).
+    expect(data.userName).toBe('היי');
     // 12000 + 300 in, 5000 + 4200 + 600 + 1000 expected out.
     expect(data.forecast).toBe(12300 - 10800);
   });

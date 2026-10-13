@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { greetingName, memberName, normalizePreferredName } from '@/lib/profile/names';
+import { drawerName, greetingName, memberName, normalizePreferredName } from '@/lib/profile/names';
 
 describe('greetingName', () => {
   it('uses the name the member chose', () => {
@@ -12,6 +12,18 @@ describe('greetingName', () => {
     expect(greetingName({ display_name: 'Nehemiah Tg', preferred_name: '   ' })).toBe('');
     expect(greetingName({ display_name: 'Nehemiah Tg' })).toBe('');
     expect(greetingName(undefined)).toBe('');
+  });
+});
+
+describe('drawerName', () => {
+  it('shows the chosen name in the drawer header', () => {
+    expect(drawerName({ display_name: 'Nehemiah Tg', preferred_name: 'יצחק' })).toBe('יצחק');
+  });
+
+  it('says just "היי" until a name is chosen — never the Telegram name', () => {
+    expect(drawerName({ display_name: 'Nehemiah Tg', preferred_name: null })).toBe('היי');
+    expect(drawerName({ display_name: 'Nehemiah Tg', preferred_name: '  ' })).toBe('היי');
+    expect(drawerName(undefined)).toBe('היי');
   });
 });
 
