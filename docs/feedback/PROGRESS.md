@@ -27,4 +27,8 @@ Read this first after any stop.
 Helper branches are `worktree-agent-*`; check `git log` on each for per-item commits after a stop.
 
 ## Stops
-(none yet)
+- 2026-10-11 ~15:00 UTC: the independent checker stopped on the usage limit (resets 15:00 UTC) before reporting.
+  Checked after the stop (2026-10-13): all five helper branches and the integration merge are already in 6fa8147 and deployed;
+  nothing uncommitted anywhere. Restarted only the checker (read-only, all 26 items).
+- Item 12 follow-up: syncs since 0003 show trackers carry their target in `originalAmount` (balancedAmount is always 0) and
+  variable / variableIncome envelopes send null for both. Targets now match RiseUp (רכב 2,850, פארמה 450, ביגוד 200, income 7,635).
