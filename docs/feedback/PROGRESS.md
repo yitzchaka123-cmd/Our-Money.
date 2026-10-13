@@ -13,7 +13,9 @@ Read this first after any stop.
 - [x] Helpers merged, migrations 0003–0007 applied, pushed (6fa8147)
 - [x] Full run on 6fa8147: typecheck clean, 400 unit, 84 integration, all previews render; no runtime errors in Vercel
 - [x] Independent check of every item: 24 done, #12 partial (RiseUp sends no plan for variable / income), #6 no change; 9 extra problems found → helper F fixing them (no migration)
-- [ ] Deploy live, statuses updated
+- [x] Helper F merged (48f31a7): 431 unit, 87 integration pass; deploy READY, no runtime errors; statuses updated, ledger done
+
+Waiting for the user: whether to set their RiseUp custom category names for them (writing them directly was blocked).
 
 ## Helpers
 | Helper | Items | Migration | State |
