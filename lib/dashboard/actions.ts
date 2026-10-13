@@ -23,6 +23,7 @@ import {
 import { ENVELOPE_TITLES, type NormalizedActual } from '@/lib/riseup/envelopes';
 import { db } from '@/lib/db/client';
 import { toOverrides, trackerKey, type TrackerOverrideRow } from '@/lib/dashboard/trackers';
+import { memberNameMap } from '@/lib/profile/names';
 import { monthBounds } from '@/lib/reconcile';
 import { loadNameBook } from '@/lib/riseup/name-book';
 import { buildNameBook, isUnresolvedName, resolveTrackerName } from '@/lib/riseup/tracker-names';
@@ -92,7 +93,7 @@ export async function envelopeHistory(
     supabase.from('cash_topups').select('*').eq('is_dismissed', false).gte('occurred_at', from).lte('occurred_at', to),
     supabase.from('cash_plans').select('*').eq('is_active', true),
     supabase.from('cash_plan_skips').select('plan_id, month').in('month', months),
-    supabase.from('household_members').select('id, display_name'),
+    supabase.from('household_members').select('id, display_name, preferred_name'),
     // Errors (no migration 0006 yet) just mean no overrides.
     supabase.from('tracker_overrides').select('*').in('month', ['', ...months]),
     type === 'trackingCategory' && label
@@ -110,9 +111,7 @@ export async function envelopeHistory(
     return { ok: false, error: 'לא הצלחנו לטעון את ההיסטוריה. נסו שוב.' };
   }
 
-  const memberNames = new Map(
-    ((members.data ?? []) as { id: string; display_name: string }[]).map((m) => [m.id, m.display_name]),
-  );
+  const memberNames = memberNameMap((members.data ?? []) as { id: string; display_name: string; preferred_name: string | null }[]);
   const planList = toPlans(plans.data as CashPlan[] | null);
   // So a tracker is named the same in every month and the title match holds.
   const names = buildNameBook({
@@ -244,7 +243,7 @@ export async function searchTransactions(
       .order('occurred_at', { ascending: false })
       .order('id', { ascending: false })
       .range(at.topup, at.topup + take - 1),
-    supabase.from('household_members').select('id, display_name'),
+    supabase.from('household_members').select('id, display_name, preferred_name'),
   ]);
   const failed = [card, spends, topups].find((r) => r.error);
   if (failed?.error) {
@@ -252,9 +251,7 @@ export async function searchTransactions(
     return { ok: false, error: 'החיפוש נכשל. נסו שוב.' };
   }
 
-  const memberNames = new Map(
-    ((members.data ?? []) as { id: string; display_name: string }[]).map((m) => [m.id, m.display_name]),
-  );
+  const memberNames = memberNameMap((members.data ?? []) as { id: string; display_name: string; preferred_name: string | null }[]);
   const cardRows = (card.data ?? []) as (ActualRow & { month: string })[];
   // Cards and accounts read as everywhere else: your name, RiseUp's nickname,
   // or the provider — never RiseUp's opaque code.
@@ -404,6 +401,7 @@ export async function searchTransactions(
         cash: {
           id: t.id,
           kind: 'income',
+          memberId: t.member_id ?? null,
           memberName: t.member_id ? (memberNames.get(t.member_id) ?? null) : null,
           inputKind: t.input_kind ?? 'text',
           status: 'confirmed',

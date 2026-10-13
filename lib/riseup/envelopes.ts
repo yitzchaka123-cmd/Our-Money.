@@ -26,6 +26,8 @@ export interface NormalizedActual {
   cash?: {
     id: string;
     kind: 'spend' | 'income';
+    /** Who logged it — what an edit keeps. Every loader sets it. */
+    memberId?: string | null;
     memberName: string | null;
     inputKind: 'text' | 'voice' | 'web';
     status: 'confirmed' | 'needs_review';

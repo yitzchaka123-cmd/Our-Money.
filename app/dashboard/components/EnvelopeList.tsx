@@ -26,6 +26,7 @@ import type { EnvelopeRef } from '@/lib/cash/envelopes';
 import { settlePlan } from '@/lib/cash/plan-actions';
 import type { CashPlan } from '@/lib/cash/plans';
 import type { EnvelopeView, PendingPlanView, WalletMovement, WalletView } from '@/lib/dashboard/data';
+import { actualDraft, movementDraft } from '@/lib/dashboard/entry-drafts';
 import { addTrackerSlot } from '@/lib/dashboard/trackers';
 import type { NormalizedActual } from '@/lib/riseup/envelopes';
 import type { HouseholdMember } from '@/lib/types';
@@ -121,20 +122,9 @@ export function EnvelopeList({
   const openNew = (kind: CashKind, envelopeId: string | null = null) =>
     setDraft({ ...emptyDraft(kind, sessionMemberId), envelopeId });
 
-  const toDraft = (actual: NormalizedActual, envelopeId: string | null): CashEntryDraft | null => {
-    if (!actual.cash) return null;
-    return {
-      id: actual.cash.id,
-      kind: actual.cash.kind,
-      amountIls: actual.amountIls,
-      category: actual.categoryLabel ?? '',
-      note: actual.businessName === actual.categoryLabel ? '' : actual.businessName,
-      date: actual.transactionDate ?? today,
-      envelopeId: actual.cash.kind === 'spend' ? envelopeId : null,
-      memberId: members.find((m) => m.display_name === actual.cash?.memberName)?.id ?? sessionMemberId,
-      walletId: actual.cash.walletId,
-    };
-  };
+  // An edit keeps the member who logged the entry: matched by id, never by name.
+  const toDraft = (actual: NormalizedActual, envelopeId: string | null): CashEntryDraft | null =>
+    actualDraft(actual, envelopeId, sessionMemberId, today);
 
   const closeAll = () => {
     setAction(null);
@@ -150,18 +140,7 @@ export function EnvelopeList({
       setWalletsFocus({ walletId: m.walletId ?? undefined });
       return;
     }
-    setDraft({
-      id: m.id,
-      kind: m.kind,
-      fromBank: m.fromBank,
-      amountIls: m.amountIls,
-      category: m.category ?? '',
-      note: m.note ?? '',
-      date: m.date,
-      envelopeId: null,
-      memberId: members.find((x) => x.display_name === m.memberName)?.id ?? sessionMemberId,
-      walletId: m.walletId,
-    });
+    setDraft(movementDraft(m, sessionMemberId));
   };
 
   const current = openTxn?.actual ?? null;

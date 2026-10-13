@@ -10,6 +10,7 @@ import { Close } from '@/app/dashboard/components/icons';
 import { confirmCashSpends } from '@/lib/cash/actions';
 import type { EnvelopeRef } from '@/lib/cash/envelopes';
 import { finishBrief } from '@/lib/dashboard/brief-actions';
+import { briefDraft } from '@/lib/dashboard/entry-drafts';
 import { proseAmount, type BriefData, type BriefItem, type RichText } from '@/lib/dashboard/brief';
 import type { WalletSummary } from '@/lib/dashboard/data';
 import type { HouseholdMember } from '@/lib/types';
@@ -180,21 +181,8 @@ export function DailyBrief({
       });
       return;
     }
-    const kind = target.kind === 'cash-spend' ? 'spend' : target.kind === 'cash-income' ? 'income' : 'withdrawal';
-    const id = target.key.slice(target.key.indexOf(':') + 1);
-    const note = target.actual.businessName === target.actual.categoryLabel ? '' : target.actual.businessName;
-    setDraft({
-      id,
-      kind,
-      fromBank: false,
-      amountIls: target.amountIls,
-      category: target.actual.categoryLabel ?? '',
-      note: kind === 'withdrawal' && note === 'משיכת מזומן' ? '' : note,
-      date: target.date ?? '',
-      envelopeId: kind === 'spend' ? target.envelopeId : null,
-      memberId: members.find((m) => m.display_name === target.memberName)?.id ?? sessionMemberId,
-      walletId: target.actual.cash?.walletId ?? null,
-    });
+    // The member who logged it stays theirs: matched by id, never by name.
+    setDraft(briefDraft(target, sessionMemberId));
   };
 
   const transform = leaving

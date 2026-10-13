@@ -235,6 +235,8 @@ export interface BriefItem {
   /** "כרטיס 7722", "חשבון 674-1908922", "מזומן · ארנק ראשי". */
   account: string | null;
   memberName: string | null;
+  /** Who logged it — what an edit keeps. Null for RiseUp rows; every loader sets it. */
+  memberId?: string | null;
   needsReview: boolean;
   insight: BriefInsight | null;
   /** The row as the dashboard knows it, so "לערוך" opens the same sheet. */
@@ -368,6 +370,7 @@ function riseupItem(row: RiseupRow, src: BriefSource): BriefItem {
     date: row.transaction_date,
     account: accountLabel(row.account_nickname, row.account_number_hash),
     memberName: null,
+    memberId: null,
     needsReview: false,
     seenAt: row.first_seen_at,
   };
@@ -463,6 +466,7 @@ function spendItem(spend: CashSpend, src: BriefSource): BriefItem {
     cash: {
       id: spend.id,
       kind: 'spend',
+      memberId: spend.member_id,
       memberName,
       inputKind: spend.input_kind,
       status: needsReview ? 'needs_review' : 'confirmed',
@@ -488,6 +492,7 @@ function spendItem(spend: CashSpend, src: BriefSource): BriefItem {
     date: spend.spent_at,
     account: walletLine(src, spend.wallet_id),
     memberName,
+    memberId: spend.member_id,
     needsReview,
     insight: needsReview ? { rule: 'needs-review', text: REVIEW_TEXT } : tracker,
     actual,
@@ -516,6 +521,7 @@ function topupItem(topup: CashTopup, src: BriefSource): BriefItem {
     date: topup.occurred_at,
     account: walletLine(src, topup.wallet_id),
     memberName,
+    memberId: topup.member_id ?? null,
     needsReview: false,
     insight: null,
     actual: {
@@ -533,7 +539,7 @@ function topupItem(topup: CashTopup, src: BriefSource): BriefItem {
       totalPayments: null,
       categoryLabel: topup.category,
       cash: income
-        ? { id: topup.id, kind: 'income', memberName, inputKind: topup.input_kind ?? 'text', status: 'confirmed', walletId: topup.wallet_id }
+        ? { id: topup.id, kind: 'income', memberId: topup.member_id ?? null, memberName, inputKind: topup.input_kind ?? 'text', status: 'confirmed', walletId: topup.wallet_id }
         : undefined,
     },
     seenAt: topup.created_at ?? topup.occurred_at,

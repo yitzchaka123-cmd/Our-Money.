@@ -4,6 +4,7 @@ import { SESSION_EXPIRED_MESSAGE } from '@/lib/auth/member';
 import { addCashEntry } from '@/lib/cash/actions';
 import { finishBrief } from '@/lib/dashboard/brief-actions';
 import { loadBrief } from '@/lib/dashboard/brief-load';
+import { briefDraft } from '@/lib/dashboard/entry-drafts';
 import { db } from '@/lib/db/client';
 
 import { resetDb, seedMember, seedMonth, signIn, signOut, sql } from './helpers';
@@ -71,6 +72,18 @@ describe('the daily brief', () => {
     expect((await loadBrief(yitzchak)).count).toBe(0);
     // Each member reads at their own pace.
     expect((await loadBrief(sara)).count).toBe(2);
+  });
+
+  it("names a partner's entry by her chosen name, and an edit keeps it hers", async () => {
+    const { error } = await db().from('household_members').update({ preferred_name: 'שרי' }).eq('id', sara);
+    if (error) throw new Error(error.message);
+    await addCashEntry({ kind: 'spend', amountIls: 45, category: 'תחבורה', note: 'מונית', date: `${MONTH}-10`, envelopeId: null, memberId: sara, walletId: null });
+
+    const item = (await loadBrief(yitzchak)).items.find((i) => i.kind === 'cash-spend')!;
+    expect(item).toMatchObject({ memberName: 'שרי', memberId: sara });
+    expect(item.actual.cash).toMatchObject({ memberName: 'שרי', memberId: sara });
+    // Yitzchak is signed in and opens her entry: the draft still belongs to Sara.
+    expect(briefDraft(item, yitzchak).memberId).toBe(sara);
   });
 
   it('keeps cash that needs review in the brief until it is confirmed', async () => {

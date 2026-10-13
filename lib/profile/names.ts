@@ -22,6 +22,14 @@ export function memberName(member: NamedMember): string {
   return member.preferred_name?.trim() || member.display_name;
 }
 
+/**
+ * Member id → the name to show for them. Matching is always by id: two
+ * screens that build names differently must never disagree about who is who.
+ */
+export function memberNameMap(rows: Array<NamedMember & { id: string }>): Map<string, string> {
+  return new Map(rows.map((m) => [m.id, memberName(m)]));
+}
+
 export type NameCheck = { ok: true; value: string | null } | { ok: false; error: string };
 
 /** Clean a typed name. Empty means "clear it" and says just "היי" again. */
