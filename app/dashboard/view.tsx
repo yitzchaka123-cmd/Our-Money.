@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { AccountFilterSheet } from '@/app/dashboard/components/AccountFilterSheet';
 import { DailyBrief } from '@/app/dashboard/components/DailyBrief';
 import { EnvelopeList } from '@/app/dashboard/components/EnvelopeList';
+import { ForecastSheet } from '@/app/dashboard/components/ForecastSheet';
 import { HeroCard } from '@/app/dashboard/components/HeroCard';
 import { InsightCards } from '@/app/dashboard/components/InsightCards';
 import { RefreshButton } from '@/app/dashboard/components/RefreshButton';
@@ -15,6 +16,7 @@ import { WalletsSheet } from '@/app/dashboard/components/WalletsSheet';
 import { filterDashboard, listAccounts, parseHidden } from '@/lib/dashboard/account-filter';
 import { EMPTY_BRIEF, type BriefData } from '@/lib/dashboard/brief';
 import type { DashboardData } from '@/lib/dashboard/data';
+import { forecastBreakdown } from '@/lib/dashboard/forecast-breakdown';
 import type { Insight } from '@/lib/dashboard/insights';
 import { isoDateInIsrael } from '@/lib/dates';
 import { monthLabel } from '@/lib/money';
@@ -54,6 +56,7 @@ export function DashboardView({
   const [search, setSearch] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [walletsOpen, setWalletsOpen] = useState(false);
+  const [forecastOpen, setForecastOpen] = useState(false);
   const [hiddenAccounts, setHiddenAccounts] = useState<Set<string>>(() => new Set(previewHiddenAccounts ?? []));
   useEffect(() => {
     if (previewHiddenAccounts) return;
@@ -116,6 +119,13 @@ export function DashboardView({
             monthName={monthName}
             forecast={shown.forecast}
             variableRemaining={shown.variableRemaining}
+            onExplain={() => setForecastOpen(true)}
+          />
+          <ForecastSheet
+            open={forecastOpen}
+            onClose={() => setForecastOpen(false)}
+            monthName={monthName}
+            breakdown={forecastBreakdown(data.envelopes)}
           />
         </div>
 

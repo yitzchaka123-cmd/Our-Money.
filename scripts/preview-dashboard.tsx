@@ -13,7 +13,9 @@ import { writeFileSync, readFileSync } from 'node:fs';
 
 import { renderToStaticMarkup } from 'react-dom/server';
 
+import { ForecastSheet } from '../app/dashboard/components/ForecastSheet';
 import { DashboardView } from '../app/dashboard/view';
+import { forecastBreakdown } from '../lib/dashboard/forecast-breakdown';
 import { envelopeChoices } from '../lib/cash/envelopes';
 import { monthTotals, type DashboardData, type EnvelopeView } from '../lib/dashboard/data';
 import { ENVELOPE_ORDER, type NormalizedActual } from '../lib/riseup/envelopes';
@@ -265,13 +267,20 @@ const css = [
   '../app/wallets-accounts.css',
   '../app/brief-insights.css',
   '../app/dashboard/trackers-search.css',
+  '../app/dashboard/forecast-sheet.css',
 ]
   .map((file) => readFileSync(new URL(file, import.meta.url), 'utf8'))
   .join('\n');
 const target = process.argv[2] ?? 'dashboard-preview.html';
 const expandAll = process.argv[3] === 'expanded';
 // Other modes draw a sheet or toast over the page: see preview-overlays.tsx.
-const overlay = previewOverlay(process.argv[3]);
+// "forecast" is the hero's ⋮ sheet, drawn from this fixture's own envelopes.
+const overlay =
+  process.argv[3] === 'forecast' ? (
+    <ForecastSheet open onClose={() => {}} monthName="ספטמבר" breakdown={forecastBreakdown(shown)} />
+  ) : (
+    previewOverlay(process.argv[3])
+  );
 
 const html = `<!doctype html>
 <html lang="he" dir="rtl">

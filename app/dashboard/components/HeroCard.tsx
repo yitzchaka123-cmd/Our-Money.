@@ -6,12 +6,15 @@ export function HeroCard({
   monthName,
   forecast,
   variableRemaining,
+  onExplain,
 }: {
   greeting: string;
   monthName: string;
   forecast: number;
   /** What is left to spend from the variable envelope this month. */
   variableRemaining: number;
+  /** The ⋮: opens "איך חישבנו את הצפי?". */
+  onExplain?: () => void;
 }) {
   const negative = forecast < 0;
 
@@ -20,7 +23,9 @@ export function HeroCard({
       <div className="card-body">
         <div className="card-head" style={{ marginBottom: 0 }}>
           <p className="hero-greeting">היי {greeting}</p>
-          <Kebab label="אפשרויות" />
+          <span className="hero-kebab">
+            <Kebab label="איך חישבנו את הצפי?" onClick={onExplain} />
+          </span>
         </div>
 
         <h1 className="hero-question">איך צפוי להסתיים התזרים של {monthName}?</h1>
