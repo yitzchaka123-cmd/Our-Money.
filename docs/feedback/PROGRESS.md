@@ -12,7 +12,7 @@ Read this first after any stop.
 - [x] Helpers launched 2026-10-11 ~10:40 UTC (five, each in its own worktree)
 - [x] Helpers merged, migrations 0003–0007 applied, pushed (6fa8147)
 - [x] Full run on 6fa8147: typecheck clean, 400 unit, 84 integration, all previews render; no runtime errors in Vercel
-- [ ] Independent check of every item (running)
+- [x] Independent check of every item: 24 done, #12 partial (RiseUp sends no plan for variable / income), #6 no change; 9 extra problems found → helper F fixing them (no migration)
 - [ ] Deploy live, statuses updated
 
 ## Helpers
