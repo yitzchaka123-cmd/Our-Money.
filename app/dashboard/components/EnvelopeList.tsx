@@ -27,6 +27,7 @@ import { settlePlan } from '@/lib/cash/plan-actions';
 import type { CashPlan } from '@/lib/cash/plans';
 import type { EnvelopeView, PendingPlanView, WalletMovement, WalletView } from '@/lib/dashboard/data';
 import { actualDraft, movementDraft } from '@/lib/dashboard/entry-drafts';
+import { summarySlot } from '@/lib/dashboard/summary-slot';
 import { addTrackerSlot } from '@/lib/dashboard/trackers';
 import type { NormalizedActual } from '@/lib/riseup/envelopes';
 import type { HouseholdMember } from '@/lib/types';
@@ -147,8 +148,9 @@ export function EnvelopeList({
   const currentKind = current?.cash?.kind ?? 'spend';
 
   // RiseUp's order: variable, trackers, "הוספת קטגוריה למעקב", fixed, the
-  // spending summary (once), then income and savings.
-  const summaryAt = envelopes.findIndex((e) => e.type === 'fixed');
+  // spending summary (once), then income and savings. With no fixed envelope
+  // the summary follows the trackers and their add button instead.
+  const summaryAfter = summarySlot(envelopes);
 
   return (
     <>
@@ -172,7 +174,7 @@ export function EnvelopeList({
         </button>
       </div>
 
-      {envelopes.map((envelope, index) => (
+      {envelopes.map((envelope) => (
         <div key={envelope.key}>
           <EnvelopeCard
             type={envelope.type}
@@ -203,7 +205,7 @@ export function EnvelopeList({
             onMenu={() => setMenuFor(envelope)}
           />
           {envelope.key === addTrackerAfter ? <AddTrackerButton onClick={() => setAddTrackerOpen(true)} /> : null}
-          {index === summaryAt ? (
+          {envelope.key === summaryAfter ? (
             <SpendSummary actual={totalActualExpenses} expected={totalExpectedExpenses} />
           ) : null}
         </div>
