@@ -232,7 +232,7 @@ export interface BriefItem {
   envelopeId: string | null;
   business: string;
   date: string | null;
-  /** "כרטיס 7722", "חשבון 674-1908922", "מזומן · ארנק ראשי". */
+  /** "לאומי קארד 2", "כרטיס 0848", "חשבון 674-1908922", "מזומן · ארנק ראשי" — never a RiseUp code. */
   account: string | null;
   memberName: string | null;
   /** Who logged it — what an edit keeps. Null for RiseUp rows; every loader sets it. */
@@ -314,10 +314,17 @@ export function briefLabel(type: EnvelopeType, title: string, category: string |
   return isCash && type !== 'cashIncome' ? `מזומן · ${withCategory}` : withCategory;
 }
 
-function accountLabel(nickname: string | null, hash: string | null): string | null {
+/**
+ * The account line of a RiseUp card: the name the dashboard gives the account
+ * (the couple's name, RiseUp's nickname, or the provider). A charge not in any
+ * envelope yet falls back to RiseUp's nickname or a real account number —
+ * never the opaque code ("cc5910") RiseUp uses to tell cards apart.
+ */
+function accountLabel(found: NormalizedActual | undefined, nickname: string | null, hash: string | null): string | null {
+  if (found?.accountName) return found.accountName;
+  if (nickname?.trim()) return nickname.trim();
   if (hash && hash.includes('-')) return `חשבון ${hash}`;
-  const id = nickname ?? hash;
-  return id ? `כרטיס ${id}` : null;
+  return null;
 }
 
 function findEnvelope(
@@ -368,7 +375,7 @@ function riseupItem(row: RiseupRow, src: BriefSource): BriefItem {
     isIncome,
     business: row.business_name ?? '',
     date: row.transaction_date,
-    account: accountLabel(row.account_nickname, row.account_number_hash),
+    account: accountLabel(undefined, row.account_nickname, row.account_number_hash),
     memberName: null,
     memberId: null,
     needsReview: false,
@@ -417,6 +424,7 @@ function riseupItem(row: RiseupRow, src: BriefSource): BriefItem {
 
   return {
     ...base,
+    account: accountLabel(found?.actual, row.account_nickname, row.account_number_hash),
     label: briefLabel(type, title, category, false),
     envelopeType: type,
     envelopeTitle: title,

@@ -6,6 +6,7 @@ import {
   type HistoryTxn,
   type RiseupRow,
 } from '@/lib/dashboard/brief';
+import { loadAccountLabels } from '@/lib/dashboard/account-labels';
 import { assembleMonth, type ActualRow, type EnvelopeRow } from '@/lib/dashboard/data';
 import { db } from '@/lib/db/client';
 import { memberNameMap } from '@/lib/profile/names';
@@ -137,7 +138,7 @@ export async function loadBriefSafely(memberId: string): Promise<BriefData> {
 async function monthEnvelopes(month: string, memberNames: Map<string, string>): Promise<BriefEnvelope[]> {
   const supabase = db();
   const { from, to } = monthBounds(month);
-  const [envelopeRows, actualRows, spends] = await Promise.all([
+  const [envelopeRows, actualRows, spends, accountLabels] = await Promise.all([
     supabase.from('riseup_envelopes').select('*').eq('month', month).then((r) => must(r, 'envelopes')),
     supabase.from('riseup_envelope_actuals').select('*').eq('month', month).then((r) => must(r, 'envelope actuals')),
     supabase
@@ -147,6 +148,8 @@ async function monthEnvelopes(month: string, memberNames: Map<string, string>): 
       .gte('spent_at', from)
       .lte('spent_at', to)
       .then((r) => must(r, 'month cash')),
+    // The couple's names for their cards, so a card reads as on the dashboard.
+    loadAccountLabels(),
   ]);
 
   const { envelopes, riseupEnvelopes } = assembleMonth({
@@ -158,6 +161,7 @@ async function monthEnvelopes(month: string, memberNames: Map<string, string>): 
     plans: [],
     skippedPlanIds: new Set(),
     memberNames,
+    accountLabels,
   });
   const planned = new Map(riseupEnvelopes.map((e) => [e.envelopeId, e.plannedIls]));
 

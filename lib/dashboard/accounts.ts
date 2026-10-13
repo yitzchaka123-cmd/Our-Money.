@@ -9,8 +9,12 @@
  *
  *   1. the couple's own name for it ("כרטיס 0848"), stored in money.account_labels;
  *   2. RiseUp's nickname for it, when RiseUp sends one;
- *   3. the provider's Hebrew name ("לאומי קארד"), plus the code only when two
- *      accounts share that provider and would otherwise look the same.
+ *   3. the provider's Hebrew name ("לאומי קארד"), numbered when two unnamed
+ *      accounts share that provider ("לאומי קארד 1", "לאומי קארד 2", in a
+ *      stable order by code) — never the code itself (feedback video 1, item 7).
+ *
+ * A provider we do not know reads as a plain "כרטיס" or "חשבון בנק", never
+ * RiseUp's English id for it.
  *
  * Pure and client-safe: no database here.
  */
@@ -88,14 +92,14 @@ export function accountKind(source: string | null, sourceType?: string | null): 
   return PROVIDERS[normalise(source)]?.kind ?? 'unknown';
 }
 
-/** The provider's Hebrew name, or a plain description when the provider is unknown. */
+/** The provider's Hebrew name, or a plain Hebrew description when the provider is unknown. */
 export function providerName(source: string | null, sourceType?: string | null): string {
   const known = PROVIDERS[normalise(source)];
   if (known) return known.name;
   const kind = accountKind(source, sourceType);
-  if (kind === 'card') return source ? `כרטיס ${source}` : 'כרטיס אשראי';
-  if (kind === 'bank') return source ? `בנק ${source}` : 'חשבון בנק';
-  return source || 'חשבון';
+  if (kind === 'card') return source ? 'כרטיס' : 'כרטיס אשראי';
+  if (kind === 'bank') return 'חשבון בנק';
+  return 'חשבון';
 }
 
 export function accountKey(source: string | null, hash: string | null): string {
@@ -109,24 +113,36 @@ function labelFor(account: AccountRef, labels: AccountLabel[]): string | null {
   return label?.trim() || null;
 }
 
+function ownName(account: AccountRef, labels: AccountLabel[]): string | null {
+  return labelFor(account, labels) ?? (account.nickname?.trim() || null);
+}
+
 /**
  * How one account reads everywhere in the app. `siblings` are the other
  * accounts in view, used only to decide whether the provider name alone is
- * enough to tell this one apart.
+ * enough to tell this one apart: when other accounts with no name of their
+ * own share the provider, each gets a number, ordered by code so the same
+ * card keeps the same number.
  */
 export function accountDisplayName(account: AccountRef, labels: AccountLabel[], siblings: AccountRef[] = []): string {
-  const label = labelFor(account, labels);
-  if (label) return label;
-  const nickname = account.nickname?.trim();
-  if (nickname) return nickname;
+  const own = ownName(account, labels);
+  if (own) return own;
 
   const provider = providerName(account.source, account.sourceType);
-  const shared = siblings.some(
-    (other) =>
-      other.hash !== account.hash &&
-      providerName(other.source, other.sourceType) === provider,
-  );
-  return shared && account.hash ? `${provider} · ${account.hash}` : provider;
+  const twins = new Map<string, AccountRef>([[accountKey(account.source, account.hash), account]]);
+  for (const other of siblings) {
+    const key = accountKey(other.source, other.hash);
+    if (twins.has(key) || ownName(other, labels)) continue;
+    if (providerName(other.source, other.sourceType) === provider) twins.set(key, other);
+  }
+  if (twins.size < 2) return provider;
+
+  const order = [...twins.keys()].sort((a, b) => {
+    const [sa, ha] = [twins.get(a)!.source ?? '', twins.get(a)!.hash ?? ''];
+    const [sb, hb] = [twins.get(b)!.source ?? '', twins.get(b)!.hash ?? ''];
+    return ha < hb ? -1 : ha > hb ? 1 : sa < sb ? -1 : sa > sb ? 1 : 0;
+  });
+  return `${provider} ${order.indexOf(accountKey(account.source, account.hash)) + 1}`;
 }
 
 /**
