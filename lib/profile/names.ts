@@ -17,6 +17,14 @@ export function greetingName(member: NamedMember | undefined | null): string {
   return member?.preferred_name?.trim() ?? '';
 }
 
+/**
+ * The signed-in member, by id — or nobody. Never another member as a stand-in:
+ * greeting someone else by name is worse than saying just "היי".
+ */
+export function signedInMember<T extends { id: string }>(rows: T[], sessionMemberId: string | null): T | undefined {
+  return sessionMemberId ? rows.find((m) => m.id === sessionMemberId) : undefined;
+}
+
 /** The drawer header: the chosen name, else just "היי" — never the Telegram one. */
 export function drawerName(member: NamedMember | undefined | null): string {
   return greetingName(member) || 'היי';

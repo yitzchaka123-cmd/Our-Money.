@@ -12,6 +12,7 @@ import {
   type CashEntryInput,
 } from '@/lib/cash/actions';
 import { loadDashboard } from '@/lib/dashboard/data';
+import { db } from '@/lib/db/client';
 
 import { resetDb, seedMember, seedMonth, signIn, signOut, sql } from './helpers';
 import { signJwt } from './jwt';
@@ -82,6 +83,18 @@ describe('cash actions against the real schema', () => {
     expect(data.userName).toBe('היי');
     // 12000 + 300 in, 5000 + 4200 + 600 + 1000 expected out.
     expect(data.forecast).toBe(12300 - 10800);
+  });
+
+  it('never greets another member when the signed-in one is not found (V1-check-4)', async () => {
+    const { error } = await db().from('household_members').update({ preferred_name: 'יצחק' }).eq('id', yitzchak);
+    if (error) throw new Error(error.message);
+    for (const session of [null, '00000000-0000-0000-0000-000000000000']) {
+      const data = await loadDashboard(MONTH, session);
+      expect(data.greeting).toBe('');
+      expect(data.userName).toBe('היי');
+      expect(data.preferredName).toBeNull();
+    }
+    expect((await loadDashboard(MONTH, yitzchak)).greeting).toBe('יצחק');
   });
 
   it('keeps a split whole: parts must add up, and the original keeps the first part', async () => {

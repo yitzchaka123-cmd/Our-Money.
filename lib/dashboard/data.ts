@@ -35,7 +35,7 @@ import {
 } from '@/lib/dashboard/trackers';
 import { loadSyncState } from '@/lib/riseup/sync';
 import { matchesWithdrawalName } from '@/lib/riseup/withdrawals';
-import { drawerName, greetingName, memberNameMap } from '@/lib/profile/names';
+import { drawerName, greetingName, memberNameMap, signedInMember } from '@/lib/profile/names';
 import { setupSteps, walletBalanceSet, type SetupStep } from '@/lib/dashboard/steps';
 import type { CashSpend, CashTopup, CashTransfer, CashWallet, EnvelopeType, HouseholdMember } from '@/lib/types';
 
@@ -326,7 +326,7 @@ export async function loadDashboard(month: string, sessionMemberId: string | nul
 
   const totals = monthTotals(envelopes);
   const variable = envelopes.find((e) => e.type === 'variable');
-  const me = memberRows.find((m) => m.id === sessionMemberId) ?? memberRows[0];
+  const me = signedInMember(memberRows, sessionMemberId);
 
   const lastSyncAt = syncState.lastSuccessAt;
 
