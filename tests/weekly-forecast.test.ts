@@ -6,6 +6,8 @@ import { ForecastSheet } from '@/app/dashboard/components/ForecastSheet';
 import { buildBuckets, weeklyExpected } from '@/lib/dashboard/buckets';
 import { assembleMonth, monthTotals, type ActualRow, type EnvelopeRow } from '@/lib/dashboard/data';
 import { forecastBreakdown } from '@/lib/dashboard/forecast-breakdown';
+import { trackerInsights } from '@/lib/dashboard/insights';
+import { trackerTargets } from '@/lib/dashboard/insights-load';
 import type { TrackerOverride } from '@/lib/dashboard/trackers';
 import { buildNameBook } from '@/lib/riseup/tracker-names';
 import type { CashSpend } from '@/lib/types';
@@ -201,5 +203,35 @@ describe('"איך חישבנו את הצפי?" (V2-18)', () => {
     expect(html).toContain('חיובים קבועים שעוד לא ירדו');
     expect(html).toContain('מי אביבים');
     expect(html).toContain('הולמס פלייס');
+  });
+});
+
+describe('insight cards read the whole month’s target (V2-1)', () => {
+  it('a weekly tracker’s target is the month’s, never one week’s slice', () => {
+    const { envelopes } = month('2026-10-15');
+    expect(trackerTargets(envelopes)).toEqual([{ name: 'סופר', planned: 3050.73, actual: 543.53 }]);
+  });
+
+  it('so 543.53 spent is not "over the target"', () => {
+    const { envelopes } = month('2026-10-15');
+    const cards = trackerInsights({
+      today: '2026-10-15',
+      month: OCT,
+      envelopes,
+      trackers: trackerTargets(envelopes),
+      forecast: 0,
+      yesterdayForecast: null,
+      wallet: { balance: 0, wallets: [] },
+      baselineExpenses: [],
+    });
+    expect(cards.some((c) => c.kind === 'tracker-over')).toBe(false);
+    expect(JSON.stringify(cards)).not.toContain('338.97');
+  });
+
+  it('a target of our own is the target', () => {
+    const { envelopes } = month('2026-10-15', {
+      overrides: [{ trackerKey: 'v2-default-il-expense-category-2', month: '', name: null, targetIls: 500, hidden: false, categoryLabel: null }],
+    });
+    expect(trackerTargets(envelopes)).toEqual([{ name: 'סופר', planned: 500, actual: 543.53 }]);
   });
 });

@@ -1,6 +1,6 @@
 import { fetchAll } from '@/lib/dashboard/brief-load';
 import type { DashboardData } from '@/lib/dashboard/data';
-import { computeInsights, type Insight, type InsightFeedback } from '@/lib/dashboard/insights';
+import { computeInsights, type Insight, type InsightFeedback, type InsightInput } from '@/lib/dashboard/insights';
 import { db } from '@/lib/db/client';
 import { isoDateInIsrael } from '@/lib/dates';
 
@@ -49,6 +49,18 @@ export async function loadFeedback(memberId: string): Promise<InsightFeedback> {
 }
 
 /**
+ * Each tracker's target for the insight cards: the merged envelope's own
+ * plan for the whole month — a weekly tracker's parts summed, or our own
+ * target — never a stored row of one weekly part (V2-1: that read 338.97,
+ * one week of a 3,050.73 month).
+ */
+export function trackerTargets(envelopes: DashboardData['envelopes']): InsightInput['trackers'] {
+  return envelopes
+    .filter((e) => e.type === 'trackingCategory')
+    .map((e) => ({ name: e.title, planned: e.planned ?? 0, actual: e.actual }));
+}
+
+/**
  * The insight cards for the dashboard. They are about now, so only the
  * current month gets them; looking back at an old month shows none.
  */
@@ -58,13 +70,8 @@ export async function loadInsights(data: DashboardData, memberId: string, now = 
   const supabase = db();
   const since = addDays(today, -BASELINE_DAYS);
 
-  const [yesterdayForecast, envelopeRows, riseupAmounts, cashRows, feedback] = await Promise.all([
+  const [yesterdayForecast, riseupAmounts, cashRows, feedback] = await Promise.all([
     recordForecast(data.month, data.forecast, today),
-    supabase
-      .from('riseup_envelopes')
-      .select('envelope_id, planned_ils')
-      .eq('month', data.month)
-      .then((r) => must(r, 'envelopes') as { envelope_id: string; planned_ils: number | string }[]),
     fetchAll<{ amount_ils: number | string | null }>((from, to) =>
       supabase
         .from('riseup_transactions')
@@ -84,16 +91,12 @@ export async function loadInsights(data: DashboardData, memberId: string, now = 
     loadFeedback(memberId),
   ]);
 
-  const planned = new Map(envelopeRows.map((r) => [r.envelope_id, Number(r.planned_ils)]));
-
   return computeInsights(
     {
       today,
       month: data.month,
       envelopes: data.envelopes,
-      trackers: data.envelopes
-        .filter((e) => e.type === 'trackingCategory')
-        .map((e) => ({ name: e.title, planned: (e.envelopeId && planned.get(e.envelopeId)) || 0, actual: e.actual })),
+      trackers: trackerTargets(data.envelopes),
       forecast: data.forecast,
       yesterdayForecast,
       wallet: { balance: data.wallet.balance, wallets: data.wallet.wallets.map((w) => ({ name: w.name, balance: w.balance })) },

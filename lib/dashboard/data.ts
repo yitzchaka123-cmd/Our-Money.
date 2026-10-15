@@ -47,6 +47,12 @@ export interface EnvelopeView {
   title: string;
   actual: number;
   expected: number;
+  /**
+   * The month's plan before spending moves it: RiseUp's plan for the whole
+   * month (a weekly tracker's parts summed) or our own target. A tracker's
+   * target, for insights; `expected` is what the forecast counts.
+   */
+  planned?: number;
   actuals: NormalizedActual[];
   showRemaining: boolean;
   /** Expected cash not yet paid (or received) this month. */
@@ -505,6 +511,7 @@ function toView(envelope: NormalizedEnvelope): EnvelopeView {
     title: envelope.name,
     actual: envelope.actualIls,
     expected: envelope.plannedIls,
+    planned: envelope.plannedIls,
     actuals: envelope.actuals,
     showRemaining: envelope.type === 'trackingCategory' || envelope.type === 'riseupGoal',
     pending: [],
