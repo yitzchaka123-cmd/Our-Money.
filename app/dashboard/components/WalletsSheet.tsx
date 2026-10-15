@@ -7,6 +7,7 @@ import { ChevronLeft } from '@/app/dashboard/components/icons';
 import { Sheet } from '@/app/dashboard/components/Sheet';
 import { WalletSettingsSheet, type WalletPanel } from '@/app/dashboard/components/WalletSettingsSheet';
 import { createWallet, transferBetweenWallets } from '@/lib/cash/actions';
+import type { MoneySource } from '@/lib/cash/wallet-actions';
 import type { WalletMovement, WalletSummary } from '@/lib/dashboard/data';
 import { isoDateInIsrael } from '@/lib/dates';
 import type { HouseholdMember } from '@/lib/types';
@@ -15,6 +16,10 @@ import type { HouseholdMember } from '@/lib/types';
 export interface WalletsSheetFocus {
   walletId?: string;
   panel?: WalletPanel;
+  /** The add panel's starting source ("משיכה מהכספומט" asks which wallet). */
+  source?: MoneySource;
+  /** Open on "העברה בין ארנקים" rather than the list. */
+  tab?: 'list' | 'transfer';
 }
 
 /**
@@ -35,7 +40,7 @@ export function WalletsSheet({
   focus?: WalletsSheetFocus | null;
   onClose: () => void;
 }) {
-  const [tab, setTab] = useState<'list' | 'transfer'>('list');
+  const [tab, setTab] = useState<'list' | 'transfer'>(focus?.tab === 'transfer' && wallets.length > 1 ? 'transfer' : 'list');
   const [settings, setSettings] = useState<{ walletId: string; panel: WalletPanel | null } | null>(
     focus?.walletId ? { walletId: focus.walletId, panel: focus.panel ?? null } : null,
   );
@@ -69,6 +74,8 @@ export function WalletsSheet({
         wallet={settingsWallet}
         adjustments={movements.filter((m) => m.kind === 'adjustment' && m.walletId === settingsWallet.id)}
         initialPanel={settings.panel}
+        initialSource={focus?.source}
+        wallets={wallets}
         onBack={() => setSettings(null)}
         onClose={onClose}
       />

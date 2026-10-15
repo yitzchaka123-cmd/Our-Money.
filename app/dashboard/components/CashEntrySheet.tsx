@@ -5,6 +5,7 @@ import { useState, useTransition } from 'react';
 import { Amount } from '@/app/dashboard/components/Amount';
 import { Sheet } from '@/app/dashboard/components/Sheet';
 import { Close } from '@/app/dashboard/components/icons';
+import { WalletPicker } from '@/app/dashboard/components/WalletPicker';
 import { addCashEntry, deleteCashEntry, updateCashEntry, type CashEntryInput, type CashKind } from '@/lib/cash/actions';
 import type { EnvelopeRef } from '@/lib/cash/envelopes';
 import type { WalletSummary } from '@/lib/dashboard/data';
@@ -257,7 +258,9 @@ export function CashEntrySheet({
           <p className="field-hint">כשהמשיכה תופיע ב-RiseUp היא תתחבר לרישום הזה ולא תיספר פעמיים.</p>
         ) : null}
 
-        {wallets.length > 1 ? (
+        {form.kind === 'withdrawal' ? (
+          <WalletPicker wallets={wallets} value={form.walletId} onChange={(walletId) => patch({ walletId })} />
+        ) : wallets.length > 1 ? (
           <div className="field">
             <span>{form.kind === 'spend' ? 'מאיזה ארנק' : 'לאיזה ארנק'}</span>
             <div className="chips">

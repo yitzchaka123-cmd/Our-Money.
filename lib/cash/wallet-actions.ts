@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 
 import { SESSION_EXPIRED_MESSAGE, sessionMember } from '@/lib/auth/member';
+import { assignWithdrawal } from '@/lib/cash/withdrawal-wallet';
 import { db } from '@/lib/db/client';
 import { isoDateInIsrael } from '@/lib/dates';
 import { walletBalances } from '@/lib/reconcile';
@@ -151,6 +152,19 @@ export async function addMoneyToWallet(input: AddMoneyInput): Promise<WalletActi
   if (error) return dbFail(error);
   refreshPages();
   return { ok: true, id: data.id as string };
+}
+
+/**
+ * File an ATM withdrawal into a wallet, from the web. The bot uses
+ * `assignWithdrawal` (lib/cash/withdrawal-wallet.ts) directly, since it has no
+ * session cookie and checks the Telegram user itself.
+ */
+export async function assignWithdrawalToWallet(topupId: string, walletId: string): Promise<WalletActionResult> {
+  if (!(await sessionMember())) return { ok: false, error: SESSION_EXPIRED_MESSAGE };
+  const result = await assignWithdrawal(topupId, walletId);
+  if (!result.ok) return result;
+  refreshPages();
+  return { ok: true, id: result.id };
 }
 
 /**

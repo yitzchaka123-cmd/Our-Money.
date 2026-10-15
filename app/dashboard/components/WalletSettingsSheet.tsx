@@ -8,6 +8,7 @@ import { ChevronRight, Close } from '@/app/dashboard/components/icons';
 import { Pencil, Plus, Scale, Star, Trash } from '@/app/dashboard/components/icons-extra';
 import { Sheet } from '@/app/dashboard/components/Sheet';
 import { ActionRow } from '@/app/dashboard/components/TransactionSheet';
+import { WalletPicker } from '@/app/dashboard/components/WalletPicker';
 import { deleteCashEntry, renameWallet, setDefaultWallet } from '@/lib/cash/actions';
 import { addMoneyToWallet, deleteWallet, setWalletBalance, type MoneySource } from '@/lib/cash/wallet-actions';
 import type { WalletMovement, WalletSummary } from '@/lib/dashboard/data';
@@ -32,6 +33,8 @@ export function WalletSettingsSheet({
   wallet,
   adjustments = [],
   initialPanel = null,
+  initialSource = 'other',
+  wallets = [wallet],
   onBack,
   onClose,
 }: {
@@ -39,6 +42,10 @@ export function WalletSettingsSheet({
   /** This month's balance updates for this wallet, newest first. */
   adjustments?: WalletMovement[];
   initialPanel?: WalletPanel | null;
+  /** Where added money comes from, when the add panel opens. */
+  initialSource?: MoneySource;
+  /** Every wallet: an ATM withdrawal asks which one the cash went into. */
+  wallets?: WalletSummary[];
   onBack?: () => void;
   onClose: () => void;
 }) {
@@ -48,7 +55,11 @@ export function WalletSettingsSheet({
   const [done, setDone] = useState<string | null>(null);
 
   const [addAmount, setAddAmount] = useState<number | ''>('');
-  const [addFrom, setAddFrom] = useState<MoneySource>('other');
+  const [addFrom, setAddFrom] = useState<MoneySource>(initialSource);
+  // An ATM withdrawal can go into any wallet; this one is picked to start with.
+  const [addWallet, setAddWallet] = useState<string>(wallet.id);
+  const addTo = addFrom === 'withdrawal' ? addWallet : wallet.id;
+  const addToName = wallets.find((w) => w.id === addTo)?.name ?? wallet.name;
   const [addNote, setAddNote] = useState('');
   const [addDate, setAddDate] = useState(isoDateInIsrael());
   const [target, setTarget] = useState<number | ''>(Math.max(wallet.balance, 0));
@@ -153,7 +164,7 @@ export function WalletSettingsSheet({
 
         {panel === 'add' ? (
           <div className="wallet-panel">
-            <h3 className="picker-title">הוספת כסף ל{wallet.name}</h3>
+            <h3 className="picker-title">הוספת כסף ל{addToName}</h3>
             <label className="field">
               <span>סכום</span>
               <input
@@ -177,6 +188,7 @@ export function WalletSettingsSheet({
               </div>
             </div>
             <p className="field-hint">{SOURCES.find((s) => s.value === addFrom)?.hint}</p>
+            {addFrom === 'withdrawal' ? <WalletPicker wallets={wallets} value={addWallet} onChange={setAddWallet} /> : null}
             <label className="field">
               <span>הערה</span>
               <input type="text" value={addNote} onChange={(e) => setAddNote(e.target.value)} />
@@ -191,8 +203,8 @@ export function WalletSettingsSheet({
               disabled={pending || !addAmount}
               onClick={() =>
                 run(
-                  () => addMoneyToWallet({ walletId: wallet.id, amountIls: Number(addAmount), from: addFrom, note: addNote || null, date: addDate }),
-                  'הכסף נוסף לארנק.',
+                  () => addMoneyToWallet({ walletId: addTo, amountIls: Number(addAmount), from: addFrom, note: addNote || null, date: addDate }),
+                  addTo === wallet.id ? 'הכסף נוסף לארנק.' : `הכסף נוסף ל${addToName}.`,
                 )
               }
             >
