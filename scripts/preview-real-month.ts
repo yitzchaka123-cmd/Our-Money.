@@ -99,6 +99,17 @@ export function realMonthEnvelopes(month: string): EnvelopeView[] {
     spends.forEach(([amount, d, business], n) => actualRows.push(actual(id, `gr-${week}-${n}`, amount, d, business, 'כלכלה')));
   });
 
+  // The salary, marked "fixed income" in RiseUp: one more `fixed` envelope
+  // whose charge is income (V2-19) — it shows as "הכנסות קבועות".
+  const salary = `${month}#fixed#c6b3e219-c39f-11f1-b563-8dcdf033ade8`;
+  envelopeRows.push({ envelope_id: salary, envelope_type: 'fixed', name: 'הוצאות קבועות', planned_ils: 7635, position: 50 });
+  actualRows.push({
+    ...actual(salary, 'fx-salary', 7635, 8, 'העברת משכורת', 'משכורת'),
+    is_income: true,
+    source: 'leumiBank',
+    account_number_hash: 'c81bcf',
+  });
+
   // What earlier months taught: the still-expected charges' categories.
   const names = buildNameBook({
     envelopes: [],
@@ -120,5 +131,8 @@ export function realMonthEnvelopes(month: string): EnvelopeView[] {
     skippedPlanIds: new Set(),
     memberNames: new Map(),
     names,
+    // Seen mid-month: the weekly grocery tracker counts weeks that are over
+    // at what was spent in them (V2-18).
+    today: `${month}-15`,
   }).envelopes;
 }
