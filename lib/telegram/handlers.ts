@@ -2,11 +2,11 @@ import { issueLoginCode } from '@/lib/auth/codes';
 import { createSessionToken } from '@/lib/auth/session';
 import { loadPlan, settlePlanOccurrence, skipPlanOccurrence } from '@/lib/cash/plan-store';
 import { env } from '@/lib/env';
-import { activeCategories } from '@/lib/intake/categories';
+import { loadBotEnvelopes } from '@/lib/intake/categories';
+import { envelopeOfSpend, fileExpense, sameEnvelopeIn, type BotEnvelope } from '@/lib/intake/envelopes';
 import { isoDateInIsrael, parseIntake } from '@/lib/intake/parse';
 import {
   monthBounds,
-  totalsByCategory,
   totalsByMember,
   walletBalances,
   walletState,
@@ -34,13 +34,11 @@ import {
   spendLine,
 } from '@/lib/telegram/format';
 import type { TelegramMessage, TelegramUpdate } from '@/lib/telegram/types';
-import { resolveEnvelopeForCategory } from '@/lib/cash/envelopes';
 import {
   activeTopups,
   allLiveSpends,
   attachBotMessage,
   dismissTopup,
-  envelopeRefsForMonth,
   getTopup,
   insertCashIncomes,
   insertManualWithdrawals,
@@ -75,7 +73,7 @@ const HELP = [
   '/undo — מחיקת הרישום האחרון',
   '/dashboard — קישור לדאשבורד המלא',
   '/sync — משיכת נתונים מרייזאפ עכשיו',
-  '/categories — רשימת הקטגוריות',
+  '/categories — המעטפות שאפשר לרשום אליהן',
   '/id — מזהי הצ׳אט (שימושי להגדרת קבוצה)',
 ].join('\n');
 
@@ -170,10 +168,16 @@ async function handleCommand(
       return;
 
     case '/categories': {
-      const categories = await activeCategories();
+      const envelopes = await loadBotEnvelopes(isoDateInIsrael().slice(0, 7));
       await sendMessage(
         chatId,
-        ['<b>קטגוריות פעילות</b>', '', ...categories.map((c) => `• ${escapeHtml(c)}`)].join('\n'),
+        [
+          '<b>המעטפות שלכם החודש</b>',
+          '',
+          ...envelopes.map((e) => `• ${escapeHtml(e.name)}`),
+          '',
+          'כל הוצאה נרשמת לאחת מהן. מה שלא מתאים לאף אחת נכנס להוצאות המשתנות.',
+        ].join('\n'),
       );
       return;
     }
@@ -290,11 +294,13 @@ async function logFromNaturalLanguage(
   const today = isoDateInIsrael();
 
   const wallets = await listWallets();
+  const envelopes = await loadBotEnvelopes(today.slice(0, 7));
   let parsed;
   try {
     parsed = await parseIntake(input, {
       speakerName: memberName(member),
       wallets: wallets.map((w) => w.name),
+      envelopes,
     });
   } catch (error) {
     // The detail is for the logs; the couple needs to know what to do.
@@ -319,23 +325,26 @@ async function logFromNaturalLanguage(
   const incomes = parsed.entries.filter((e) => e.direction === 'income');
   const withdrawals = parsed.entries.filter((e) => e.direction === 'withdrawal');
 
-  // Cash is filed into RiseUp's own envelopes, so it shows up in the same card
-  // a card spend would. The pin is resolved now, against the entry's month,
-  // the same way RiseUp files an uncategorised charge.
+  // Cash is filed into the household's own envelopes, so it shows up in the
+  // same card a card spend would. The pin is resolved now, against the
+  // entry's month (yesterday may be last month).
   const monthsNeeded = [...new Set(expenses.map((e) => e.spentAt.slice(0, 7)))];
-  const refsByMonth = new Map(
-    await Promise.all(monthsNeeded.map(async (m) => [m, await envelopeRefsForMonth(m)] as const)),
+  const envelopesByMonth = new Map<string, BotEnvelope[]>(
+    await Promise.all(
+      monthsNeeded.map(async (m) => [m, m === today.slice(0, 7) ? envelopes : await loadBotEnvelopes(m)] as const),
+    ),
   );
 
   const defaultWallet = wallets.find((w) => w.is_default) ?? wallets[0] ?? null;
   const walletFor = (name: string | null) => (matchWalletByName(wallets, name) ?? defaultWallet)?.id ?? null;
 
   const rows: NewSpend[] = expenses.map((entry, index) => {
-    const target = resolveEnvelopeForCategory(refsByMonth.get(entry.spentAt.slice(0, 7)) ?? [], entry.category);
+    const chosen = fileExpense(entry.category, entry.note, envelopes);
+    const target = sameEnvelopeIn(chosen, envelopesByMonth.get(entry.spentAt.slice(0, 7)) ?? envelopes);
     return {
       member_id: member.id,
       amount_ils: entry.amountIls,
-      category: entry.category,
+      category: target.name,
       note: entry.note || null,
       spent_at: entry.spentAt,
       status: entry.confidence === 'low' ? 'needs_review' : 'confirmed',
@@ -348,8 +357,8 @@ async function logFromNaturalLanguage(
       telegram_update_id: index === 0 ? update.update_id : null,
       telegram_chat_id: chatId,
       telegram_message_id: message.message_id,
-      envelope_id: target?.envelopeId ?? null,
-      envelope_type: target?.type ?? null,
+      envelope_id: target.envelopeId,
+      envelope_type: target.type,
       wallet_id: walletFor(entry.wallet),
     };
   });
@@ -521,39 +530,34 @@ async function handleCallback(update: TelegramUpdate): Promise<void> {
     }
 
     case 'pick_category': {
-      const categories = await activeCategories();
+      const envelopes = await loadBotEnvelopes(spend.spent_at.slice(0, 7));
       await editMessageText(
         chatId,
         messageId,
-        `באיזו קטגוריה לרשום את ${formatIls(spend.amount_ils)}?`,
-        categoryKeyboard(spend.id, categories),
+        `לאיזו מעטפה לרשום את ${formatIls(spend.amount_ils)}?`,
+        categoryKeyboard(spend.id, envelopes.map((e) => e.name)),
       );
       await answerCallbackQuery(query.id);
       return;
     }
 
     case 'set_category': {
-      const categories = await activeCategories();
-      const category = categories[action.categoryIndex];
-      if (!category) {
-        await answerCallbackQuery(query.id, 'קטגוריה לא נמצאה');
+      // The index is into the spend's own month's envelopes, as the picker showed them.
+      const envelopes = await loadBotEnvelopes(spend.spent_at.slice(0, 7));
+      const target = envelopes[action.categoryIndex];
+      if (!target) {
+        await answerCallbackQuery(query.id, 'המעטפה לא נמצאה');
         return;
       }
-      // A new category can mean a new envelope: re-resolve the pin against the
-      // spend's own month, or the dashboard would keep it in the old card.
-      const target = resolveEnvelopeForCategory(
-        await envelopeRefsForMonth(spend.spent_at.slice(0, 7)),
-        category,
-      );
       const updated = await updateSpend(spend.id, {
-        category,
+        category: target.name,
         status: 'confirmed',
         confidence: 'high',
-        envelope_id: target?.envelopeId ?? null,
-        envelope_type: target?.type ?? null,
+        envelope_id: target.envelopeId,
+        envelope_type: target.type,
       });
       await editMessageText(chatId, messageId, `✅ עודכן\n\n• ${spendLine(updated, today)}`);
-      await answerCallbackQuery(query.id, category);
+      await answerCallbackQuery(query.id, target.name);
       return;
     }
   }
@@ -627,14 +631,29 @@ async function sendMonth(chatId: number, requested?: string): Promise<void> {
   const month = requested && /^\d{4}-\d{2}$/.test(requested) ? requested : today.slice(0, 7);
   const { from, to } = monthBounds(month);
 
-  const [spends, members] = await Promise.all([spendsBetween(from, to), membersById()]);
+  const [spends, members, envelopes] = await Promise.all([
+    spendsBetween(from, to),
+    membersById(),
+    loadBotEnvelopes(month),
+  ]);
   if (spends.length === 0) {
     await sendMessage(chatId, `אין הוצאות מזומן רשומות ב-${month}.`);
     return;
   }
 
   const total = spends.reduce((sum, s) => sum + Number(s.amount_ils), 0);
-  const byCategory = totalsByCategory(spends);
+  // The same envelopes the dashboard shows, never RiseUp's raw labels.
+  const byEnvelope = new Map<string, { total: number; count: number }>();
+  for (const s of spends) {
+    const name = envelopeOfSpend(s, envelopes).name;
+    const row = byEnvelope.get(name) ?? { total: 0, count: 0 };
+    row.total = Math.round((row.total + Number(s.amount_ils)) * 100) / 100;
+    row.count += 1;
+    byEnvelope.set(name, row);
+  }
+  const byCategory = [...byEnvelope.entries()]
+    .map(([category, row]) => ({ category, ...row }))
+    .sort((a, b) => b.total - a.total);
   const byMember = totalsByMember(spends);
 
   const memberLines = [...byMember.entries()].map(([memberId, amount]) => {
@@ -648,7 +667,7 @@ async function sendMonth(chatId: number, requested?: string): Promise<void> {
     [
       `<b>💸 מזומן ב-${month} · ${formatIls(total)}</b>`,
       '',
-      '<b>לפי קטגוריה</b>',
+      '<b>לפי מעטפה</b>',
       ...byCategory.map(
         (row) => `• ${escapeHtml(row.category)}: ${formatIls(row.total)} (${row.count})`,
       ),
