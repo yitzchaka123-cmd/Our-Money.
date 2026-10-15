@@ -3,10 +3,11 @@
 import { useState } from 'react';
 
 import { Amount } from '@/app/dashboard/components/Amount';
-import { ChevronDown, Kebab, Mic } from '@/app/dashboard/components/icons';
+import { ChevronDown, Kebab, Mic, Note } from '@/app/dashboard/components/icons';
 import { barRatio } from '@/lib/dashboard/bar';
 import { providerName } from '@/lib/dashboard/accounts';
 import { buildBuckets, type Bucket } from '@/lib/dashboard/buckets';
+import { dayLabel } from '@/lib/dashboard/day-label';
 import type { PendingPlanView } from '@/lib/dashboard/data';
 import type { NormalizedActual, UpcomingCharge } from '@/lib/riseup/envelopes';
 import { formatAmount } from '@/lib/money';
@@ -168,6 +169,7 @@ export function EnvelopeCard({
           envelopeTitle={title}
           expandFirst={defaultOpen}
           onOpenTransaction={onOpenTransaction}
+          today={today}
         />
       ) : null}
 
@@ -196,12 +198,14 @@ function Breakdown({
   envelopeTitle,
   expandFirst = false,
   onOpenTransaction,
+  today,
 }: {
   buckets: Bucket[];
   labels: Labels;
   envelopeTitle: string;
   expandFirst?: boolean;
   onOpenTransaction?: (actual: NormalizedActual, envelopeTitle: string) => void;
+  today: string;
 }) {
   return (
     <div className="breakdown">
@@ -218,6 +222,7 @@ function Breakdown({
           envelopeTitle={envelopeTitle}
           defaultOpen={expandFirst && index === 0}
           onOpenTransaction={onOpenTransaction}
+          today={today}
         />
       ))}
     </div>
@@ -229,11 +234,13 @@ function BucketRow({
   envelopeTitle,
   defaultOpen = false,
   onOpenTransaction,
+  today,
 }: {
   bucket: Bucket;
   envelopeTitle: string;
   defaultOpen?: boolean;
   onOpenTransaction?: (actual: NormalizedActual, envelopeTitle: string) => void;
+  today: string;
 }) {
   const expandable = bucket.items.length > 0 || bucket.upcoming.length > 0;
   const [open, setOpen] = useState(defaultOpen && expandable);
@@ -273,7 +280,7 @@ function BucketRow({
               type="button"
               onClick={() => onOpenTransaction?.(item, envelopeTitle)}
             >
-              <span className="date">{shortDate(item.transactionDate)}</span>
+              <span className="date">{dayLabel(item.transactionDate, today)}</span>
               <span className="amount">
                 <Amount value={item.amountIls} />
               </span>
@@ -292,6 +299,7 @@ function BucketRow({
                 {item.cash?.status === 'needs_review' ? (
                   <span className="pill">לאישור</span>
                 ) : null}
+                {!item.cash && item.note ? <TxnNote note={item.note} /> : null}
               </span>
             </button>
           ))
@@ -349,6 +357,16 @@ function PendingRows({
         </div>
       ))}
     </div>
+  );
+}
+
+/** Our own note on a RiseUp charge, under the merchant name (video 2, item 16). */
+export function TxnNote({ note }: { note: string }) {
+  return (
+    <span className="txn-note">
+      <Note size={14} />
+      <span>{note}</span>
+    </span>
   );
 }
 

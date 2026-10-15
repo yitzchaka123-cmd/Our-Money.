@@ -11,7 +11,8 @@ import {
   type CashAction,
 } from '@/app/dashboard/components/CashActionSheets';
 import { CashEntrySheet, type CashEntryDraft } from '@/app/dashboard/components/CashEntrySheet';
-import { merchantLine, shortDate } from '@/app/dashboard/components/EnvelopeCard';
+import { merchantLine, TxnNote } from '@/app/dashboard/components/EnvelopeCard';
+import { RiseupNoteSheet } from '@/app/dashboard/components/RiseupNoteSheet';
 import { Close, Search } from '@/app/dashboard/components/icons';
 import { ArrowBack, Spinner } from '@/app/dashboard/components/icons-extra';
 import { TransactionSheet, type OpenTransaction } from '@/app/dashboard/components/TransactionSheet';
@@ -19,7 +20,9 @@ import { deleteCashEntry, markCashSpendAsSavings } from '@/lib/cash/actions';
 import type { EnvelopeRef } from '@/lib/cash/envelopes';
 import { searchTransactions, type SearchHit } from '@/lib/dashboard/actions';
 import type { WalletSummary } from '@/lib/dashboard/data';
+import { dayLabel } from '@/lib/dashboard/day-label';
 import type { SearchCursor } from '@/lib/dashboard/search';
+import { isoDateInIsrael } from '@/lib/dates';
 import { monthLabel } from '@/lib/money';
 import type { HouseholdMember } from '@/lib/types';
 
@@ -162,6 +165,7 @@ export function SearchSheet({
     else groups.push([hit.month, [hit]]);
   }
   const oldest = hits[hits.length - 1]?.month ?? null;
+  const today = isoDateInIsrael();
   const current = open?.txn.actual ?? null;
   const kind = current?.cash?.kind ?? 'spend';
 
@@ -221,7 +225,7 @@ export function SearchSheet({
                   {list.map((hit) => (
                     <div key={hit.key} className="envelope search-hit-wrap" data-type={hit.envelopeType}>
                       <button type="button" className="txn-row search-hit" onClick={() => openHit(hit)}>
-                        <span className="date">{shortDate(hit.date)}</span>
+                        <span className="date">{dayLabel(hit.date, today)}</span>
                         <span className="amount">
                           {hit.kind !== 'spend' ? <span className="flow-sign" aria-hidden="true">+</span> : null}
                           <Amount value={hit.amountIls} />
@@ -231,6 +235,7 @@ export function SearchSheet({
                           {hit.source === 'cash'
                             ? [hit.title, hit.category && hit.category !== hit.title ? hit.category : null].filter(Boolean).join(' · ')
                             : merchantLine(hit.actual)}
+                          {hit.source === 'card' && hit.note ? <TxnNote note={hit.note} /> : null}
                         </span>
                         <span className="kebab" aria-hidden="true">
                           <span />
@@ -303,6 +308,9 @@ export function SearchSheet({
       />
 
       {current?.cash && action === 'note' ? <NoteSheet actual={current} kind={kind} onClose={closeAndRefresh} /> : null}
+      {current && !current.cash && action === 'note' && open ? (
+        <RiseupNoteSheet actual={current} month={open.hit.month} onClose={closeAndRefresh} />
+      ) : null}
       {current?.cash && action === 'move' ? (
         <MoveEnvelopeSheet
           actual={current}

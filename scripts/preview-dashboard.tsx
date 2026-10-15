@@ -60,7 +60,8 @@ const envelopes: EnvelopeView[] = [
     pending: [],
     pendingTotal: 0,
     actuals: [
-      actual('v1', '2026-09-02', 40, 'BIT', { accountNumberHash: '0848' }),
+      // Our own note on a RiseUp charge (video 2, item 16).
+      actual('v1', '2026-09-02', 40, 'BIT', { accountNumberHash: '0848', note: 'החזר לדני על הפיצה' }),
       actual('v2', '2026-09-09', 92.1, 'שופרסל דיל', { accountNumberHash: '0848' }),
       actual('v3', '2026-09-15', 29.6, 'ארומה', { accountNumberHash: '0848' }),
       actual('cash:c1', '2026-09-15', 85, 'מכולת בפינה', {

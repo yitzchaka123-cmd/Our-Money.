@@ -521,6 +521,25 @@ a {
   overflow-wrap: anywhere;
 }
 
+/* Our own note on a RiseUp charge, under the merchant (video 2, item 16). */
+.txn-note {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.txn-note svg {
+  flex: 0 0 auto;
+}
+
+.sheet-head .txn-sheet-note {
+  margin-top: 8px;
+  font-weight: 600;
+}
+
 .txn-row .kebab {
   grid-column: 4;
   grid-row: 1 / 3;
