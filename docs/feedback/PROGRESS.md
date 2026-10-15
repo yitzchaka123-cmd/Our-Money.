@@ -34,3 +34,17 @@ Helper branches are `worktree-agent-*`; check `git log` on each for per-item com
   nothing uncommitted anywhere. Restarted only the checker (read-only, all 26 items).
 - Item 12 follow-up: syncs since 0003 show trackers carry their target in `originalAmount` (balancedAmount is always 0) and
   variable / variableIncome envelopes send null for both. Targets now match RiseUp (רכב 2,850, פארמה 450, ביגוד 200, income 7,635).
+
+
+## Videos 2–4 — 2026-10-15 (Drive 1UzbfX…, 17uYMD…, 16PjNv…)
+
+- [x] Downloaded; audio in three versions (plain, evened-out, raised); frames every 0.5 s; scene changes; no black flashes
+- [x] Watched every second (half-second strips where busy) + full-size zooms at the grey dot
+- [~] Three transcriptions: pass 1 and 2 done for all; pass 3 (openai-whisper medium) running in the background
+- [x] Item lists written and pushed: 2026-10-15-video2.md, -video3.md, -video4.md (7d321c5); master checklist updated
+- [x] V2-11 tracker names saved in money.tracker_overrides (user asked at 3:06)
+- [x] Helpers started (5): N numbers/forecast/fixed income (0008), W wallets (0009), T Telegram & settings (0010), U drawer/sync line/notes/session (0011), B brief/insights/tips (0012)
+- [ ] Merge each helper, apply its migration, push
+- [ ] Full run (typecheck, lint, unit, integration, build)
+- [ ] Independent check of every item
+- [ ] Deploy live, statuses, answer A–F
