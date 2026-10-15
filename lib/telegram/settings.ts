@@ -21,7 +21,7 @@ export const NUDGE_CHOICES: ReadonlyArray<{ value: NudgeFrequency; label: string
 
 export const CONFIRM_CHOICES: ReadonlyArray<{ value: ConfirmMode; label: string; hint: string }> = [
   { value: 'instant', label: 'לרשום מיד', hint: 'ההוצאה נספרת ברגע ששלחתם.' },
-  { value: 'ask', label: 'לשאול לפני שרושמים', hint: 'הבוט מחכה ל"לאשר" — עד אז זה לא נספר.' },
+  { value: 'ask', label: 'לשאול לפני שרושמים', hint: 'הבוט שואל "לאשר?", ועד שמאשרים ההוצאה מסומנת "לאישור".' },
 ];
 
 export function isNudgeFrequency(value: unknown): value is NudgeFrequency {

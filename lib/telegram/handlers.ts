@@ -50,11 +50,13 @@ import {
   membersById,
   resolveMember,
   spendsBetween,
+  spendsOfBotMessage,
   updateAlreadyProcessed,
   updateSpend,
   type NewSpend,
 } from '@/lib/db/queries';
-import type { HouseholdMember } from '@/lib/types';
+import type { CashSpend, HouseholdMember } from '@/lib/types';
+import { confirmModeOf } from '@/lib/telegram/settings';
 import { memberName } from '@/lib/profile/names';
 
 const HELP = [
@@ -335,6 +337,7 @@ async function logFromNaturalLanguage(
     ),
   );
 
+  const askFirst = confirmModeOf(member) === 'ask';
   const defaultWallet = wallets.find((w) => w.is_default) ?? wallets[0] ?? null;
   const walletFor = (name: string | null) => (matchWalletByName(wallets, name) ?? defaultWallet)?.id ?? null;
 
@@ -347,7 +350,8 @@ async function logFromNaturalLanguage(
       category: target.name,
       note: entry.note || null,
       spent_at: entry.spentAt,
-      status: entry.confidence === 'low' ? 'needs_review' : 'confirmed',
+      // "לשאול לפני שרושמים" (Settings → טלגרם): nothing is approved until "לאשר".
+      status: askFirst || entry.confidence === 'low' ? 'needs_review' : 'confirmed',
       confidence: entry.confidence,
       input_kind: inputKind,
       raw_input: input,
@@ -501,14 +505,13 @@ async function handleCallback(update: TelegramUpdate): Promise<void> {
   }
 
   const spend = await getSpend(action.spendId);
-  if (!spend) {
+  if (!spend || spend.status === 'deleted') {
     await answerCallbackQuery(query.id, 'הרישום כבר לא קיים');
     return;
   }
 
   const chatId = query.message.chat.id;
   const messageId = query.message.message_id;
-  const today = isoDateInIsrael();
 
   switch (action.kind) {
     case 'delete': {
@@ -523,8 +526,12 @@ async function handleCallback(update: TelegramUpdate): Promise<void> {
     }
 
     case 'confirm': {
-      const updated = await updateSpend(spend.id, { status: 'confirmed', confidence: 'high' });
-      await editMessageText(chatId, messageId, `✅ אושר\n\n• ${spendLine(updated, today)}`);
+      // "לאשר" approves everything the message is about.
+      const rows = await messageSpends(spend);
+      for (const row of rows.filter((r) => r.status === 'needs_review')) {
+        await updateSpend(row.id, { status: 'confirmed', confidence: 'high' });
+      }
+      await redrawSpendMessage(chatId, messageId, spend);
       await answerCallbackQuery(query.id, 'אושר');
       return;
     }
@@ -534,9 +541,15 @@ async function handleCallback(update: TelegramUpdate): Promise<void> {
       await editMessageText(
         chatId,
         messageId,
-        `לאיזו מעטפה לרשום את ${formatIls(spend.amount_ils)}?`,
+        `לאיזו מעטפה לרשום את ${formatIls(spend.amount_ils)}${spend.note ? ` (${escapeHtml(spend.note)})` : ''}?`,
         categoryKeyboard(spend.id, envelopes.map((e) => e.name)),
       );
+      await answerCallbackQuery(query.id);
+      return;
+    }
+
+    case 'back': {
+      await redrawSpendMessage(chatId, messageId, spend);
       await answerCallbackQuery(query.id);
       return;
     }
@@ -549,18 +562,41 @@ async function handleCallback(update: TelegramUpdate): Promise<void> {
         await answerCallbackQuery(query.id, 'המעטפה לא נמצאה');
         return;
       }
-      const updated = await updateSpend(spend.id, {
+      // A new envelope is not an approval: a spend waiting for "לאשר" keeps waiting.
+      await updateSpend(spend.id, {
         category: target.name,
-        status: 'confirmed',
-        confidence: 'high',
         envelope_id: target.envelopeId,
         envelope_type: target.type,
       });
-      await editMessageText(chatId, messageId, `✅ עודכן\n\n• ${spendLine(updated, today)}`);
+      await redrawSpendMessage(chatId, messageId, spend);
       await answerCallbackQuery(query.id, target.name);
       return;
     }
   }
+}
+
+/** The live spends a bot reply is about; just this one when it is not linked. */
+async function messageSpends(spend: CashSpend): Promise<CashSpend[]> {
+  if (spend.bot_message_id && spend.telegram_chat_id) {
+    const rows = await spendsOfBotMessage(Number(spend.telegram_chat_id), Number(spend.bot_message_id));
+    if (rows.length > 0) return rows;
+  }
+  const fresh = await getSpend(spend.id);
+  return fresh && fresh.status !== 'deleted' ? [fresh] : [];
+}
+
+/** Put a spend's bot reply back as it is now: text, envelope and buttons. */
+async function redrawSpendMessage(chatId: number, messageId: number, spend: CashSpend): Promise<void> {
+  const rows = await messageSpends(spend);
+  if (rows.length === 0) return;
+  const members = await membersById();
+  const who = members.get(rows[0]!.member_id);
+  await editMessageText(
+    chatId,
+    messageId,
+    savedMessage(rows, isoDateInIsrael(), who ? memberName(who) : ''),
+    spendKeyboard(rows),
+  );
 }
 
 async function sendBalance(chatId: number): Promise<void> {

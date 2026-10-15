@@ -9,6 +9,9 @@ export interface HouseholdMember {
   /** What the member asked to be called; null until they choose. */
   preferred_name?: string | null;
   is_active: boolean;
+  /** Settings → טלגרם (migration 0010); absent before it is applied. */
+  nudge_frequency?: string | null;
+  bot_confirm_mode?: string | null;
 }
 
 export interface CashSpend {

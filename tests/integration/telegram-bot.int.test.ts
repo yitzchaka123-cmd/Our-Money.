@@ -217,3 +217,99 @@ describe('V3-2 / V2-10: spends land in the household’s own envelopes', () => {
     expect(text).not.toContain('כלכלה');
   });
 });
+
+function tap(data: string, message: { chatId: number; messageId: number }, from = 111): TelegramUpdate {
+  updateId += 1;
+  return {
+    update_id: updateId,
+    callback_query: {
+      id: `cb-${updateId}`,
+      from: { id: from, is_bot: false, first_name: 'Nechemiah' },
+      data,
+      message: { message_id: message.messageId, date: 0, chat: { id: message.chatId, type: 'private' } },
+    },
+  } as TelegramUpdate;
+}
+
+const buttonTexts = (keyboard?: Array<Array<{ text: string }>>) => (keyboard ?? []).flat().map((b) => b.text);
+const buttonData = (keyboard: Array<Array<{ text: string; callback_data: string }>> | undefined, text: string) =>
+  (keyboard ?? []).flat().find((b) => b.text === text)!.callback_data;
+
+describe('V4-4: ask before saving, and a picker of your own envelopes with a way back', () => {
+  async function logInAskMode() {
+    run(`update household_members set bot_confirm_mode = 'ask' where id = '${member}'`);
+    const { handleUpdate } = await import('@/lib/telegram/handlers');
+    intake.next = spend(845, 'אחר', 'סיבוניס');
+    await handleUpdate(textUpdate('845 סיבוניס'));
+    const reply = telegram.sent[0]!;
+    return { handleUpdate, reply, where: { chatId: reply.chatId, messageId: 1001 } };
+  }
+
+  it('in ask mode the spend waits, with לאשר / שינוי קטגוריה / מחיקה', async () => {
+    const { reply } = await logInAskMode();
+    expect(sql('select status from cash_spends')).toEqual([{ status: 'needs_review' }]);
+    expect(reply.text).toContain('לאשר');
+    expect(buttonTexts(reply.keyboard)).toEqual(['✅ לאשר', '✏️ שינוי קטגוריה', '🗑 מחיקה']);
+  });
+
+  it('לאשר approves it and redraws the message as saved', async () => {
+    const { handleUpdate, reply, where } = await logInAskMode();
+    await handleUpdate(tap(buttonData(reply.keyboard, '✅ לאשר'), where));
+    expect(sql('select status from cash_spends')).toEqual([{ status: 'confirmed' }]);
+    const edit = telegram.edits.at(-1)!;
+    expect(edit.text).toContain('✅ נרשם');
+    expect(buttonTexts(edit.keyboard)).toEqual(['✏️ שינוי קטגוריה', '🗑 מחיקה']);
+  });
+
+  it('the picker shows only this month’s envelopes by name, plus חזרה', async () => {
+    const { handleUpdate, reply, where } = await logInAskMode();
+    await handleUpdate(tap(buttonData(reply.keyboard, '✏️ שינוי קטגוריה'), where));
+    const picker = telegram.edits.at(-1)!;
+    expect(buttonTexts(picker.keyboard)).toEqual(['אוכל בחוץ', 'סופר', 'הוצאות משתנות', 'הוצאות קבועות', '↩️ חזרה']);
+  });
+
+  it('חזרה puts the original message back, untouched', async () => {
+    const { handleUpdate, reply, where } = await logInAskMode();
+    await handleUpdate(tap(buttonData(reply.keyboard, '✏️ שינוי קטגוריה'), where));
+    const picker = telegram.edits.at(-1)!;
+    await handleUpdate(tap(buttonData(picker.keyboard, '↩️ חזרה'), where));
+    const back = telegram.edits.at(-1)!;
+    expect(back.text).toBe(reply.text);
+    expect(back.keyboard).toEqual(reply.keyboard);
+    expect(sql('select status, category from cash_spends')).toEqual([{ status: 'needs_review', category: 'הוצאות משתנות' }]);
+  });
+
+  it('choosing an envelope files it there and keeps waiting for לאשר', async () => {
+    const { handleUpdate, reply, where } = await logInAskMode();
+    await handleUpdate(tap(buttonData(reply.keyboard, '✏️ שינוי קטגוריה'), where));
+    const picker = telegram.edits.at(-1)!;
+    await handleUpdate(tap(buttonData(picker.keyboard, 'סופר'), where));
+    expect(sql('select status, category, envelope_id from cash_spends')).toEqual([
+      { status: 'needs_review', category: 'סופר', envelope_id: SUPER_ID },
+    ]);
+    const redrawn = telegram.edits.at(-1)!;
+    expect(redrawn.text).toContain('סופר');
+    expect(buttonTexts(redrawn.keyboard)).toContain('✅ לאשר');
+  });
+
+  it('in instant mode it is saved at once, and a new envelope keeps it saved', async () => {
+    const { handleUpdate } = await import('@/lib/telegram/handlers');
+    intake.next = spend(45, 'אחר', 'פיתה');
+    await handleUpdate(textUpdate('45 פיתה'));
+    const reply = telegram.sent[0]!;
+    expect(sql('select status from cash_spends')).toEqual([{ status: 'confirmed' }]);
+    expect(buttonTexts(reply.keyboard)).toEqual(['✏️ שינוי קטגוריה', '🗑 מחיקה']);
+
+    const where = { chatId: reply.chatId, messageId: 1001 };
+    await handleUpdate(tap(buttonData(reply.keyboard, '✏️ שינוי קטגוריה'), where));
+    await handleUpdate(tap(buttonData(telegram.edits.at(-1)!.keyboard, 'אוכל בחוץ'), where));
+    expect(sql('select status, envelope_id from cash_spends')).toEqual([{ status: 'confirmed', envelope_id: `${MONTH}-food` }]);
+  });
+
+  it('saves the setting from Settings → טלגרם', async () => {
+    signIn(member);
+    const { setConfirmMode } = await import('@/lib/telegram/settings-actions');
+    expect(await setConfirmMode(member, 'ask')).toEqual({ ok: true });
+    expect(sql('select bot_confirm_mode from household_members')).toEqual([{ bot_confirm_mode: 'ask' }]);
+  });
+});

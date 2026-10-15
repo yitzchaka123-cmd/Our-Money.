@@ -93,6 +93,24 @@ export async function attachBotMessage(
   if (error) throw new Error(`Failed to attach bot message: ${error.message}`);
 }
 
+/**
+ * The live spends one bot reply is about (a message may log several), the
+ * first-logged first — so its buttons and text can be redrawn as they are now.
+ */
+export async function spendsOfBotMessage(chatId: number, botMessageId: number): Promise<CashSpend[]> {
+  const { data, error } = await db()
+    .from('cash_spends')
+    .select('*')
+    .eq('telegram_chat_id', chatId)
+    .eq('bot_message_id', botMessageId)
+    .neq('status', 'deleted')
+    .order('created_at')
+    .order('telegram_update_id', { nullsFirst: false })
+    .order('id');
+  if (error) throw new Error(`Failed to load the message's spends: ${error.message}`);
+  return (data ?? []) as CashSpend[];
+}
+
 export async function getSpend(id: string): Promise<CashSpend | null> {
   const { data, error } = await db()
     .from('cash_spends')

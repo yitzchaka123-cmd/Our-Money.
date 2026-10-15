@@ -15,6 +15,8 @@ export type CallbackAction =
   | { kind: 'pick_category'; spendId: string }
   | { kind: 'set_category'; spendId: string; categoryIndex: number }
   | { kind: 'confirm'; spendId: string }
+  /** "חזרה" from the envelope picker: put the original message back. */
+  | { kind: 'back'; spendId: string }
   /** Delete a cash income (a cash_topups row); spendId carries the top-up id. */
   | { kind: 'delete_income'; spendId: string }
   /** "Not a withdrawal": dismiss a detected withdrawal top-up. */
@@ -28,6 +30,7 @@ const PREFIX = {
   pick_category: 'cat',
   set_category: 'sc',
   confirm: 'ok',
+  back: 'bk',
   delete_income: 'di',
   dismiss_topup: 'dt',
   settle_plan: 'sp',
@@ -60,6 +63,8 @@ export function encodeCallback(action: CallbackAction): string {
       return `${PREFIX.pick_category}:${id}`;
     case 'confirm':
       return `${PREFIX.confirm}:${id}`;
+    case 'back':
+      return `${PREFIX.back}:${id}`;
     case 'delete_income':
       return `${PREFIX.delete_income}:${id}`;
     case 'dismiss_topup':
@@ -92,6 +97,8 @@ export function decodeCallback(data: string): CallbackAction | null {
       return { kind: 'pick_category', spendId };
     case PREFIX.confirm:
       return { kind: 'confirm', spendId };
+    case PREFIX.back:
+      return { kind: 'back', spendId };
     case PREFIX.delete_income:
       return { kind: 'delete_income', spendId };
     case PREFIX.dismiss_topup:
@@ -119,20 +126,35 @@ export function spendLine(spend: CashSpend, today: string): string {
   return `<b>${formatIls(spend.amount_ils)}</b> · ${escapeHtml(spend.category)}${note} · ${friendlyDate(spend.spent_at, today)}`;
 }
 
+/**
+ * The bot's reply to a logged spend, always built from the rows as they are
+ * now — so "חזרה" from the picker, a new envelope or "לאשר" all redraw the
+ * same message. Rows waiting for "לאשר" (the ask-first setting, or an amount
+ * the AI was unsure of) say so.
+ */
 export function savedMessage(spends: CashSpend[], today: string, memberName: string): string {
-  const header =
-    spends.length === 1 ? '✅ נרשם' : `✅ נרשמו ${spends.length} הוצאות`;
-  const lines = spends.map((spend) => `• ${spendLine(spend, today)}`);
-  const needsReview = spends.some((s) => s.status === 'needs_review');
+  const waiting = spends.filter((s) => s.status === 'needs_review');
+  const allWaiting = spends.length > 0 && waiting.length === spends.length;
+  const unsure = waiting.some((s) => s.confidence === 'low');
 
-  return [
-    `${header} · ${escapeHtml(memberName)}`,
-    '',
-    ...lines,
-    needsReview ? '\n⚠️ לא הייתי בטוח בסכום או בקטגוריה — כדאי לאשר.' : '',
-  ]
-    .filter(Boolean)
-    .join('\n');
+  const header = allWaiting
+    ? spends.length === 1
+      ? '📝 לאשר את ההוצאה?'
+      : `📝 לאשר ${spends.length} הוצאות?`
+    : spends.length === 1
+      ? '✅ נרשם'
+      : `✅ נרשמו ${spends.length} הוצאות`;
+  const lines = spends.map((spend) => `• ${spendLine(spend, today)}`);
+
+  const footer = unsure
+    ? '\n⚠️ לא הייתי בטוח בסכום או במעטפה — כדאי לבדוק ולאשר.'
+    : allWaiting
+      ? '\nעד שתאשרו, זה ממתין לאישור.'
+      : waiting.length > 0
+        ? '\nחלק מהרישומים ממתינים לאישור.'
+        : '';
+
+  return [`${header} · ${escapeHtml(memberName)}`, '', ...lines, footer].filter(Boolean).join('\n');
 }
 
 export function spendKeyboard(spends: CashSpend[]): InlineKeyboard {
@@ -142,9 +164,9 @@ export function spendKeyboard(spends: CashSpend[]): InlineKeyboard {
   if (!primary) return [];
 
   const rows: InlineKeyboard = [];
-  if (primary.status === 'needs_review') {
+  if (spends.some((s) => s.status === 'needs_review')) {
     rows.push([
-      { text: '✅ אישור', callback_data: encodeCallback({ kind: 'confirm', spendId: primary.id }) },
+      { text: '✅ לאשר', callback_data: encodeCallback({ kind: 'confirm', spendId: primary.id }) },
     ]);
   }
   rows.push([
@@ -157,6 +179,10 @@ export function spendKeyboard(spends: CashSpend[]): InlineKeyboard {
   return rows;
 }
 
+/**
+ * The envelope picker: the household's envelopes for the spend's month (two
+ * per row), and "חזרה" to put the original message back untouched.
+ */
 export function categoryKeyboard(spendId: string, categories: string[]): InlineKeyboard {
   const rows: InlineKeyboard = [];
   for (let i = 0; i < categories.length; i += 2) {
@@ -170,5 +196,6 @@ export function categoryKeyboard(spendId: string, categories: string[]): InlineK
     }));
     rows.push(row);
   }
+  rows.push([{ text: '↩️ חזרה', callback_data: encodeCallback({ kind: 'back', spendId }) }]);
   return rows;
 }
