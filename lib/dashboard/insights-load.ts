@@ -1,6 +1,6 @@
 import { fetchAll } from '@/lib/dashboard/brief-load';
 import type { DashboardData } from '@/lib/dashboard/data';
-import { computeInsights, type Insight, type InsightFeedback } from '@/lib/dashboard/insights';
+import { computeInsights, keysToMarkSeen, type Insight, type InsightFeedback } from '@/lib/dashboard/insights';
 import { db } from '@/lib/db/client';
 import { isoDateInIsrael } from '@/lib/dates';
 
@@ -41,11 +41,38 @@ export async function recordForecast(month: string, forecast: number, today: str
 }
 
 export async function loadFeedback(memberId: string): Promise<InsightFeedback> {
-  const rows = must(
-    await db().from('insight_feedback').select('insight_key, dismissed, helpful').eq('member_id', memberId),
-    'insight feedback',
-  ) as { insight_key: string; dismissed: boolean; helpful: boolean | null }[];
-  return new Map(rows.map((r) => [r.insight_key, { dismissed: r.dismissed, helpful: r.helpful }]));
+  // select('*'): seen_at and opened_at arrive with migration 0012; until then they are absent.
+  const rows = must(await db().from('insight_feedback').select('*').eq('member_id', memberId), 'insight feedback') as {
+    insight_key: string;
+    dismissed: boolean;
+    helpful: boolean | null;
+    seen_at?: string | null;
+    opened_at?: string | null;
+  }[];
+  return new Map(
+    rows.map((r) => [
+      r.insight_key,
+      { dismissed: r.dismissed, helpful: r.helpful, seenAt: r.seen_at ?? null, openedAt: r.opened_at ?? null },
+    ]),
+  );
+}
+
+/**
+ * Stamp "first shown" on the cards about to be shown, so tomorrow they stay
+ * away (V2-17). Writes only `seen_at`, never over a stamp already there; a
+ * failure (say, before migration 0012) only means the card may show again.
+ */
+export async function markSeen(memberId: string, cards: Array<{ key: string }>, feedback: InsightFeedback, now = new Date()): Promise<void> {
+  const keys = keysToMarkSeen(cards, feedback);
+  if (keys.length === 0) return;
+  const seenAt = now.toISOString();
+  const { error } = await db()
+    .from('insight_feedback')
+    .upsert(
+      keys.map((key) => ({ member_id: memberId, insight_key: key, seen_at: seenAt })),
+      { onConflict: 'member_id,insight_key' },
+    );
+  if (error) console.error('Marking insight cards seen failed:', error.message);
 }
 
 /**
@@ -86,7 +113,7 @@ export async function loadInsights(data: DashboardData, memberId: string, now = 
 
   const planned = new Map(envelopeRows.map((r) => [r.envelope_id, Number(r.planned_ils)]));
 
-  return computeInsights(
+  const cards = computeInsights(
     {
       today,
       month: data.month,
@@ -101,6 +128,8 @@ export async function loadInsights(data: DashboardData, memberId: string, now = 
     },
     feedback,
   );
+  await markSeen(memberId, cards, feedback, now);
+  return cards;
 }
 
 export async function loadInsightsSafely(data: DashboardData, memberId: string): Promise<Insight[]> {

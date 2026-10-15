@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { SESSION_EXPIRED_MESSAGE } from '@/lib/auth/member';
 import { addCashEntry } from '@/lib/cash/actions';
 import { loadDashboard } from '@/lib/dashboard/data';
-import { dismissInsight, rateInsight, restoreInsight } from '@/lib/dashboard/insight-actions';
+import { dismissInsight, openInsight, rateInsight, restoreInsight } from '@/lib/dashboard/insight-actions';
 import { loadFeedback, loadInsights, recordForecast } from '@/lib/dashboard/insights-load';
 import { db } from '@/lib/db/client';
 import { isoDateInIsrael } from '@/lib/dates';
@@ -29,8 +29,8 @@ describe('insight cards', () => {
     expect(await dismissInsight('forecast:2026-10-11')).toEqual({ ok: true });
     expect(await rateInsight('tracker-over:2026-10:פארמה', false)).toEqual({ ok: true });
     let feedback = await loadFeedback(yitzchak);
-    expect(feedback.get('forecast:2026-10-11')).toEqual({ dismissed: true, helpful: null });
-    expect(feedback.get('tracker-over:2026-10:פארמה')).toEqual({ dismissed: false, helpful: false });
+    expect(feedback.get('forecast:2026-10-11')).toMatchObject({ dismissed: true, helpful: null });
+    expect(feedback.get('tracker-over:2026-10:פארמה')).toMatchObject({ dismissed: false, helpful: false });
 
     await restoreInsight('forecast:2026-10-11');
     feedback = await loadFeedback(yitzchak);
@@ -61,13 +61,37 @@ describe('insight cards', () => {
     await addCashEntry({ kind: 'spend', amountIls: 700, category: 'אוכל בחוץ', note: 'חתונה', date: `${month}-01`, envelopeId: `${month}-food`, memberId: null, walletId: null });
 
     const data = await loadDashboard(month, yitzchak);
-    const key = `tracker-over:${month}:אוכל בחוץ`;
-    expect((await loadInsights(data, yitzchak)).map((i) => i.key)).toContain(key);
+    // The key carries how far over it is (V2-17), so find it by its start.
+    const key = (await loadInsights(data, yitzchak)).map((i) => i.key).find((k) => k.startsWith(`tracker-over:${month}:אוכל בחוץ`))!;
+    expect(key).toBeTruthy();
 
     await dismissInsight(key);
     expect((await loadInsights(data, yitzchak)).map((i) => i.key)).not.toContain(key);
     expect((await loadInsights(data, sara)).map((i) => i.key)).toContain(key);
     // An old month gets no cards.
     expect(await loadInsights(await loadDashboard(MONTH, yitzchak), yitzchak)).toEqual([]);
+  });
+
+  it('shows a card on the day it first appears only, and never after it was opened (V2-17)', async () => {
+    const month = isoDateInIsrael().slice(0, 7);
+    await seedMonth(month);
+    await addCashEntry({ kind: 'spend', amountIls: 700, category: 'אוכל בחוץ', note: 'חתונה', date: `${month}-01`, envelopeId: `${month}-food`, memberId: null, walletId: null });
+    const data = await loadDashboard(month, yitzchak);
+
+    const now = new Date();
+    const key = (await loadInsights(data, yitzchak, now)).map((i) => i.key).find((k) => k.startsWith(`tracker-over:${month}:אוכל בחוץ`))!;
+    expect(key).toBeTruthy();
+    const seenAt = (await loadFeedback(yitzchak)).get(key)?.seenAt;
+    expect(seenAt).toBeTruthy();
+    // Later the same day: still there, and the first stamp is kept.
+    expect((await loadInsights(data, yitzchak, new Date(now.getTime() + 60_000))).map((i) => i.key)).toContain(key);
+    expect((await loadFeedback(yitzchak)).get(key)?.seenAt).toBe(seenAt);
+
+    // Sara has not seen it; opening it hides it from her next load.
+    expect((await loadInsights(data, sara, now)).map((i) => i.key)).toContain(key);
+    signIn(sara);
+    expect(await openInsight(key)).toEqual({ ok: true });
+    expect((await loadFeedback(sara)).get(key)?.openedAt).toBeTruthy();
+    expect((await loadInsights(data, sara, now)).map((i) => i.key)).not.toContain(key);
   });
 });

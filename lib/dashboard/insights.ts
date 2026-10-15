@@ -9,6 +9,7 @@
 
 import { median, type RichText } from '@/lib/dashboard/brief';
 import type { EnvelopeView } from '@/lib/dashboard/data';
+import { isoDateInIsrael } from '@/lib/dates';
 import { monthLabel } from '@/lib/money';
 
 export type InsightKind = 'forecast' | 'big-charge' | 'tracker-over' | 'tracker-pace' | 'income' | 'cash-low';
@@ -52,11 +53,46 @@ export interface InsightInput {
   baselineExpenses: number[];
 }
 
-export type InsightFeedback = Map<string, { dismissed: boolean; helpful: boolean | null }>;
+/**
+ * What a member has done with each card, by key. `seenAt` is when it was
+ * first shown and `openedAt` when "לפרטים נוספים" was tapped (migration 0012;
+ * both absent before it is applied).
+ */
+export type InsightFeedback = Map<
+  string,
+  { dismissed: boolean; helpful: boolean | null; seenAt?: string | null; openedAt?: string | null }
+>;
 
 const MAX_CARDS = 6;
 
 // ---------------------------------------------------------------------------
+
+/**
+ * A card's key moves on only when its numbers move materially: `value` in
+ * steps of `size`. The first step keeps the plain key, so a small overrun
+ * dismissed before keys had steps stays dismissed.
+ */
+function steppedKey(base: string, value: number, size: number): string {
+  const level = size > 0 ? Math.floor(Math.max(value, 0) / size) : 0;
+  return level > 0 ? `${base}:${level + 1}` : base;
+}
+
+/**
+ * Shown once: a card is shown on the day it first appears and never after,
+ * and never again once opened, answered or dismissed. Only a new key — the
+ * numbers moved materially — makes a new card.
+ */
+export function stillShowable(key: string, feedback: InsightFeedback, today: string): boolean {
+  const seen = feedback.get(key);
+  if (!seen) return true;
+  if (seen.dismissed || seen.openedAt || seen.helpful !== null) return false;
+  return !seen.seenAt || isoDateInIsrael(new Date(seen.seenAt)) >= today;
+}
+
+/** The cards on screen that have no "first shown" mark yet. */
+export function keysToMarkSeen(shown: Array<{ key: string }>, feedback: InsightFeedback): string[] {
+  return shown.map((c) => c.key).filter((key) => !feedback.get(key)?.seenAt);
+}
 
 function addDays(iso: string, days: number): string {
   const d = new Date(`${iso}T12:00:00Z`);
@@ -142,6 +178,11 @@ const PACE_MIN_ILS = 50;
 /** …and there is still enough month left for it to matter. */
 const PACE_UNTIL_SHARE = 0.9;
 
+/** An over-target card comes back when it is this share of the target further over… */
+const OVER_STEP_SHARE = 0.25;
+/** …and at least this much. */
+const OVER_STEP_MIN_ILS = 100;
+
 /** Trackers over their target, or running well ahead of the month. */
 export function trackerInsights(input: InsightInput): Insight[] {
   const day = Number(input.today.slice(8, 10));
@@ -157,7 +198,8 @@ export function trackerInsights(input: InsightInput): Insight[] {
       const over = round(t.actual - t.planned);
       return [
         {
-          key: `tracker-over:${input.month}:${name}`,
+          // A new card each further quarter of the target over (at least 100 ₪).
+          key: steppedKey(`tracker-over:${input.month}:${name}`, over, Math.max(OVER_STEP_MIN_ILS, t.planned * OVER_STEP_SHARE)),
           kind: 'tracker-over',
           art: 'bars',
           title: `${name}: עברתם את היעד החודשי.`,
@@ -184,7 +226,8 @@ export function trackerInsights(input: InsightInput): Insight[] {
       const projection = Math.round(t.actual / share);
       return [
         {
-          key: `tracker-pace:${input.month}:${name}`,
+          // A new card each time another quarter of the target is gone.
+          key: `tracker-pace:${input.month}:${name}:q${Math.floor((t.actual / t.planned) * 4)}`,
           kind: 'tracker-pace',
           art: 'bars',
           title: `${name} בקצב מהיר מהרגיל:`,
@@ -243,6 +286,8 @@ export function incomeInsight(input: InsightInput): Insight | null {
   };
 }
 
+const CASH_LOW_STEP_ILS = 200;
+
 /** Less cash in the wallets than the cash payments still planned this month. */
 export function cashLowInsight(input: InsightInput): Insight | null {
   const planned = input.envelopes.flatMap((e) => e.pending).filter((p) => p.kind === 'spend');
@@ -252,7 +297,8 @@ export function cashLowInsight(input: InsightInput): Insight | null {
   const gap = round(plannedTotal - balance);
 
   return {
-    key: `cash-low:${input.month}`,
+    // A new card for every further 200 ₪ the wallets fall short.
+    key: steppedKey(`cash-low:${input.month}`, gap, CASH_LOW_STEP_ILS),
     kind: 'cash-low',
     art: 'wallet',
     title: 'המזומן בארנקים לא יספיק:',
@@ -308,7 +354,10 @@ export function forecastInsight(input: InsightInput): Insight | null {
   };
 }
 
-/** Every card worth showing, in order, without the ones this member dismissed. */
+/**
+ * Every card worth showing, in order — without the ones this member already
+ * had: dismissed, opened, or first shown on an earlier day (V2-17).
+ */
 export function computeInsights(input: InsightInput, feedback: InsightFeedback): Insight[] {
   const all = [
     forecastInsight(input),
@@ -319,7 +368,7 @@ export function computeInsights(input: InsightInput, feedback: InsightFeedback):
   ].filter((i): i is Insight => i !== null);
 
   return all
-    .filter((i) => !feedback.get(i.key)?.dismissed)
+    .filter((i) => stillShowable(i.key, feedback, input.today))
     .map((i) => ({ ...i, helpful: feedback.get(i.key)?.helpful ?? null }))
     .slice(0, MAX_CARDS);
 }

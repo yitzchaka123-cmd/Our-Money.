@@ -14,7 +14,10 @@ function validKey(key: unknown): key is string {
   return typeof key === 'string' && key.length > 0 && key.length <= 200;
 }
 
-async function writeFeedback(key: string, patch: { dismissed?: boolean; helpful?: boolean }): Promise<InsightResult> {
+async function writeFeedback(
+  key: string,
+  patch: { dismissed?: boolean; helpful?: boolean; opened_at?: string },
+): Promise<InsightResult> {
   const memberId = await sessionMember();
   if (!memberId) return { ok: false, error: SESSION_EXPIRED_MESSAGE };
   if (!validKey(key)) return { ok: false, error: 'כרטיס לא מוכר.' };
@@ -32,6 +35,11 @@ async function writeFeedback(key: string, patch: { dismissed?: boolean; helpful?
 /** X on a card: it does not come back for the same key. */
 export async function dismissInsight(key: string): Promise<InsightResult> {
   return writeFeedback(key, { dismissed: true });
+}
+
+/** "לפרטים נוספים": an opened card does not come back (V2-17). */
+export async function openInsight(key: string): Promise<InsightResult> {
+  return writeFeedback(key, { opened_at: new Date().toISOString() });
 }
 
 /** "ביטול" on the snackbar. */
