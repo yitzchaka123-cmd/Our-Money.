@@ -63,6 +63,41 @@ describe('wallet card buttons (V2-04)', () => {
   });
 });
 
+describe('wallets as tiles (V2-07)', () => {
+  const several = walletView({
+    balance: -740,
+    wallets: [
+      { id: 'w-main', name: 'ארנק ראשי', balance: -890, isDefault: true, memberName: null },
+      { id: 'w-test', name: 'Test', balance: 150, isDefault: false, memberName: 'שרה' },
+    ],
+  });
+
+  it('draws one tile per wallet: its name, its balance, and a "default" pill on the default only', () => {
+    const html = render(several);
+    const tiles = html.match(/<button[^>]*class="wallet-tile"[\s\S]*?<\/button>/g) ?? [];
+    expect(tiles).toHaveLength(2);
+    expect(tiles[0]).toContain('<span class="wallet-tile-name">ארנק ראשי</span>');
+    expect(tiles[0]).toContain('<span class="wallet-tag">ברירת מחדל</span>');
+    expect(tiles[1]).toContain('<span class="wallet-tile-name">Test</span>');
+    expect(tiles[1]).not.toContain('ברירת מחדל');
+  });
+
+  it('shows a negative balance in red', () => {
+    const html = render(several);
+    expect(html).toMatch(/aria-label="הגדרות ארנק ראשי"[\s\S]*?wallet-tile-balance is-negative/);
+    expect(html).toMatch(/aria-label="הגדרות Test"[\s\S]*?class="amount wallet-tile-balance"/);
+  });
+
+  it('taps open that wallet', () => {
+    // The tile is a button labelled for the wallet's settings.
+    expect(render(several)).toContain('aria-label="הגדרות Test"');
+  });
+
+  it('no longer lists wallets as text rows', () => {
+    expect(render(several)).not.toContain('wallet-list');
+  });
+});
+
 describe('the list under the wallet card (V2-04)', () => {
   it('shows the expense button once, on the card, and no duplicate income button', async () => {
     const { EnvelopeList } = await import('@/app/dashboard/components/EnvelopeList');

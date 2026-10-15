@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import { Amount } from '@/app/dashboard/components/Amount';
 import { ChevronDown, Kebab } from '@/app/dashboard/components/icons';
+import { WalletTiles } from '@/app/dashboard/components/WalletTiles';
 import type { WalletMovement, WalletView } from '@/lib/dashboard/data';
 import { shortDate } from '@/app/dashboard/components/EnvelopeCard';
 
@@ -46,18 +47,7 @@ export function WalletCard({
         <p className="figure-label">{several ? 'סה״כ במזומן' : 'בארנק עכשיו'}</p>
         <Amount value={wallet.balance} className={wallet.balance < 0 ? 'account-figure is-negative' : 'account-figure'} />
 
-        {several ? (
-          <ul className="wallet-list">
-            {wallet.wallets.map((w) => (
-              <li key={w.id}>
-                <button type="button" className="wallet-list-open" onClick={() => onOpenWallet?.(w.id)} aria-label={`הגדרות ${w.name}`}>
-                  <span className="wallet-list-name">{w.name}</span>
-                  <Amount value={w.balance} className={w.balance < 0 ? 'wallet-list-balance is-negative' : 'wallet-list-balance'} />
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : null}
+        {several ? <WalletTiles wallets={wallet.wallets} onOpen={onOpenWallet} /> : null}
 
         <div className="wallet-flows">
           <div><p className="figure-label">נמשך החודש</p><Amount value={wallet.withdrawn} className="figure-expected" /></div>
