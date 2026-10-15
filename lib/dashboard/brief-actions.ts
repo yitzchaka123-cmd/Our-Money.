@@ -49,3 +49,21 @@ export async function finishBrief(asOf: string): Promise<BriefResult> {
   revalidatePath('/dashboard');
   return { ok: true };
 }
+
+/**
+ * Settings → "הסיכום היומי": turn the daily brief (the blob, the deck and the
+ * drawer's link) on or off for this member. Stored on their own row
+ * (migration 0012); on by default.
+ */
+export async function setBriefEnabled(enabled: boolean): Promise<BriefResult> {
+  const memberId = await sessionMember();
+  if (!memberId) return { ok: false, error: SESSION_EXPIRED_MESSAGE };
+  if (typeof enabled !== 'boolean') return { ok: false, error: 'ערך לא תקין.' };
+
+  const { error } = await db().from('household_members').update({ show_daily_brief: enabled }).eq('id', memberId);
+  if (error) return failed('Saving the brief setting', error);
+
+  revalidatePath('/dashboard');
+  revalidatePath('/settings');
+  return { ok: true };
+}

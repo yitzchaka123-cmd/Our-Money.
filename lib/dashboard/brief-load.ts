@@ -7,6 +7,7 @@ import {
   type RiseupRow,
 } from '@/lib/dashboard/brief';
 import { loadAccountLabels } from '@/lib/dashboard/account-labels';
+import { accountNamer, type AccountRef } from '@/lib/dashboard/accounts';
 import { assembleMonth, type ActualRow, type EnvelopeRow } from '@/lib/dashboard/data';
 import { db } from '@/lib/db/client';
 import { memberNameMap } from '@/lib/profile/names';
@@ -21,7 +22,7 @@ const HISTORY_DAYS = 240;
 const PAGE = 1000;
 
 const RISEUP_COLUMNS =
-  'transaction_id, transaction_date, cashflow_month, business_name, amount_ils, is_income, account_nickname, account_number_hash, category_label, is_withdrawal, first_seen_at';
+  'transaction_id, transaction_date, cashflow_month, business_name, amount_ils, is_income, account_nickname, account_number_hash, category_label, is_withdrawal, first_seen_at, source, source_type';
 
 type Page<T> = (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>;
 
@@ -101,9 +102,22 @@ export async function loadBrief(memberId: string, now = new Date()): Promise<Bri
   months.delete('');
 
   const envelopesByMonth: Record<string, BriefEnvelope[]> = {};
-  await Promise.all([...months].map(async (month) => {
-    envelopesByMonth[month] = await monthEnvelopes(month, memberNames);
-  }));
+  const [labels] = await Promise.all([
+    loadAccountLabels(),
+    Promise.all(
+      [...months].map(async (month) => {
+        envelopesByMonth[month] = await monthEnvelopes(month, memberNames);
+      }),
+    ),
+  ]);
+
+  // A card reads as on the dashboard: numbered among the accounts in view.
+  const refs: AccountRef[] = [
+    ...Object.values(envelopesByMonth).flatMap((envelopes) =>
+      envelopes.flatMap((e) => e.actuals.map((a) => ({ source: a.source, hash: a.accountNumberHash, nickname: a.accountNickname }))),
+    ),
+    ...riseupRows.map((r) => ({ source: r.source ?? null, hash: r.account_number_hash, nickname: r.account_nickname, sourceType: r.source_type ?? null })),
+  ];
 
   return buildBrief({
     asOf,
@@ -122,7 +136,21 @@ export async function loadBrief(memberId: string, now = new Date()): Promise<Bri
     withdrawalTopups,
     wallets: ((walletRows ?? []) as CashWallet[]).map((w) => ({ id: w.id, name: w.name, isDefault: w.is_default })),
     memberNames,
+    nameAccount: accountNamer(refs, labels),
   });
+}
+
+/**
+ * Whether this member wants the daily brief at all (Settings → "הסיכום היומי").
+ * On by default, and on while the setting's column does not exist yet.
+ */
+export async function briefEnabled(memberId: string): Promise<boolean> {
+  const { data, error } = await db().from('household_members').select('*').eq('id', memberId).maybeSingle();
+  if (error) {
+    console.error('Reading the brief setting failed:', error.message);
+    return true;
+  }
+  return (data as { show_daily_brief?: boolean | null } | null)?.show_daily_brief !== false;
 }
 
 export async function loadBriefSafely(memberId: string): Promise<BriefData> {

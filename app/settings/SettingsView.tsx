@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 
+import { BriefToggle } from '@/app/settings/BriefToggle';
 import { NameEditor } from '@/app/settings/NameEditor';
 import { Bank, ChevronLeft, ChevronRight, Download, SparkleBubble } from '@/app/dashboard/components/icons';
 import { Chat, CreditCard, Lock, LogOut } from '@/app/dashboard/components/icons-extra';
@@ -16,6 +17,8 @@ export interface SettingsData {
   lastSync: string | null;
   month: string;
   yearAgo: string;
+  /** Settings → "הסיכום היומי". Absent means on. */
+  briefEnabled?: boolean;
 }
 
 /**
@@ -92,6 +95,10 @@ export function SettingsView({ data }: { data: SettingsData }) {
             </span>
           </div>
         ))}
+      </SettingsGroup>
+
+      <SettingsGroup title="בדף הראשי">
+        <BriefToggle enabled={data.briefEnabled !== false} />
       </SettingsGroup>
 
       <SettingsGroup title="החיבור לרייזאפ">

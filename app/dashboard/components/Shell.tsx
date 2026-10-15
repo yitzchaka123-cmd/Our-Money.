@@ -36,7 +36,8 @@ export function Shell({
   months: string[];
   userName: string;
   lastUpdated: string | null;
-  briefCount: number;
+  /** Null: the daily brief is turned off in Settings, so the drawer has no link to it. */
+  briefCount: number | null;
   onSearch?: () => void;
   onFilter?: () => void;
   /** The drawer's "ארנקים": opens the wallets sheet. */
@@ -183,7 +184,7 @@ export function DrawerContent({
 }: {
   userName: string;
   lastUpdated: string | null;
-  briefCount: number;
+  briefCount: number | null;
   onOpenWallets?: () => void;
 }) {
   return (
@@ -203,11 +204,13 @@ export function DrawerContent({
           <Coins />
           <span className="drawer-label">תזרים חודשי</span>
         </a>
-        <a className="drawer-link" href="/dashboard?brief=1">
-          <Cards />
-          <span className="drawer-label">הרייזאפ היומי</span>
-          {briefCount > 0 ? <span className="drawer-badge">{briefCount}</span> : null}
-        </a>
+        {briefCount !== null ? (
+          <a className="drawer-link" href="/dashboard?brief=1">
+            <Cards />
+            <span className="drawer-label">הרייזאפ היומי</span>
+            {briefCount > 0 ? <span className="drawer-badge">{briefCount}</span> : null}
+          </a>
+        ) : null}
         <a className="drawer-link" href="/accounts">
           <Bank />
           <span className="drawer-label">מצב העו״ש והאשראי</span>

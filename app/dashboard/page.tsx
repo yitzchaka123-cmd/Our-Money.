@@ -2,7 +2,7 @@ import { cookies } from 'next/headers';
 
 import { SignedOut } from '@/app/SignedOut';
 import { SESSION_COOKIE, verifySessionToken } from '@/lib/auth/session';
-import { loadBriefSafely } from '@/lib/dashboard/brief-load';
+import { briefEnabled, loadBriefSafely } from '@/lib/dashboard/brief-load';
 import { currentMonth, loadDashboard } from '@/lib/dashboard/data';
 import { loadInsightsSafely } from '@/lib/dashboard/insights-load';
 import { syncIfStale } from '@/lib/riseup/sync';
@@ -32,13 +32,17 @@ export default async function DashboardPage({
 
   await refreshIfStale();
 
-  const [data, brief] = await Promise.all([loadDashboard(month, session.memberId), loadBriefSafely(session.memberId)]);
+  const [data, brief] = await Promise.all([
+    loadDashboard(month, session.memberId),
+    // Settings → "הסיכום היומי" off: no blob, no deck, no drawer link.
+    briefEnabled(session.memberId).then((on) => (on ? loadBriefSafely(session.memberId) : null)),
+  ]);
   const insights = await loadInsightsSafely(data, session.memberId);
 
   return (
     <DashboardView
       // The drawer's badge and the blob show the same, true count.
-      data={{ ...data, briefCount: brief.count }}
+      data={{ ...data, briefCount: brief?.count ?? 0 }}
       brief={brief}
       insights={insights}
       sessionMemberId={session.memberId}
