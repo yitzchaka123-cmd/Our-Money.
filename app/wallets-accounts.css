@@ -596,3 +596,14 @@
     animation: none;
   }
 }
+
+/* --- wallet card (videos 2 and 4) --------------------------------------- */
+/* Money in green, money out red, an ATM withdrawal purple. */
+.add-plus--spend {
+  background: var(--alert);
+  font-size: 24px;
+}
+
+.add-plus--withdrawal {
+  background: var(--primary);
+}

@@ -159,20 +159,10 @@ export function EnvelopeList({
         onOpenMovement={openMovement}
         onManage={() => setWalletsFocus({})}
         onAddWithdrawal={() => openNew('withdrawal')}
+        onAddSpend={() => openNew('spend')}
         onAddMoney={() => setWalletsFocus({ walletId: wallet.wallets.find((w) => w.isDefault)?.id ?? wallet.wallets[0]?.id, panel: 'add' })}
         onOpenWallet={(walletId) => setWalletsFocus({ walletId })}
       />
-
-      <div className="add-row-pair">
-        <button className="add-row" type="button" onClick={() => openNew('spend')}>
-          <span className="add-plus" aria-hidden="true">+</span>
-          <span>הוספת הוצאה במזומן</span>
-        </button>
-        <button className="add-row" type="button" onClick={() => openNew('income')}>
-          <span className="add-plus add-plus--income" aria-hidden="true">+</span>
-          <span>הוספת הכנסה במזומן</span>
-        </button>
-      </div>
 
       {envelopes.map((envelope) => (
         <div key={envelope.key}>

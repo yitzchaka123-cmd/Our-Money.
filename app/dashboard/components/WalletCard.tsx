@@ -18,12 +18,15 @@ export function WalletCard({
   onManage,
   onAddWithdrawal,
   onAddMoney,
+  onAddSpend,
   onOpenWallet,
 }: {
   wallet: WalletView;
   onOpenMovement?: (movement: WalletMovement) => void;
   onManage?: () => void;
   onAddWithdrawal?: () => void;
+  /** A cash expense: the cash entry sheet. */
+  onAddSpend?: () => void;
   /** Add money to a wallet, or set how much is in it — the wallet's own settings. */
   onAddMoney?: () => void;
   onOpenWallet?: (walletId: string) => void;
@@ -100,15 +103,23 @@ export function WalletCard({
         </div>
       ) : null}
 
+      {/* Money in is green, money out red, an ATM withdrawal purple. Cash
+          income is one of the sources under "הוספת כסף לארנק". */}
       {onAddMoney ? (
         <button className="add-row add-row--inline" type="button" onClick={onAddMoney}>
           <span className="add-plus add-plus--income" aria-hidden="true">+</span>
           <span>הוספת כסף לארנק</span>
         </button>
       ) : null}
+      {onAddSpend ? (
+        <button className="add-row add-row--inline" type="button" onClick={onAddSpend}>
+          <span className="add-plus add-plus--spend" aria-hidden="true">−</span>
+          <span>הוספת הוצאה במזומן</span>
+        </button>
+      ) : null}
       {onAddWithdrawal ? (
         <button className="add-row add-row--inline" type="button" onClick={onAddWithdrawal}>
-          <span className="add-plus" aria-hidden="true">+</span>
+          <span className="add-plus add-plus--withdrawal" aria-hidden="true">+</span>
           <span>רישום משיכה מהכספומט</span>
         </button>
       ) : null}
