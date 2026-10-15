@@ -18,17 +18,19 @@ import { setupSteps } from '../lib/dashboard/steps';
 
 export function previewOverlay(mode: string | undefined): ReactNode {
   switch (mode) {
+    // A sync's result is said in the line under the month bar (no bubble):
+    // these draw that line, in place, as it reads right after a tap.
     case 'sync-toast':
       return (
-        <div className="sync-toast" role="status">
+        <p className="sync-line" role="status" style={{ position: 'fixed', top: 116, insetInline: 0 }}>
           סונכרן עכשיו
-        </div>
+        </p>
       );
     case 'sync-error':
       return (
-        <div className="sync-toast" data-tone="error" role="status">
+        <p className="sync-line" data-tone="error" role="status" style={{ position: 'fixed', top: 116, insetInline: 0 }}>
           הטוקן של RiseUp פג תוקף. צריך ליצור חדש ולעדכן אותו.
-        </div>
+        </p>
       );
     case 'steps':
       return (

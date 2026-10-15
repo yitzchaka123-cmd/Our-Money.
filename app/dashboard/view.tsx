@@ -85,6 +85,7 @@ export function DashboardView({
       months={data.months}
       userName={data.userName}
       lastUpdated={data.lastUpdated}
+      lastSyncAt={data.lastSyncAt}
       briefCount={data.briefCount}
       onSearch={() => setSearch(true)}
       onFilter={() => setFilterOpen(true)}

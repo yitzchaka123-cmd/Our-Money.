@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { AssistantSheet } from '@/app/dashboard/components/AssistantSheet';
 import { RefreshButton } from '@/app/dashboard/components/RefreshButton';
 import { Sheet } from '@/app/dashboard/components/Sheet';
-import { SyncButton } from '@/app/dashboard/components/SyncButton';
+import { SyncButton, SyncLine, SyncProvider } from '@/app/dashboard/components/SyncButton';
 import {
   Bank,
   ChevronDown,
@@ -26,6 +26,7 @@ export function Shell({
   months,
   userName,
   lastUpdated,
+  lastSyncAt = null,
   briefCount,
   onSearch,
   onFilter,
@@ -36,6 +37,8 @@ export function Shell({
   months: string[];
   userName: string;
   lastUpdated: string | null;
+  /** The last successful pull from RiseUp, ISO, for the line under the month bar. */
+  lastSyncAt?: string | null;
   briefCount: number;
   onSearch?: () => void;
   onFilter?: () => void;
@@ -65,6 +68,7 @@ export function Shell({
 
   return (
     <>
+      <SyncProvider lastSyncAt={lastSyncAt}>
       <header className="appbar">
         <div className="appbar-actions">
           <button
@@ -119,6 +123,8 @@ export function Shell({
           <ChevronLeft />
         </a>
       </nav>
+      <SyncLine />
+      </SyncProvider>
 
       {children}
 

@@ -81,6 +81,7 @@ export const screens: Record<string, () => ReactElement> = {
         ],
         accounts: accounts.map((a) => ({ key: a.key, name: a.displayName, provider: a.provider, kind: a.kind, named: Boolean(a.label) })),
         lastSync: '11.10 11:20',
+        lastSyncAt: '2026-10-11T08:20:00Z',
         month: '2026-10',
         yearAgo: '2025-10',
       }}
@@ -88,12 +89,14 @@ export const screens: Record<string, () => ReactElement> = {
   ),
   loading: () => <DashboardLoading />,
   accounts: () => (
-    <AccountsView data={{ month: '2026-10', updated: '11.10.26, 11:20', accounts, cash: { balance: 515, walletCount: 3 } }} />
+    <AccountsView
+      data={{ month: '2026-10', updated: '11.10.26, 11:20', lastSyncAt: '2026-10-11T08:20:00Z', accounts, cash: { balance: 515, walletCount: 3 } }}
+    />
   ),
 };
 
 const root = process.cwd();
-const css = ['app/globals.css', 'app/wallets-accounts.css'].map((f) => readFileSync(join(root, f), 'utf8')).join('\n');
+const css = ['app/globals.css', 'app/assistant-and-setup.css', 'app/wallets-accounts.css'].map((f) => readFileSync(join(root, f), 'utf8')).join('\n');
 const out = process.argv[2] ?? '.shots';
 mkdirSync(out, { recursive: true });
 

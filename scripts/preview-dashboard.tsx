@@ -217,7 +217,8 @@ const fixture: DashboardData = {
   userName: 'יצחק אברגל',
   greeting: 'יצחק',
   lastUpdated: '15.09 7:36',
-  lastSyncAt: '2026-09-15T04:36:00Z',
+  // Five minutes ago, so the line under the month bar reads "עודכן לפני 5 דק׳".
+  lastSyncAt: new Date(Date.now() - 5 * 60_000).toISOString(),
   syncBanner: process.env.PREVIEW_BANNER
     ? { tone: 'error', text: 'החיבור ל-RiseUp פג תוקף. צריך ליצור טוקן חדש ב-RiseUp ולעדכן אותו בהגדרות, ועד אז הנתונים לא מתעדכנים.' }
     : null,

@@ -72,7 +72,9 @@ body {
   font-family: 'Assistant', 'Noto Sans Hebrew', system-ui, -apple-system, sans-serif;
   font-size: 15px;
   line-height: 1.5;
-  overflow-x: hidden;
+  /* `clip`, not `hidden`: hidden can make body the scroller, and then the
+     sticky top bar scrolls away with the page (video 2, item 15). */
+  overflow-x: clip;
   -webkit-font-smoothing: antialiased;
 }
 

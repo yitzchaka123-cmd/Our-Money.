@@ -11,10 +11,13 @@ import { syncFeedback, type SyncFeedback } from '@/lib/riseup/sync-feedback';
  * dashboard itself, so the new numbers arrive without a reload.
  *
  * `holdMs` clears the message again after a while (null keeps it).
+ * `syncedAt` is when this tap found RiseUp freshly pulled (ISO), so the
+ * "עודכן לפני…" line can move on before the page's own data arrives.
  */
 export function useRiseupSync(holdMs: { ok: number; error: number } | null = null) {
   const [pending, start] = useTransition();
   const [feedback, setFeedback] = useState<SyncFeedback | null>(null);
+  const [syncedAt, setSyncedAt] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => () => {
@@ -27,7 +30,10 @@ export function useRiseupSync(holdMs: { ok: number; error: number } | null = nul
     start(async () => {
       let next: SyncFeedback;
       try {
-        next = syncFeedback(await refreshFromRiseup());
+        const outcome = await refreshFromRiseup();
+        // "fresh": a pull finished moments ago, which is just as current.
+        if (outcome.ok && outcome.skipped !== 'running') setSyncedAt(new Date().toISOString());
+        next = syncFeedback(outcome);
       } catch {
         next = { tone: 'error', text: 'אין חיבור כרגע. בדקו את האינטרנט ונסו שוב.' };
       }
@@ -36,5 +42,5 @@ export function useRiseupSync(holdMs: { ok: number; error: number } | null = nul
     });
   }, [holdMs]);
 
-  return { pending, feedback, run, dismiss: () => setFeedback(null) };
+  return { pending, feedback, syncedAt, run, dismiss: () => setFeedback(null) };
 }
