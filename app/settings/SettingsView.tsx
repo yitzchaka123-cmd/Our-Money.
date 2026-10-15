@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 
 import { NameEditor } from '@/app/settings/NameEditor';
+import { TelegramSettings, type TelegramSettingsData } from '@/app/settings/TelegramSettings';
 import { Bank, ChevronLeft, ChevronRight, Download, SparkleBubble } from '@/app/dashboard/components/icons';
 import { Chat, CreditCard, Lock, LogOut } from '@/app/dashboard/components/icons-extra';
 import type { AccountKind } from '@/lib/dashboard/accounts';
@@ -16,6 +17,8 @@ export interface SettingsData {
   lastSync: string | null;
   month: string;
   yearAgo: string;
+  /** Settings → טלגרם; absent in older previews. */
+  telegram?: TelegramSettingsData;
 }
 
 /**
@@ -93,6 +96,8 @@ export function SettingsView({ data }: { data: SettingsData }) {
           </div>
         ))}
       </SettingsGroup>
+
+      {data.telegram ? <TelegramSettings data={data.telegram} /> : null}
 
       <SettingsGroup title="החיבור לרייזאפ">
         <div className="settings-row settings-row--static">

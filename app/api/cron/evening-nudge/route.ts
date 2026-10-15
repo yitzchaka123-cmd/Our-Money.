@@ -7,6 +7,7 @@ import { env } from '@/lib/env';
 import { sendMessage } from '@/lib/telegram/client';
 import { memberName } from '@/lib/profile/names';
 import { composeNudge, type NudgeMember } from '@/lib/telegram/nudge';
+import { nudgeFrequencyOf, wantsNudgeOn } from '@/lib/telegram/settings';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -39,12 +40,26 @@ export async function GET(request: Request): Promise<NextResponse> {
       .filter((id): id is string => Boolean(id)),
   );
 
+  type MemberRow = {
+    id: string;
+    display_name: string;
+    preferred_name?: string | null;
+    telegram_user_id: number | string;
+    nudge_frequency?: string | null;
+  };
+  const memberRows = (members.data ?? []) as MemberRow[];
+  // Each member's own choice in Settings → טלגרם (daily until they pick).
+  const remindToday = new Set(
+    memberRows.filter((m) => wantsNudgeOn(nudgeFrequencyOf(m), today)).map((m) => m.id),
+  );
+
   const messages = composeNudge({
-    members: (members.data ?? []).map(
+    remindToday,
+    members: memberRows.map(
       (m): NudgeMember => ({
-        id: m.id as string,
+        id: m.id,
         // The name they chose, never the Telegram account's.
-        displayName: memberName(m as { display_name: string; preferred_name?: string | null }),
+        displayName: memberName(m),
         telegramUserId: Number(m.telegram_user_id),
       }),
     ),

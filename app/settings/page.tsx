@@ -1,12 +1,14 @@
 import { cookies } from 'next/headers';
 
 import { SettingsView } from '@/app/settings/SettingsView';
+import './telegram-settings.css';
 import { SignedOut } from '@/app/SignedOut';
 import { SESSION_COOKIE, verifySessionToken } from '@/lib/auth/session';
 import { loadAccountSummaries } from '@/lib/dashboard/account-summaries';
 import { currentMonth } from '@/lib/dashboard/data';
 import { db } from '@/lib/db/client';
 import { loadSyncState } from '@/lib/riseup/sync';
+import { confirmModeOf, nudgeFrequencyOf } from '@/lib/telegram/settings';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -16,6 +18,8 @@ interface MemberRow {
   display_name: string;
   preferred_name?: string | null;
   is_active: boolean;
+  nudge_frequency?: string | null;
+  bot_confirm_mode?: string | null;
 }
 
 export default async function SettingsPage() {
@@ -52,6 +56,15 @@ export default async function SettingsPage() {
           kind: a.kind,
           named: Boolean(a.label),
         })),
+        telegram: {
+          members: members.map((m) => ({
+            id: m.id,
+            name: m.preferred_name?.trim() || m.display_name,
+            isYou: m.id === session.memberId,
+            nudge: nudgeFrequencyOf(m),
+            confirm: confirmModeOf(m),
+          })),
+        },
         lastSync: formatStamp(syncState.lastSuccessAt),
         month,
         yearAgo: monthsBefore(month, 12),

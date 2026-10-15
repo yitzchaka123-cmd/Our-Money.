@@ -1,12 +1,12 @@
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { IntakeResult } from '@/lib/intake/parse';
 import type { TelegramUpdate } from '@/lib/telegram/types';
 
-import { resetDb, seedMember, seedMonth, sql } from './helpers';
+import { resetDb, seedMember, seedMonth, signIn, sql } from './helpers';
 
 /**
  * The bot's video 2–4 items (group, ask-first mode, envelope picker, names,
@@ -117,5 +117,47 @@ describe('V3-3: the bot uses the name you chose', () => {
     intake.next = spend(45, 'אוכל בחוץ', 'פלאפל');
     await handleUpdate(textUpdate('45 פלאפל'));
     expect(telegram.sent[0]!.text).toContain('Nechemiah Seltzer');
+  });
+});
+
+describe("V4-2: the evening reminder follows each person's setting", () => {
+  afterEach(() => vi.useRealTimers());
+
+  async function runNudge(isoInstant: string): Promise<number[]> {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(isoInstant));
+    const { GET } = await import('@/app/api/cron/evening-nudge/route');
+    telegram.sent = [];
+    await GET(new Request('https://our-money.test/api/cron/evening-nudge', { headers: { authorization: 'Bearer integration-cron-secret' } }));
+    vi.useRealTimers();
+    return telegram.sent.map((m) => m.chatId);
+  }
+
+  it('saves the choice from Settings and the cron obeys it', async () => {
+    const sara = await seedMember(222, 'שרה');
+    signIn(member);
+    const { setNudgeFrequency } = await import('@/lib/telegram/settings-actions');
+    expect(await setNudgeFrequency(member, 'weekly')).toEqual({ ok: true });
+    expect(await setNudgeFrequency(sara, 'never')).toEqual({ ok: true });
+    expect(sql(`select nudge_frequency from household_members order by telegram_user_id`)).toEqual([
+      { nudge_frequency: 'weekly' },
+      { nudge_frequency: 'never' },
+    ]);
+
+    // Thursday evening: weekly (Sunday) is not today, never is never.
+    expect(await runNudge('2026-10-15T17:00:00Z')).toEqual([]);
+    // Sunday evening: the weekly one comes, only to him.
+    expect(await runNudge('2026-10-18T17:00:00Z')).toEqual([111]);
+  });
+
+  it('keeps the daily reminder for anyone who never chose', async () => {
+    expect(await runNudge('2026-10-16T17:00:00Z')).toEqual([111]);
+  });
+
+  it('refuses a choice it does not know, and needs a session', async () => {
+    const { setNudgeFrequency } = await import('@/lib/telegram/settings-actions');
+    expect((await setNudgeFrequency(member, 'daily')).ok).toBe(false);
+    signIn(member);
+    expect((await setNudgeFrequency(member, 'hourly' as never)).ok).toBe(false);
   });
 });
