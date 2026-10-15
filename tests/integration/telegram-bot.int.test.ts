@@ -17,6 +17,7 @@ import { resetDb, seedMember, seedMonth, signIn, sql } from './helpers';
 const telegram = vi.hoisted(() => ({
   sent: [] as Array<{ chatId: number; text: string; keyboard?: Array<Array<{ text: string; callback_data: string }>> }>,
   edits: [] as Array<{ chatId: number; messageId: number; text: string; keyboard?: Array<Array<{ text: string; callback_data: string }>> }>,
+  left: [] as number[],
 }));
 vi.mock('@/lib/telegram/client', async (importOriginal) => {
   const original = await importOriginal<typeof import('@/lib/telegram/client')>();
@@ -32,6 +33,9 @@ vi.mock('@/lib/telegram/client', async (importOriginal) => {
     answerCallbackQuery: async () => {},
     sendTyping: async () => {},
     getMe: async () => ({ id: 999000, username: 'our_money_test_bot', first_name: 'Our Money' }),
+    leaveChat: async (chatId: number) => {
+      telegram.left.push(chatId);
+    },
   };
 });
 
@@ -96,6 +100,7 @@ beforeEach(async () => {
   resetCategoryCache();
   telegram.sent = [];
   telegram.edits = [];
+  telegram.left = [];
 });
 
 describe('V3-3: the bot uses the name you chose', () => {
@@ -311,5 +316,196 @@ describe('V4-4: ask before saving, and a picker of your own envelopes with a way
     const { setConfirmMode } = await import('@/lib/telegram/settings-actions');
     expect(await setConfirmMode(member, 'ask')).toEqual({ ok: true });
     expect(sql('select bot_confirm_mode from household_members')).toEqual([{ bot_confirm_mode: 'ask' }]);
+  });
+});
+
+const GROUP = -100777;
+const BOT = { id: 999000, is_bot: true, first_name: 'Our Money', username: 'our_money_test_bot' };
+
+function botAdded(by = 111, status: 'member' | 'left' = 'member'): TelegramUpdate {
+  updateId += 1;
+  return {
+    update_id: updateId,
+    my_chat_member: {
+      chat: { id: GROUP, type: 'group', title: 'הבית שלנו' },
+      from: { id: by, is_bot: false, first_name: by === 111 ? 'Nechemiah' : 'זר' },
+      date: 0,
+      old_chat_member: { status: status === 'member' ? 'left' : 'member', user: BOT },
+      new_chat_member: { status, user: BOT },
+    },
+  } as TelegramUpdate;
+}
+
+function joinedServiceMessage(by = 111): TelegramUpdate {
+  updateId += 1;
+  return {
+    update_id: updateId,
+    message: {
+      message_id: updateId,
+      date: 0,
+      chat: { id: GROUP, type: 'group', title: 'הבית שלנו' },
+      from: { id: by, is_bot: false, first_name: 'Nechemiah' },
+      new_chat_members: [BOT],
+    },
+  } as TelegramUpdate;
+}
+
+const storedGroup = () => sql<{ value: string }>(`select value from app_settings where key = 'telegram_group_chat_id'`);
+
+describe('V4-3 / V3-1: the family group, set up with one tap', () => {
+  it('remembers the group when one of us adds the bot, and says hello there once', async () => {
+    const { handleUpdate } = await import('@/lib/telegram/handlers');
+    await handleUpdate(botAdded());
+    await handleUpdate(joinedServiceMessage());
+
+    expect(storedGroup()).toEqual([{ value: String(GROUP) }]);
+    const hello = telegram.sent.filter((m) => m.chatId === GROUP);
+    expect(hello).toHaveLength(1);
+    expect(hello[0]!.text).toContain('הקבוצה המשפחתית מחוברת');
+  });
+
+  it('a stranger cannot add it: polite no, it leaves, nothing is stored', async () => {
+    const { handleUpdate } = await import('@/lib/telegram/handlers');
+    await handleUpdate(botAdded(999));
+    expect(storedGroup()).toEqual([]);
+    expect(telegram.left).toEqual([GROUP]);
+    expect(telegram.sent[0]!.text).toContain('פרטי');
+  });
+
+  it('forgets the group when the bot is removed from it', async () => {
+    const { handleUpdate } = await import('@/lib/telegram/handlers');
+    await handleUpdate(botAdded());
+    await handleUpdate(botAdded(111, 'left'));
+    expect(storedGroup()).toEqual([]);
+  });
+
+  it('announces a spend logged in private in the group: who, how much, which envelope', async () => {
+    run(`update household_members set preferred_name = 'יצחק' where id = '${member}'`);
+    const { handleUpdate } = await import('@/lib/telegram/handlers');
+    await handleUpdate(botAdded());
+    telegram.sent = [];
+
+    intake.next = spend(45, 'מזון וצריכה', 'שופרסל');
+    await handleUpdate(textUpdate('45 בשופרסל'));
+    const inGroup = telegram.sent.filter((m) => m.chatId === GROUP);
+    expect(inGroup).toHaveLength(1);
+    expect(inGroup[0]!.text).toContain('יצחק');
+    expect(inGroup[0]!.text).toContain('₪45');
+    expect(inGroup[0]!.text).toContain('סופר');
+  });
+
+  it('announces a change of envelope too', async () => {
+    const { handleUpdate } = await import('@/lib/telegram/handlers');
+    await handleUpdate(botAdded());
+    intake.next = spend(45, 'אחר', 'פיתה');
+    await handleUpdate(textUpdate('45 פיתה'));
+    const reply = telegram.sent.find((m) => m.chatId === 111)!;
+    telegram.sent = [];
+
+    const where = { chatId: 111, messageId: 1002 };
+    await handleUpdate(tap(buttonData(reply.keyboard, '✏️ שינוי קטגוריה'), where));
+    await handleUpdate(tap(buttonData(telegram.edits.at(-1)!.keyboard, 'אוכל בחוץ'), where));
+    const inGroup = telegram.sent.filter((m) => m.chatId === GROUP);
+    expect(inGroup).toHaveLength(1);
+    expect(inGroup[0]!.text).toContain('אוכל בחוץ');
+  });
+
+  it('in ask mode, the group hears about it once it is approved', async () => {
+    run(`update household_members set bot_confirm_mode = 'ask' where id = '${member}'`);
+    const { handleUpdate } = await import('@/lib/telegram/handlers');
+    await handleUpdate(botAdded());
+    telegram.sent = [];
+    intake.next = spend(845, 'אחר', 'סיבוניס');
+    await handleUpdate(textUpdate('845 סיבוניס'));
+    expect(telegram.sent.filter((m) => m.chatId === GROUP)).toHaveLength(0);
+
+    const reply = telegram.sent.find((m) => m.chatId === 111)!;
+    await handleUpdate(tap(buttonData(reply.keyboard, '✅ לאשר'), { chatId: 111, messageId: 1001 }));
+    expect(telegram.sent.filter((m) => m.chatId === GROUP)).toHaveLength(1);
+  });
+
+  it('both of us can log from inside the group without @-mentioning the bot; chit-chat gets no reply', async () => {
+    await seedMember(222, 'שרה');
+    const { handleUpdate } = await import('@/lib/telegram/handlers');
+    await handleUpdate(botAdded());
+    telegram.sent = [];
+
+    intake.next = spend(30, 'אחר', 'קפה');
+    await handleUpdate(textUpdate('30 על קפה', 222, { id: GROUP, type: 'group' }));
+    expect(sql('select amount_ils from cash_spends')).toEqual([{ amount_ils: 30 }]);
+    // One reply, in the group — and no second "announcement" of the same thing.
+    expect(telegram.sent.map((m) => m.chatId)).toEqual([GROUP]);
+
+    telegram.sent = [];
+    intake.next = { intent: 'unclear', entries: [], replyNote: 'כמה זה היה?' };
+    await handleUpdate(textUpdate('נתראה בערב', 111, { id: GROUP, type: 'group' }));
+    expect(telegram.sent).toEqual([]);
+  });
+
+  it('stays a guest in any other group', async () => {
+    const { handleUpdate } = await import('@/lib/telegram/handlers');
+    intake.next = spend(30, 'אחר', 'קפה');
+    await handleUpdate(textUpdate('30 על קפה', 111, { id: -555, type: 'group' }));
+    expect(sql('select amount_ils from cash_spends')).toEqual([]);
+  });
+
+  it('/id speaks plain Hebrew and never asks to edit a server setting', async () => {
+    const { handleUpdate } = await import('@/lib/telegram/handlers');
+    await handleUpdate(textUpdate('/id'));
+    const text = telegram.sent[0]!.text;
+    expect(text).not.toContain('TELEGRAM_GROUP_CHAT_ID');
+    expect(text).toContain('/group');
+  });
+
+  it('/group gives three steps and an add-to-group button', async () => {
+    const { handleUpdate } = await import('@/lib/telegram/handlers');
+    await handleUpdate(textUpdate('/group'));
+    const reply = telegram.sent[0]!;
+    expect(reply.text).toContain('שלושה צעדים');
+    const button = (reply.keyboard as unknown as Array<Array<{ text: string; url: string }>>)[0]![0]!;
+    expect(button.url).toBe('https://t.me/our_money_test_bot?startgroup=family');
+
+    await handleUpdate(botAdded());
+    telegram.sent = [];
+    await handleUpdate(textUpdate('/group'));
+    expect(telegram.sent[0]!.text).toContain('מחוברת');
+    expect(telegram.sent[0]!.text).toContain('הבית שלנו');
+  });
+
+  it('an entry added on the dashboard is announced too', async () => {
+    const { handleUpdate } = await import('@/lib/telegram/handlers');
+    await handleUpdate(botAdded());
+    telegram.sent = [];
+    signIn(member);
+    const { addCashEntry } = await import('@/lib/cash/actions');
+    const result = await addCashEntry({
+      kind: 'spend', amountIls: 60, category: 'סופר', note: 'ירקות', date: `${MONTH}-12`,
+      envelopeId: SUPER_ID, memberId: null, walletId: null,
+    });
+    expect(result.ok).toBe(true);
+    const inGroup = telegram.sent.filter((m) => m.chatId === GROUP);
+    expect(inGroup).toHaveLength(1);
+    expect(inGroup[0]!.text).toContain('₪60');
+    expect(inGroup[0]!.text).toContain('סופר');
+  });
+
+  it('the evening reminder goes to the group the bot remembered', async () => {
+    const { handleUpdate } = await import('@/lib/telegram/handlers');
+    await handleUpdate(botAdded());
+    telegram.sent = [];
+    const { GET } = await import('@/app/api/cron/evening-nudge/route');
+    await GET(new Request('https://our-money.test/api/cron/evening-nudge', { headers: { authorization: 'Bearer integration-cron-secret' } }));
+    expect(telegram.sent.map((m) => m.chatId)).toEqual([GROUP]);
+  });
+
+  it('follows the group when Telegram turns it into a supergroup', async () => {
+    const { handleUpdate } = await import('@/lib/telegram/handlers');
+    await handleUpdate(botAdded());
+    updateId += 1;
+    await handleUpdate({
+      update_id: updateId,
+      message: { message_id: updateId, date: 0, chat: { id: GROUP, type: 'group' }, from: { id: 111, is_bot: false }, migrate_to_chat_id: -1009999 },
+    } as TelegramUpdate);
+    expect(storedGroup()).toEqual([{ value: '-1009999' }]);
   });
 });

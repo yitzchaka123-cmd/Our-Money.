@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { SESSION_EXPIRED_MESSAGE, sessionMember } from '@/lib/auth/member';
 import { resolveEnvelopeForCategory } from '@/lib/cash/envelopes';
 import { db } from '@/lib/db/client';
+import { announceWebEntry } from '@/lib/telegram/announce';
 import { envelopeRefsForMonth } from '@/lib/db/queries';
 import { syncIfStale } from '@/lib/riseup/sync';
 
@@ -137,6 +138,7 @@ export async function addCashEntry(input: CashEntryInput): Promise<ActionResult>
       .single();
     if (error) return dbFail(error);
     refreshPages();
+    await announceWebEntry({ ...announced(input, memberId), kind: input.kind === 'income' ? 'income' : 'withdrawal' });
     return { ok: true, id: data.id as string };
   }
 
@@ -159,7 +161,13 @@ export async function addCashEntry(input: CashEntryInput): Promise<ActionResult>
     .single();
   if (error) return dbFail(error);
   refreshPages();
+  // The family group hears about it, as it would from the bot.
+  await announceWebEntry({ ...announced(input, memberId), kind: 'spend', envelopeId: pin.envelope_id, envelopeType: pin.envelope_type });
   return { ok: true, id: data.id as string };
+}
+
+function announced(input: CashEntryInput, memberId: string) {
+  return { amountIls: input.amountIls, category: input.category.trim(), note: input.note?.trim() || null, date: input.date, memberId };
 }
 
 export async function updateCashEntry(id: string, input: CashEntryInput): Promise<ActionResult> {

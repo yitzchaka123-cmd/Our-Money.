@@ -35,6 +35,19 @@ export interface TelegramMessage {
   audio?: TelegramAudio;
   entities?: { type: string; offset: number; length: number }[];
   reply_to_message?: TelegramMessage;
+  /** Service message: people (or the bot) added to a group. */
+  new_chat_members?: TelegramUser[];
+  /** Service message: a group became a supergroup, which changes its id. */
+  migrate_to_chat_id?: number;
+}
+
+/** A change in the bot's own membership of a chat (added, removed, promoted). */
+export interface TelegramChatMemberUpdated {
+  chat: TelegramChat;
+  from: TelegramUser;
+  date: number;
+  old_chat_member: { status: string; user: TelegramUser };
+  new_chat_member: { status: string; user: TelegramUser };
 }
 
 export interface TelegramCallbackQuery {
@@ -49,6 +62,7 @@ export interface TelegramUpdate {
   message?: TelegramMessage;
   edited_message?: TelegramMessage;
   callback_query?: TelegramCallbackQuery;
+  my_chat_member?: TelegramChatMemberUpdated;
 }
 
 export interface InlineKeyboardButton {
@@ -57,3 +71,11 @@ export interface InlineKeyboardButton {
 }
 
 export type InlineKeyboard = InlineKeyboardButton[][];
+
+/** A button that opens a link (e.g. "add the bot to a group"). */
+export interface LinkButton {
+  text: string;
+  url: string;
+}
+
+export type LinkKeyboard = LinkButton[][];

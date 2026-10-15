@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
 import { SettingsView, type SettingsData } from '@/app/settings/SettingsView';
+import { FamilyGroupSettings } from '@/app/settings/TelegramSettings';
 import { composeNudge } from '@/lib/telegram/nudge';
 import { confirmModeOf, nudgeFrequencyOf, wantsNudgeOn } from '@/lib/telegram/settings';
 
@@ -93,5 +94,35 @@ describe('V4-2: Settings → טלגרם', () => {
     expect(yitzchak).toMatch(/aria-checked="true"[^>]*data-selected="true"[^>]*>פעם בשבוע/);
     const sara = html.slice(html.indexOf('שרה</p>'));
     expect(sara).toMatch(/aria-checked="true"[^>]*data-selected="true"[^>]*>כל יום/);
+  });
+});
+
+describe('V4-3 / V3-1: Settings → קבוצה משפחתית', () => {
+  const url = 'https://t.me/our_money_bot?startgroup=family';
+
+  it('before a group: plain steps and one button that adds the bot to a group', () => {
+    const html = renderToStaticMarkup(
+      createElement(FamilyGroupSettings, { group: { connected: null, addToGroupUrl: url } }),
+    );
+    expect(html).toContain('קבוצה משפחתית');
+    expect(html).toContain('<ol class="tg-steps">');
+    expect(html).toContain(`href="${url}"`);
+    expect(html).toContain('הוספת הבוט לקבוצה');
+    expect(html).not.toContain('TELEGRAM_GROUP_CHAT_ID');
+  });
+
+  it('once connected: says which group, and what goes there', () => {
+    const html = renderToStaticMarkup(
+      createElement(FamilyGroupSettings, { group: { connected: { title: 'הבית שלנו', fromServerSetting: false }, addToGroupUrl: url } }),
+    );
+    expect(html).toContain('מחוברת: הבית שלנו');
+    expect(html).toContain('מי רשם, כמה, ובאיזו מעטפה');
+    expect(html).toContain('להעביר לקבוצה אחרת');
+  });
+
+  it('without the bot’s name, points to /group instead of a dead button', () => {
+    const html = renderToStaticMarkup(createElement(FamilyGroupSettings, { group: { connected: null, addToGroupUrl: null } }));
+    expect(html).toContain('/group');
+    expect(html).not.toContain('tg-group-btn');
   });
 });

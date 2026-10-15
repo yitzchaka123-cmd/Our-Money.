@@ -1,14 +1,16 @@
 import { cookies } from 'next/headers';
 
 import { SettingsView } from '@/app/settings/SettingsView';
-import './telegram-settings.css';
 import { SignedOut } from '@/app/SignedOut';
 import { SESSION_COOKIE, verifySessionToken } from '@/lib/auth/session';
 import { loadAccountSummaries } from '@/lib/dashboard/account-summaries';
 import { currentMonth } from '@/lib/dashboard/data';
 import { db } from '@/lib/db/client';
 import { loadSyncState } from '@/lib/riseup/sync';
+import { addToGroupUrl, botIdentity, getFamilyGroup } from '@/lib/telegram/group';
 import { confirmModeOf, nudgeFrequencyOf } from '@/lib/telegram/settings';
+
+import './telegram-settings.css';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -29,11 +31,14 @@ export default async function SettingsPage() {
   if (!session) return <SignedOut />;
 
   const month = currentMonth();
-  const [{ data: memberRows }, accounts, syncState] = await Promise.all([
+  const [{ data: memberRows }, accounts, syncState, group, bot] = await Promise.all([
     // select('*'): preferred_name arrives with migration 0004/0005; until then it is simply absent.
     db().from('household_members').select('*').order('created_at'),
     loadAccountSummaries(month),
     loadSyncState(),
+    getFamilyGroup(),
+    // The "add to group" link needs the bot's @name; never let Telegram hold up the page.
+    Promise.race([botIdentity(), new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500))]),
   ]);
   const members = ((memberRows ?? []) as MemberRow[]).filter((m) => m.is_active);
   const me = members.find((m) => m.id === session.memberId);
@@ -64,6 +69,10 @@ export default async function SettingsPage() {
             nudge: nudgeFrequencyOf(m),
             confirm: confirmModeOf(m),
           })),
+          group: {
+            connected: group ? { title: group.title, fromServerSetting: group.source === 'env' } : null,
+            addToGroupUrl: bot?.username ? addToGroupUrl(bot.username) : null,
+          },
         },
         lastSync: formatStamp(syncState.lastSuccessAt),
         month,

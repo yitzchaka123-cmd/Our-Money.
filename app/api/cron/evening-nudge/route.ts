@@ -6,6 +6,7 @@ import { db } from '@/lib/db/client';
 import { env } from '@/lib/env';
 import { sendMessage } from '@/lib/telegram/client';
 import { memberName } from '@/lib/profile/names';
+import { familyGroupChatId } from '@/lib/telegram/group';
 import { composeNudge, type NudgeMember } from '@/lib/telegram/nudge';
 import { nudgeFrequencyOf, wantsNudgeOn } from '@/lib/telegram/settings';
 
@@ -66,7 +67,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     loggedToday: logged,
     due,
     reviewCount: review.count ?? 0,
-    groupChatId: env.telegramGroupChatId,
+    groupChatId: await familyGroupChatId(),
   });
 
   let sent = 0;

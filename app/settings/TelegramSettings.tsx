@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 
+import { Chat, Check, Plus } from '@/app/dashboard/components/icons-extra';
 import { setConfirmMode, setNudgeFrequency } from '@/lib/telegram/settings-actions';
 import { CONFIRM_CHOICES, NUDGE_CHOICES, type ConfirmMode, type NudgeFrequency } from '@/lib/telegram/settings';
 
@@ -13,8 +14,16 @@ export interface TelegramMemberSettings {
   confirm: ConfirmMode;
 }
 
+export interface FamilyGroupData {
+  /** The connected group, or null. */
+  connected: { title: string | null; fromServerSetting: boolean } | null;
+  /** https://t.me/<bot>?startgroup=…, or null when the bot's name is unknown. */
+  addToGroupUrl: string | null;
+}
+
 export interface TelegramSettingsData {
   members: TelegramMemberSettings[];
+  group?: FamilyGroupData;
 }
 
 /**
@@ -24,13 +33,75 @@ export interface TelegramSettingsData {
  */
 export function TelegramSettings({ data }: { data: TelegramSettingsData }) {
   return (
-    <section className="settings-group tg-settings" aria-labelledby="tg-settings-title">
-      <h2 className="settings-group-title" id="tg-settings-title">
-        טלגרם
+    <>
+      <section className="settings-group tg-settings" aria-labelledby="tg-settings-title">
+        <h2 className="settings-group-title" id="tg-settings-title">
+          טלגרם
+        </h2>
+        {data.members.map((m) => (
+          <MemberSettings key={m.id} member={m} />
+        ))}
+      </section>
+      {data.group ? <FamilyGroupSettings group={data.group} /> : null}
+    </>
+  );
+}
+
+/**
+ * Settings → קבוצה משפחתית (feedback video 3 #1, video 4 #3): one tap to add
+ * the bot to a group with your partner. The bot remembers the group itself.
+ */
+export function FamilyGroupSettings({ group }: { group: FamilyGroupData }) {
+  return (
+    <section className="settings-group tg-group" aria-labelledby="tg-group-title">
+      <h2 className="settings-group-title" id="tg-group-title">
+        קבוצה משפחתית
       </h2>
-      {data.members.map((m) => (
-        <MemberSettings key={m.id} member={m} />
-      ))}
+      {group.connected ? (
+        <>
+          <div className="settings-row settings-row--static">
+            <span className="settings-ico tg-group-ok">
+              <Check size={22} />
+            </span>
+            <span className="settings-row-text">
+              <span className="settings-row-title">
+                מחוברת{group.connected.title ? `: ${group.connected.title}` : ''}
+              </span>
+              <span className="settings-row-sub">
+                כל הוצאה והכנסה במזומן נשלחת לקבוצה — מי רשם, כמה, ובאיזו מעטפה. שניכם יכולים לרשום גם מתוכה.
+                {group.connected.fromServerSetting ? ' (הקבוצה נקבעה בהגדרות השרת.)' : ''}
+              </span>
+            </span>
+          </div>
+          {group.addToGroupUrl ? (
+            <a className="settings-row settings-link" href={group.addToGroupUrl} target="_blank" rel="noopener noreferrer">
+              <span className="settings-ico">
+                <Chat />
+              </span>
+              <span className="settings-row-text">
+                <span className="settings-row-title">להעביר לקבוצה אחרת</span>
+              </span>
+            </a>
+          ) : null}
+        </>
+      ) : (
+        <div className="tg-group-setup">
+          <p className="tg-group-lead">קבוצה אחת בטלגרם — אתם, בן או בת הזוג והבוט — ושניכם רואים כל רישום במזומן.</p>
+          <ol className="tg-steps">
+            <li>פותחים בטלגרם קבוצה עם בן או בת הזוג (או בוחרים קבוצה שכבר יש לכם).</li>
+            <li>
+              {group.addToGroupUrl ? 'לוחצים על הכפתור ובוחרים את הקבוצה.' : 'שולחים לבוט /group ולוחצים על הכפתור שהוא שולח.'}
+            </li>
+            <li>זהו! הבוט כותב בקבוצה שהיא מחוברת, ומאז כל רישום מופיע שם.</li>
+          </ol>
+          {group.addToGroupUrl ? (
+            <a className="tg-group-btn" href={group.addToGroupUrl} target="_blank" rel="noopener noreferrer">
+              <Plus size={20} bold />
+              הוספת הבוט לקבוצה
+            </a>
+          ) : null}
+        </div>
+      )}
     </section>
   );
 }
