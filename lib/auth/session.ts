@@ -5,8 +5,15 @@ import { env } from '@/lib/env';
 export const SESSION_COOKIE = 'om_session';
 /** A sign-in link travels through chat history, so it lives a week. */
 const LINK_DAYS = 7;
-/** The cookie is httpOnly and never leaves the device, so it can live longer. */
-const COOKIE_DAYS = 30;
+/**
+ * The cookie is httpOnly and never leaves the device, so it can live longer:
+ * 90 days, renewed on each visit (see renewedCookieToken and proxy.ts), so a
+ * couple that opens the app now and then never has to ask the bot for a code
+ * again (feedback video 4, item 11).
+ */
+const COOKIE_DAYS = 90;
+/** A cookie younger than this is left as it is, so not every request rewrites it. */
+const RENEW_AFTER_DAYS = 1;
 
 interface SessionPayload {
   memberId: string;
@@ -65,6 +72,20 @@ export const SESSION_MAX_AGE = COOKIE_DAYS * 24 * 60 * 60;
 /** The token the cookie holds: fresh, and good for the cookie's whole life. */
 export function createCookieToken(memberId: string, now = Date.now()): string {
   return createSessionToken(memberId, now, COOKIE_DAYS);
+}
+
+/**
+ * A visit with a good cookie that is more than a day old earns a fresh one,
+ * good for another 90 days. Null when there is nothing to renew: the token is
+ * missing, forged or expired (that one signs in again), or it is fresh.
+ */
+export function renewedCookieToken(token: string | undefined, now = Date.now()): string | null {
+  if (!token) return null;
+  const session = verifySessionToken(token, now);
+  if (!session) return null;
+  const remainingMs = session.exp * 1000 - now;
+  if (remainingMs > (COOKIE_DAYS - RENEW_AFTER_DAYS) * 24 * 60 * 60 * 1000) return null;
+  return createCookieToken(session.memberId, now);
 }
 
 export const SESSION_COOKIE_OPTIONS = {
