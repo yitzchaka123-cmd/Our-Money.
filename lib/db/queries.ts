@@ -18,7 +18,9 @@ export async function resolveMember(
 
   const { data: existing, error } = await supabase
     .from('household_members')
-    .select('id, telegram_user_id, display_name, is_active')
+    // '*': the chosen name and the bot settings arrive with later migrations;
+    // until they are applied the fields are simply absent.
+    .select('*')
     .eq('telegram_user_id', telegramUserId)
     .maybeSingle();
 
@@ -33,7 +35,7 @@ export async function resolveMember(
       telegram_user_id: telegramUserId,
       display_name: fallbackName || String(telegramUserId),
     })
-    .select('id, telegram_user_id, display_name, is_active')
+    .select('*')
     .single();
 
   if (insertError) throw new Error(`Failed to create member: ${insertError.message}`);
@@ -167,7 +169,7 @@ export async function activeTopups(): Promise<CashTopup[]> {
 export async function membersById(): Promise<Map<string, HouseholdMember>> {
   const { data, error } = await db()
     .from('household_members')
-    .select('id, telegram_user_id, display_name, is_active');
+    .select('*');
   if (error) throw new Error(`Failed to load members: ${error.message}`);
   return new Map((data ?? []).map((m) => [m.id, m as HouseholdMember]));
 }

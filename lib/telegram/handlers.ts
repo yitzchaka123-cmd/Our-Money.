@@ -57,6 +57,7 @@ import {
   type NewSpend,
 } from '@/lib/db/queries';
 import type { HouseholdMember } from '@/lib/types';
+import { memberName } from '@/lib/profile/names';
 
 const HELP = [
   '<b>Our Money</b> — יומן המזומן שלנו 💸',
@@ -292,7 +293,7 @@ async function logFromNaturalLanguage(
   let parsed;
   try {
     parsed = await parseIntake(input, {
-      speakerName: member.display_name,
+      speakerName: memberName(member),
       wallets: wallets.map((w) => w.name),
     });
   } catch (error) {
@@ -381,7 +382,7 @@ async function logFromNaturalLanguage(
   if (saved.length > 0) {
     const sent = await sendMessage(
       chatId,
-      savedMessage(saved, today, member.display_name),
+      savedMessage(saved, today, memberName(member)),
       spendKeyboard(saved),
     );
     await attachBotMessage(
@@ -397,7 +398,7 @@ async function logFromNaturalLanguage(
     await sendMessage(
       chatId,
       [
-        `💵 נרשמה הכנסה במזומן · ${escapeHtml(member.display_name)}`,
+        `💵 נרשמה הכנסה במזומן · ${escapeHtml(memberName(member))}`,
         '',
         `• <b>${formatIls(Number(t.amount_ils))}</b> · ${escapeHtml(t.category ?? '')}${
           t.note ? ` — ${escapeHtml(t.note)}` : ''
@@ -411,7 +412,7 @@ async function logFromNaturalLanguage(
     await sendMessage(
       chatId,
       [
-        `🏧 נרשמה משיכה · ${escapeHtml(member.display_name)}`,
+        `🏧 נרשמה משיכה · ${escapeHtml(memberName(member))}`,
         '',
         `• <b>${formatIls(Number(t.amount_ils))}</b> · ${friendlyDate(t.occurred_at, today)}${walletName(t.wallet_id)}`,
         '',
@@ -637,7 +638,8 @@ async function sendMonth(chatId: number, requested?: string): Promise<void> {
   const byMember = totalsByMember(spends);
 
   const memberLines = [...byMember.entries()].map(([memberId, amount]) => {
-    const name = members.get(memberId)?.display_name ?? 'לא ידוע';
+    const found = members.get(memberId);
+    const name = found ? memberName(found) : 'לא ידוע';
     return `• ${escapeHtml(name)}: ${formatIls(amount)}`;
   });
 
