@@ -722,6 +722,96 @@
   color: var(--ink-2);
 }
 
+/* "חודשים קודמים" for cash: in and out side by side per month. */
+.cash-bars {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 0 2px;
+}
+
+.cash-bars-month {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.cash-bars-pair {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 3px;
+  width: 100%;
+  min-height: 150px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.cash-bars-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+
+.cash-bars-value {
+  font-size: 10px;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.cash-bars-bar {
+  display: block;
+  width: 14px;
+  border-radius: 7px 7px 0 0;
+}
+
+.cash-bars-bar.is-in,
+.cash-bars-legend .is-in {
+  background: var(--income);
+}
+
+.cash-bars-bar.is-out,
+.cash-bars-legend .is-out {
+  background: var(--alert);
+}
+
+.cash-bars-label {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.cash-bars-month[data-current='true'] .cash-bars-label {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.cash-bars-legend {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.cash-bars-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cash-bars-legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
 .inflow-explain {
   margin: 0 0 14px;
   font-size: 15px;

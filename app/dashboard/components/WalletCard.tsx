@@ -22,6 +22,7 @@ export function WalletCard({
   onAddMoney,
   onAddSpend,
   onEditInflow,
+  onMenu,
   onOpenWallet,
 }: {
   wallet: WalletView;
@@ -32,6 +33,8 @@ export function WalletCard({
   onAddSpend?: () => void;
   /** "עדכון כמה צפוי להיכנס". */
   onEditInflow?: () => void;
+  /** The ⋮: the wallet menu. Without it the ⋮ opens wallet management. */
+  onMenu?: () => void;
   /** Add money to a wallet, or set how much is in it — the wallet's own settings. */
   onAddMoney?: () => void;
   onOpenWallet?: (walletId: string) => void;
@@ -44,9 +47,13 @@ export function WalletCard({
       <div className="card-body">
         <div className="card-head">
           <h2 className="card-title">{several ? 'ארנקי מזומן' : 'ארנק מזומן'}</h2>
-          <span onClick={onManage} role="presentation">
-            <Kebab label="ניהול ארנקים" />
-          </span>
+          {onMenu ? (
+            <Kebab label="תפריט הארנק" onClick={onMenu} />
+          ) : (
+            <span onClick={onManage} role="presentation">
+              <Kebab label="ניהול ארנקים" />
+            </span>
+          )}
         </div>
         <p className="figure-label">{several ? 'סה״כ במזומן' : 'בארנק עכשיו'}</p>
         <Amount value={wallet.balance} className={wallet.balance < 0 ? 'account-figure is-negative' : 'account-figure'} />

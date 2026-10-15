@@ -167,6 +167,7 @@ export function EnvelopeList({
         onAddSpend={() => openNew('spend')}
         onAddMoney={() => setWalletsFocus({ walletId: wallet.wallets.find((w) => w.isDefault)?.id ?? wallet.wallets[0]?.id, panel: 'add' })}
         onOpenWallet={(walletId) => setWalletsFocus({ walletId })}
+        onTransfer={() => setWalletsFocus({ tab: 'transfer' })}
       />
 
       {envelopes.map((envelope) => (
