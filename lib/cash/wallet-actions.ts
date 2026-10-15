@@ -155,6 +155,31 @@ export async function addMoneyToWallet(input: AddMoneyInput): Promise<WalletActi
 }
 
 /**
+ * "עדכון כמה צפוי להיכנס": the couple's own figure for how much cash comes
+ * into the wallets this month, in place of the app's guess. Null goes back to
+ * the guess. Kept on our side only.
+ */
+export async function setCashInflowOverride(month: string, amountIls: number | null): Promise<WalletActionResult> {
+  const memberId = await sessionMember();
+  if (!memberId) return { ok: false, error: SESSION_EXPIRED_MESSAGE };
+  if (!/^\d{4}-\d{2}$/.test(month)) return { ok: false, error: 'חודש לא תקין.' };
+
+  const supabase = db();
+  if (amountIls === null) {
+    const { error } = await supabase.from('cash_inflow_overrides').delete().eq('month', month);
+    if (error) return dbFail(error);
+  } else {
+    if (!Number.isFinite(amountIls) || amountIls < 0) return { ok: false, error: 'צריך סכום של אפס או יותר.' };
+    const { error } = await supabase
+      .from('cash_inflow_overrides')
+      .upsert({ month, amount_ils: round(amountIls), member_id: memberId, updated_at: new Date().toISOString() }, { onConflict: 'month' });
+    if (error) return dbFail(error);
+  }
+  refreshPages();
+  return { ok: true, id: month };
+}
+
+/**
  * File an ATM withdrawal into a wallet, from the web. The bot uses
  * `assignWithdrawal` (lib/cash/withdrawal-wallet.ts) directly, since it has no
  * session cookie and checks the Telegram user itself.

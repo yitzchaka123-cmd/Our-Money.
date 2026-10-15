@@ -1,4 +1,5 @@
 import { envelopeChoices, resolveEnvelopeForCategory, type EnvelopeRef } from '@/lib/cash/envelopes';
+import { cashFlowsByMonth, inflowForecast, previousMonths, type CashMonthFlow, type InflowForecast } from '@/lib/cash/inflow';
 import { loadAccountLabels } from '@/lib/dashboard/account-labels';
 import { accountNamer, type AccountLabel, type AccountRef } from '@/lib/dashboard/accounts';
 import {
@@ -116,6 +117,10 @@ export interface WalletView {
   income: number;
   spent: number;
   movements: WalletMovement[];
+  /** "צפוי להיכנס החודש" (lib/cash/inflow.ts). */
+  inflow?: InflowForecast;
+  /** Cash in and out for the last five months, this one last: "חודשים קודמים". */
+  history?: CashMonthFlow[];
 }
 
 export interface DashboardData {
@@ -262,6 +267,7 @@ export async function loadDashboard(month: string, sessionMemberId: string | nul
     { data: skipRows },
     names,
     { data: overrideRows },
+    { data: inflowRow },
   ] = await Promise.all([
     supabase.from('riseup_envelopes').select('*').eq('month', month).order('position'),
     supabase.from('riseup_envelope_actuals').select('*').eq('month', month),
@@ -298,6 +304,8 @@ export async function loadDashboard(month: string, sessionMemberId: string | nul
     loadNameBook(),
     // Until migration 0006 is applied this errors, and there are simply no overrides.
     supabase.from('tracker_overrides').select('*').in('month', ['', month]),
+    // Until migration 0009 is applied this errors, and the card shows the guess.
+    supabase.from('cash_inflow_overrides').select('amount_ils').eq('month', month).maybeSingle(),
   ]);
 
   const wallets = (walletRows ?? []) as CashWallet[];
@@ -363,6 +371,8 @@ export async function loadDashboard(month: string, sessionMemberId: string | nul
       monthSpends: spends,
       monthTransfers: (monthTransfers ?? []) as CashTransfer[],
       memberNames,
+      month,
+      inflowOverride: inflowRow ? Number(inflowRow.amount_ils) : null,
     }),
     members: memberList,
     briefCount: spends.filter((s) => s.status === 'needs_review').length,
@@ -751,6 +761,8 @@ export function buildWallet({
   monthSpends,
   monthTransfers,
   memberNames,
+  month,
+  inflowOverride = null,
 }: {
   wallets: CashWallet[];
   allTopups: CashTopup[];
@@ -760,7 +772,17 @@ export function buildWallet({
   monthSpends: CashSpend[];
   monthTransfers: CashTransfer[];
   memberNames: Map<string, string>;
+  /** The month shown: with it come "צפוי להיכנס" and the five-month history. */
+  month?: string;
+  /** The couple's own expected cash in for that month (money.cash_inflow_overrides). */
+  inflowOverride?: number | null;
 }): WalletView {
+  const forecast = month
+    ? {
+        inflow: inflowForecast(allTopups, allSpends, month, inflowOverride),
+        history: cashFlowsByMonth(allTopups, allSpends, [...previousMonths(month, 4), month]),
+      }
+    : {};
   const state = walletState(allTopups, allSpends);
   const walletName = new Map(wallets.map((w) => [w.id, w.name]));
   const fallbackId = wallets.find((w) => w.is_default)?.id ?? wallets[0]?.id ?? null;
@@ -834,6 +856,7 @@ export function buildWallet({
     income: round(monthTopups.filter((t) => t.source === 'cash_income').reduce((s, t) => s + Number(t.amount_ils), 0)),
     spent: round(monthSpends.reduce((s, x) => s + Number(x.amount_ils), 0)),
     movements,
+    ...forecast,
   };
 }
 

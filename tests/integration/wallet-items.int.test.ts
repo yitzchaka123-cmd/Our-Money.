@@ -3,7 +3,8 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { SESSION_EXPIRED_MESSAGE } from '@/lib/auth/member';
 import { addCashEntry } from '@/lib/cash/actions';
 import { assignWithdrawal } from '@/lib/cash/withdrawal-wallet';
-import { assignWithdrawalToWallet } from '@/lib/cash/wallet-actions';
+import { assignWithdrawalToWallet, setCashInflowOverride } from '@/lib/cash/wallet-actions';
+import { loadDashboard } from '@/lib/dashboard/data';
 import { db } from '@/lib/db/client';
 
 import { resetDb, seedMember, signIn, signOut, sql } from './helpers';
@@ -30,8 +31,45 @@ let yitzchak: string;
 
 beforeEach(async () => {
   resetDb();
+  // Ours alone; the shared reset does not know it.
+  await db().from('cash_inflow_overrides').delete().neq('month', '');
   yitzchak = await seedMember(111, 'יצחק');
   signIn(yitzchak);
+});
+
+describe('expected cash in this month (V2-12)', () => {
+  const withdraw = (amount: number, date: string) =>
+    addCashEntry({ kind: 'withdrawal', amountIls: amount, category: '', note: null, date, envelopeId: null, memberId: null, walletId: null });
+
+  it('the dashboard guesses from the last three months, and our figure replaces the guess until removed', async () => {
+    await withdraw(900, '2026-06-05');
+    await withdraw(1200, '2026-07-05');
+    await addCashEntry({ kind: 'income', amountIls: 300, category: 'מתנה', note: null, date: '2026-08-02', envelopeId: null, memberId: null, walletId: null });
+    await withdraw(900, '2026-08-05');
+    await withdraw(250, `${MONTH}-03`);
+
+    const before = (await loadDashboard(MONTH, yitzchak)).wallet;
+    // June, July, August: 900, 1200, and 300 income + 900 withdrawn.
+    expect(before.inflow).toMatchObject({ predicted: 1100, override: null, arrived: 250 });
+    expect(before.history?.map((h) => h.in)).toEqual([0, 900, 1200, 1200, 250]);
+
+    expect((await setCashInflowOverride(MONTH, 2500)).ok).toBe(true);
+    expect((await setCashInflowOverride(MONTH, 2600)).ok).toBe(true);
+    expect(sql('select month, amount_ils from cash_inflow_overrides')).toEqual([{ month: MONTH, amount_ils: 2600 }]);
+    expect((await loadDashboard(MONTH, yitzchak)).wallet.inflow).toMatchObject({ override: 2600, expected: 2600 });
+    // Another month is untouched.
+    expect((await loadDashboard('2026-10', yitzchak)).wallet.inflow?.override).toBeNull();
+
+    expect((await setCashInflowOverride(MONTH, null)).ok).toBe(true);
+    expect((await loadDashboard(MONTH, yitzchak)).wallet.inflow?.override).toBeNull();
+  });
+
+  it('needs a session, a real month and a sane amount', async () => {
+    expect((await setCashInflowOverride('2026-9', 100)).ok).toBe(false);
+    expect((await setCashInflowOverride(MONTH, -5)).ok).toBe(false);
+    signOut();
+    expect(await setCashInflowOverride(MONTH, 100)).toEqual({ ok: false, error: SESSION_EXPIRED_MESSAGE });
+  });
 });
 
 describe('which wallet a withdrawal went into (V2-06a)', () => {

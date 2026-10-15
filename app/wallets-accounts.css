@@ -666,3 +666,65 @@
   font-size: 12px;
   color: var(--ink-2);
 }
+
+/* "צפוי להיכנס החודש": RiseUp's income line, for cash. */
+.wallet-inflow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  margin-top: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-row);
+  background: var(--surface);
+  color: var(--ink);
+  text-align: start;
+  font: inherit;
+  cursor: pointer;
+}
+
+.wallet-inflow-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.wallet-inflow-label {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.wallet-inflow-figure {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--income);
+}
+
+.wallet-inflow-bar {
+  display: block;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--income-track);
+  overflow: hidden;
+}
+
+.wallet-inflow-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--income);
+}
+
+.wallet-inflow-note {
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.inflow-explain {
+  margin: 0 0 14px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}

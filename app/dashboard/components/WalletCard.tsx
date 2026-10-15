@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import { Amount } from '@/app/dashboard/components/Amount';
 import { ChevronDown, Kebab } from '@/app/dashboard/components/icons';
+import { WalletInflowLine } from '@/app/dashboard/components/WalletInflow';
 import { WalletTiles } from '@/app/dashboard/components/WalletTiles';
 import type { WalletMovement, WalletView } from '@/lib/dashboard/data';
 import { shortDate } from '@/app/dashboard/components/EnvelopeCard';
@@ -20,6 +21,7 @@ export function WalletCard({
   onAddWithdrawal,
   onAddMoney,
   onAddSpend,
+  onEditInflow,
   onOpenWallet,
 }: {
   wallet: WalletView;
@@ -28,6 +30,8 @@ export function WalletCard({
   onAddWithdrawal?: () => void;
   /** A cash expense: the cash entry sheet. */
   onAddSpend?: () => void;
+  /** "עדכון כמה צפוי להיכנס". */
+  onEditInflow?: () => void;
   /** Add money to a wallet, or set how much is in it — the wallet's own settings. */
   onAddMoney?: () => void;
   onOpenWallet?: (walletId: string) => void;
@@ -54,6 +58,7 @@ export function WalletCard({
           <div><p className="figure-label">נכנס במזומן</p><Amount value={wallet.income} className="figure-expected" /></div>
           <div><p className="figure-label">יצא במזומן</p><Amount value={wallet.spent} className="figure-expected" /></div>
         </div>
+        {wallet.inflow ? <WalletInflowLine inflow={wallet.inflow} onEdit={onEditInflow} /> : null}
         {wallet.balance < 0 ? (
           <p className="wallet-warning">נרשמו יותר הוצאות ממה שנכנס — כנראה חסרה משיכה או הכנסה במזומן.</p>
         ) : null}

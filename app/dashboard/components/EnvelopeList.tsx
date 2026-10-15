@@ -19,7 +19,7 @@ import { newPlanDraft, PlanSheet, planToDraft, type PlanDraft } from '@/app/dash
 import { TrackerSheets, type TrackerSheetKind } from '@/app/dashboard/components/TrackerSheets';
 import { TransferSheet } from '@/app/dashboard/components/TransferSheet';
 import { TransactionSheet, type OpenTransaction } from '@/app/dashboard/components/TransactionSheet';
-import { WalletCard } from '@/app/dashboard/components/WalletCard';
+import { WalletSection } from '@/app/dashboard/components/WalletSection';
 import { WalletMovementOverlays } from '@/app/dashboard/components/WalletMovementSheet';
 import { WalletsSheet, type WalletsSheetFocus } from '@/app/dashboard/components/WalletsSheet';
 import { deleteCashEntry, markCashSpendAsSavings, type CashKind } from '@/lib/cash/actions';
@@ -159,7 +159,7 @@ export function EnvelopeList({
 
   return (
     <>
-      <WalletCard
+      <WalletSection
         wallet={wallet}
         onOpenMovement={openMovement}
         onManage={() => setWalletsFocus({})}
