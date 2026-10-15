@@ -205,7 +205,8 @@ export async function envelopeRefsForMonth(month: string): Promise<EnvelopeRef[]
   const supabase = db();
   const [{ data, error }, { data: actuals }, { data: overrideRows }] = await Promise.all([
     supabase.from('riseup_envelopes').select('envelope_id, envelope_type, name').eq('month', month),
-    supabase.from('riseup_envelope_actuals').select('envelope_id, category_label').eq('month', month).not('category_label', 'is', null),
+    // Income labels ("משכורת" in a fixed-income envelope) never file a cash spend.
+    supabase.from('riseup_envelope_actuals').select('envelope_id, category_label').eq('month', month).eq('is_income', false).not('category_label', 'is', null),
     // Trackers we added ourselves; errors (no migration 0006 yet) mean none.
     supabase.from('tracker_overrides').select('*').like('tracker_key', `${CUSTOM_PREFIX}%`),
   ]);

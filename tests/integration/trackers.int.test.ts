@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SESSION_EXPIRED_MESSAGE } from '@/lib/auth/member';
 import { addCashEntry } from '@/lib/cash/actions';
@@ -18,6 +18,10 @@ import { db } from '@/lib/db/client';
 import { resetDb, seedMember, seedMonth, signIn, signOut, sql } from './helpers';
 
 const SEP = '2026-09';
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 const OCT = '2026-10';
 const KEY = 'v2-default-il-expense-category-13';
 const carId = (month: string) => `${month}#trackingCategory#${KEY}#0`;
@@ -142,6 +146,11 @@ describe('tracker overrides against the real schema', () => {
   });
 
   it('applies our target and name to a tracker RiseUp splits by the week, shown as one card', async () => {
+    // Seen before October starts, every week counts its plan or what was
+    // spent in it, if more (V2-18): week 1 (part #0) 2,850; week 2 (part #1)
+    // 150 planned but 250 spent on the 6th; week 3, no plan, 80 on the 12th.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-09-28T09:00:00Z'));
     // A second week of the same tracker in October.
     const week2 = `${OCT}#trackingCategory#${KEY}#1`;
     await db().from('riseup_envelopes').insert({ month: OCT, envelope_id: week2, envelope_type: 'trackingCategory', name: 'רכב', planned_ils: 150, actual_ils: 80, position: 6 });
@@ -149,7 +158,7 @@ describe('tracker overrides against the real schema', () => {
 
     const before = (await loadDashboard(OCT, yitzchak)).envelopes.filter((e) => e.trackerKey === KEY);
     expect(before).toHaveLength(1);
-    expect(before[0]).toMatchObject({ actual: 330, expected: 3000, weekly: true });
+    expect(before[0]).toMatchObject({ actual: 330, expected: 3180, weekly: true, weekPlans: [2850, 150] });
 
     await renameTracker(KEY, 'האוטו');
     await setTrackerTarget(KEY, 1000, OCT, false);
@@ -163,6 +172,7 @@ describe('tracker overrides against the real schema', () => {
       [SEP, 400, 1000],
       [OCT, 330, 1000],
     ]);
+    vi.useRealTimers();
   });
 
   it("reads a tracker's months by its key, and falls back to transactions by label", async () => {

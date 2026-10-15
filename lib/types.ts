@@ -104,7 +104,12 @@ export type EnvelopeType =
   | 'trackingCategory'
   | 'riseupGoal'
   /** Not a RiseUp type — the cash income envelope this app adds. */
-  | 'cashIncome';
+  | 'cashIncome'
+  /**
+   * Not a RiseUp type — RiseUp's `fixed` envelopes whose charges are income
+   * (a salary marked "הכנסה קבועה"), folded into one income card.
+   */
+  | 'fixedIncome';
 
 export interface RiseupEnvelopeActual {
   transactionId: string;

@@ -56,6 +56,42 @@
   color: var(--muted);
 }
 
+.forecast-weekly {
+  display: block;
+}
+
+/* The fixed charges not charged yet: a fold under the fixed line. */
+.forecast-upcoming {
+  padding: 10px 0 12px 0;
+  padding-inline-start: 22px;
+  border-bottom: 1px solid var(--hairline);
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.forecast-upcoming summary {
+  cursor: pointer;
+  color: var(--ink-2);
+}
+
+.forecast-upcoming ul {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+
+.forecast-upcoming li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 3px 0;
+}
+
+.forecast-upcoming-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .forecast-figure {
   flex: 0 0 auto;
   font-size: 17px;

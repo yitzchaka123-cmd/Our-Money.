@@ -141,7 +141,8 @@ function AccountCard({ account, monthName, updated }: { account: AccountSummary;
     <article className="card account-card">
       <div className="card-body">
         {updated ? <p className="account-updated">מעודכן ל-{updated}</p> : null}
-        <p className="account-provider">{named ? account.displayName : account.provider}</p>
+        {/* The name used everywhere: yours, else the provider — numbered when two share it. */}
+        <p className="account-provider">{account.displayName}</p>
         {named ? <p className="account-sub">{account.provider}</p> : null}
         <p className="account-figure-label">
           חיובים ב{monthName}

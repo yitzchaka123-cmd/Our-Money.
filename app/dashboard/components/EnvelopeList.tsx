@@ -184,6 +184,7 @@ export function EnvelopeList({
             actuals={envelope.actuals}
             upcoming={envelope.upcoming}
             weekly={envelope.weekly}
+            weekPlans={envelope.weekPlans}
             month={month}
             today={today}
             showRemaining={envelope.showRemaining}
@@ -194,7 +195,7 @@ export function EnvelopeList({
             onAddCash={
               envelope.type === 'cashIncome'
                 ? () => openNew('income')
-                : envelope.type === 'variableIncome' || envelope.type === 'riseupGoal'
+                : envelope.type === 'variableIncome' || envelope.type === 'fixedIncome' || envelope.type === 'riseupGoal'
                   ? undefined
                   : () => openNew('spend', envelope.envelopeId)
             }

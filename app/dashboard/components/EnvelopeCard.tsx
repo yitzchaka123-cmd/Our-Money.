@@ -38,6 +38,8 @@ export interface EnvelopeCardProps {
   upcoming?: UpcomingCharge[];
   /** A tracker RiseUp keeps by the week: break it down by week. */
   weekly?: boolean;
+  /** That tracker's plan per week: each week shows what it is expected to cost. */
+  weekPlans?: number[];
 }
 
 /** Column wording differs per envelope type, exactly as RiseUp words it. */
@@ -58,6 +60,13 @@ function labels(type: EnvelopeType): Labels {
         expected: 'צפוי להיכנס',
         expectedInTable: 'צפוי להיכנס',
         expander: 'פירוט הכנסות משתנות',
+      };
+    case 'fixedIncome':
+      return {
+        actual: 'נכנס',
+        expected: 'צפוי להיכנס',
+        expectedInTable: 'צפוי להיכנס',
+        expander: 'פירוט הכנסות קבועות',
       };
     case 'cashIncome':
       return {
@@ -102,6 +111,7 @@ export function EnvelopeCard({
   onMenu,
   upcoming = [],
   weekly = false,
+  weekPlans,
 }: EnvelopeCardProps) {
   const [open, setOpen] = useState(defaultOpen);
   const text = weekly ? { ...labels(type), expander: 'פירוט שבועי' } : labels(type);
@@ -111,7 +121,7 @@ export function EnvelopeCard({
   const ratio = barRatio(actual, expected);
   // Cash already promised is not free to spend, even before it goes out.
   const remaining = Math.max(expected - actual - pendingTotal, 0);
-  const buckets = buildBuckets(type, actuals, { today, month, upcoming, weekly });
+  const buckets = buildBuckets(type, actuals, { today, month, upcoming, weekly, weekPlans });
 
   return (
     <article className="card envelope" data-type={type}>
@@ -165,6 +175,7 @@ export function EnvelopeCard({
         <Breakdown
           buckets={buckets}
           labels={text}
+          upcomingLabel={type === 'fixedIncome' ? 'צפוי להיכנס' : 'צפוי לרדת'}
           envelopeTitle={title}
           expandFirst={defaultOpen}
           onOpenTransaction={onOpenTransaction}
@@ -193,12 +204,14 @@ export function EnvelopeCard({
 function Breakdown({
   buckets,
   labels: text,
+  upcomingLabel,
   envelopeTitle,
   expandFirst = false,
   onOpenTransaction,
 }: {
   buckets: Bucket[];
   labels: Labels;
+  upcomingLabel: string;
   envelopeTitle: string;
   expandFirst?: boolean;
   onOpenTransaction?: (actual: NormalizedActual, envelopeTitle: string) => void;
@@ -215,6 +228,7 @@ function Breakdown({
         <BucketRow
           key={bucket.key}
           bucket={bucket}
+          upcomingLabel={upcomingLabel}
           envelopeTitle={envelopeTitle}
           defaultOpen={expandFirst && index === 0}
           onOpenTransaction={onOpenTransaction}
@@ -226,11 +240,14 @@ function Breakdown({
 
 function BucketRow({
   bucket,
+  upcomingLabel,
   envelopeTitle,
   defaultOpen = false,
   onOpenTransaction,
 }: {
   bucket: Bucket;
+  /** The date column of a charge still to come: "צפוי לרדת", or "צפוי להיכנס" for income. */
+  upcomingLabel: string;
   envelopeTitle: string;
   defaultOpen?: boolean;
   onOpenTransaction?: (actual: NormalizedActual, envelopeTitle: string) => void;
@@ -300,7 +317,7 @@ function BucketRow({
       {open
         ? bucket.upcoming.map((charge) => (
             <div key={charge.key} className="txn-row is-upcoming">
-              <span className="date">צפוי לרדת</span>
+              <span className="date">{upcomingLabel}</span>
               <span className="amount">
                 <Amount value={charge.amountIls} />
               </span>

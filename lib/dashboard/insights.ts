@@ -88,7 +88,7 @@ function round(value: number): number {
 const sum = (values: number[]) => round(values.reduce((s, v) => s + v, 0));
 
 const EXPENSE_CANDIDATES = new Set<EnvelopeView['type']>(['variable', 'trackingCategory']);
-const INCOME_TYPES = new Set<EnvelopeView['type']>(['variableIncome', 'cashIncome']);
+const INCOME_TYPES = new Set<EnvelopeView['type']>(['variableIncome', 'fixedIncome', 'cashIncome']);
 
 // ---------------------------------------------------------------------------
 // The rules

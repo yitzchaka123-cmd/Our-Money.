@@ -77,8 +77,11 @@ export function mostCommon(labels: Array<string | null | undefined>, prefer?: st
 export interface NameBook {
   /** Tracker key → its name. */
   trackers: Map<string, string>;
-  /** Fixed charge key → the category and merchant it was charged under. */
-  fixed: Map<string, { label: string | null; businessName: string | null }>;
+  /**
+   * Fixed charge key → the category and merchant it was charged under, and
+   * whether it came in as income (a salary RiseUp keeps as fixed income).
+   */
+  fixed: Map<string, { label: string | null; businessName: string | null; income?: boolean }>;
 }
 
 export interface NameBookInput {
@@ -88,6 +91,7 @@ export interface NameBookInput {
     category_label: string | null;
     business_name?: string | null;
     transaction_date?: string | null;
+    is_income?: boolean | null;
   }>;
 }
 
@@ -130,9 +134,13 @@ export function buildNameBook({ envelopes, actuals }: NameBookInput): NameBook {
   const fixed: NameBook['fixed'] = new Map();
   for (const [key, rows] of fixedRows) {
     const latest = [...rows].sort((a, b) => (b.transaction_date ?? '').localeCompare(a.transaction_date ?? ''))[0];
+    // Income when every charge of its latest month came in as income.
+    const latestMonth = latest?.envelope_id.split('#')[0];
+    const recent = rows.filter((r) => r.envelope_id.split('#')[0] === latestMonth);
     fixed.set(key, {
       label: mostCommon(rows.map((r) => r.category_label)),
       businessName: latest?.business_name?.trim() || null,
+      income: recent.length > 0 && recent.every((r) => r.is_income === true),
     });
   }
 

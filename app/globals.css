@@ -314,6 +314,7 @@ a {
 }
 
 .envelope[data-type='variableIncome'],
+.envelope[data-type='fixedIncome'],
 .envelope[data-type='cashIncome'] {
   --accent: var(--income);
   --track: var(--income-track);

@@ -179,6 +179,7 @@ button.blob {
   --panel-ink: #6b5200;
 }
 .brief-panel[data-type='variableIncome'],
+.brief-panel[data-type='fixedIncome'],
 .brief-panel[data-type='cashIncome'] {
   --panel: #e3f3c6;
   --panel-ink: #1a1a1a;

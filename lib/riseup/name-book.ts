@@ -11,6 +11,7 @@ export function budgetActualRows(budgets: RiseupBudget[]): NameBookInput['actual
         category_label: actual.categoryLabel ?? actual.expense ?? null,
         business_name: actual.businessName ?? null,
         transaction_date: actual.transactionDate?.slice(0, 10) ?? null,
+        is_income: Boolean(actual.isIncome),
       })),
     ),
   );
@@ -28,7 +29,7 @@ export async function loadNameBook(fresh: NameBookInput['actuals'] = []): Promis
       supabase.from('riseup_envelopes').select('envelope_id, envelope_type, name').eq('envelope_type', 'trackingCategory'),
       supabase
         .from('riseup_envelope_actuals')
-        .select('envelope_id, category_label, business_name, transaction_date')
+        .select('envelope_id, category_label, business_name, transaction_date, is_income')
         .or('envelope_id.like.*#trackingCategory#*,envelope_id.like.*#fixed#*'),
     ]);
     const failed = envelopes.error ?? actuals.error;

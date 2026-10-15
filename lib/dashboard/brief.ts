@@ -303,6 +303,7 @@ const TYPE_LABELS: Partial<Record<EnvelopeType, string>> = {
   variable: 'הוצאות משתנות',
   fixed: 'הוצאות קבועות',
   variableIncome: 'הכנסות משתנות',
+  fixedIncome: 'הכנסות קבועות',
   cashIncome: 'הכנסה במזומן',
   riseupGoal: 'הפקדות לחיסכון',
 };
@@ -310,7 +311,7 @@ const TYPE_LABELS: Partial<Record<EnvelopeType, string>> = {
 export function briefLabel(type: EnvelopeType, title: string, category: string | null, isCash: boolean): string {
   const base = type === 'trackingCategory' ? title : (TYPE_LABELS[type] ?? title);
   const withCategory =
-    (type === 'variable' || type === 'fixed') && category && category !== base ? `${base} · ${category}` : base;
+    (type === 'variable' || type === 'fixed' || type === 'fixedIncome') && category && category !== base ? `${base} · ${category}` : base;
   return isCash && type !== 'cashIncome' ? `מזומן · ${withCategory}` : withCategory;
 }
 

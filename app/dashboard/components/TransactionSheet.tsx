@@ -21,6 +21,7 @@ function sheetLabel(type: EnvelopeType, envelopeTitle: string, isCash: boolean):
     case 'variable': return `${prefix}הוצאה משתנה`;
     case 'variableIncome': return `${prefix}הכנסות משתנות`;
     case 'cashIncome': return 'הכנסה במזומן';
+    case 'fixedIncome': return 'הכנסה קבועה';
     case 'fixed': return `${prefix}הוצאות קבועות · ${envelopeTitle}`;
     case 'riseupGoal': return `${prefix}הפקדה לחיסכון`;
     default: return `${prefix}${envelopeTitle}`;
