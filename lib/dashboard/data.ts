@@ -21,6 +21,7 @@ import {
   type UpcomingCharge,
 } from '@/lib/riseup/envelopes';
 import { syncBanner, type SyncBanner } from '@/lib/riseup/banner';
+import { weeklyExpected } from '@/lib/dashboard/buckets';
 import { mergeRiseupEnvelopes } from '@/lib/dashboard/merge-envelopes';
 import { loadNameBook } from '@/lib/riseup/name-book';
 import { isUnresolvedName, resolveTrackerName, type NameBook } from '@/lib/riseup/tracker-names';
@@ -55,6 +56,11 @@ export interface EnvelopeView {
   upcoming?: UpcomingCharge[];
   /** A tracker RiseUp keeps by the week: its breakdown is weekly. */
   weekly?: boolean;
+  /**
+   * That tracker's plan per calendar week. With a date to count from, its
+   * expected follows RiseUp: weeks that are over at what was spent in them.
+   */
+  weekPlans?: number[];
   /** Trackers: the key that stays the same from month to month. */
   trackerKey?: string | null;
   /** Set when our own override (money.tracker_overrides) changed this envelope. */
@@ -171,6 +177,13 @@ export interface MonthRows {
   accountLabels?: AccountLabel[];
   /** Our tracker and expected-income overrides; RiseUp's API is read-only. */
   overrides?: TrackerOverride[];
+  /**
+   * Israel date (YYYY-MM-DD) the month is seen from. With it, a weekly
+   * tracker counts the weeks that are over at what was spent in them, as
+   * RiseUp does (lib/dashboard/buckets.ts `weeklyExpected`); without it, at
+   * the sum of its plans.
+   */
+  today?: string;
 }
 
 /**
@@ -216,6 +229,7 @@ export function assembleMonth(rows: MonthRows): {
     occurrences,
     rows.plans,
     rows.memberNames,
+    rows.today ? { today: rows.today, month: rows.month } : undefined,
   ).map((view) => {
     const info = prepared.info.get(view.key);
     return info ? { ...view, override: info } : view;
@@ -322,6 +336,7 @@ export async function loadDashboard(month: string, sessionMemberId: string | nul
     names,
     accountLabels,
     overrides: toOverrides(overrideRows as TrackerOverrideRow[] | null),
+    today: isoDateInIsrael(),
   });
 
   const totals = monthTotals(envelopes);
@@ -496,6 +511,7 @@ function toView(envelope: NormalizedEnvelope): EnvelopeView {
     pendingTotal: 0,
     ...(envelope.upcoming?.length ? { upcoming: envelope.upcoming } : {}),
     ...(envelope.weekly ? { weekly: true } : {}),
+    ...(envelope.weekPlans ? { weekPlans: envelope.weekPlans } : {}),
     trackerKey: envelope.type === 'trackingCategory' ? trackerKey(envelope.envelopeId) : null,
   };
 }
@@ -525,6 +541,8 @@ export function applyCashFigures(
   occurrences: PlanOccurrence[],
   plans: CashPlan[],
   memberNames: Map<string, string>,
+  /** The month, and the Israel date it is seen from; see `MonthRows.today`. */
+  seen?: { today: string; month: string },
 ): EnvelopeView[] {
   const list = [...envelopes];
   const refs = list.filter((e) => e.type !== 'cashIncome').map(toRef);
@@ -561,12 +579,18 @@ export function applyCashFigures(
     const cashActual = round(envelope.actuals.filter((a) => a.cash).reduce((s, a) => s + a.amountIls, 0));
     const riseupActual = round(envelope.actualIls - cashActual);
     const pendingTotal = round(pending.reduce((s, o) => s + o.amountIls, 0));
+    // A weekly tracker's plan, RiseUp-style: weeks that are over count what
+    // was spent in them (cash included), the rest their plan or more.
+    const riseupPlanned =
+      envelope.weekPlans && seen
+        ? weeklyExpected({ weekPlans: envelope.weekPlans, actuals: envelope.actuals, ...seen }).total
+        : envelope.plannedIls;
 
     return {
       ...view,
       expected: expectedWithCash({
         type: envelope.type,
-        riseupPlanned: envelope.plannedIls,
+        riseupPlanned,
         riseupActual,
         cashActual,
         planCommitted: round(own.reduce((s, o) => s + o.amountIls, 0)),

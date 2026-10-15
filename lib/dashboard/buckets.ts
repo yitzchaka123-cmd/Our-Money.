@@ -53,6 +53,41 @@ function weekWithin(isoDate: string, month: string): number {
 }
 
 /**
+ * A weekly tracker's expected spending, the way RiseUp counts it: RiseUp
+ * splits the month's plan into one part per calendar week (part `#k` is week
+ * k + 1). A week that is over counts what was really spent in it; the
+ * current week and the ones after it count their plan, or what was spent if
+ * that is more. A month that is over counts only what was spent; a month to
+ * come counts every plan. `actuals` are bucketed by date, cash included.
+ */
+export function weeklyExpected({
+  weekPlans,
+  actuals,
+  month,
+  today,
+}: {
+  weekPlans: number[];
+  actuals: NormalizedActual[];
+  month: string;
+  today: string;
+}): { total: number; byWeek: number[] } {
+  const thisMonth = today.slice(0, 7);
+  const firstOpenWeek = thisMonth < month ? 1 : thisMonth > month ? Infinity : weekOfMonth(today);
+  const weeks = Math.max(weeksInMonth(month), weekPlans.length);
+  const spent = new Array<number>(weeks).fill(0);
+  for (const actual of actuals) {
+    if (!actual.transactionDate) continue;
+    const week = weekWithin(actual.transactionDate, month);
+    spent[week - 1] = (spent[week - 1] ?? 0) + actual.amountIls;
+  }
+  const byWeek = spent.map((s, index) => {
+    const plan = weekPlans[index] ?? 0;
+    return round(index + 1 < firstOpenWeek ? s : Math.max(plan, s));
+  });
+  return { total: round(byWeek.reduce((sum, value) => sum + value, 0)), byWeek };
+}
+
+/**
  * Variable expenses — and a tracker RiseUp keeps by the week — break down by
  * week (`פירוט שבועי`); everything else breaks down by the category label on
  * its transactions (`פירוט חודשי`), with the fixed charges still expected this
@@ -61,7 +96,14 @@ function weekWithin(isoDate: string, month: string): number {
 export function buildBuckets(
   type: EnvelopeType,
   actuals: NormalizedActual[],
-  options: { today?: string; month: string; upcoming?: UpcomingCharge[]; weekly?: boolean },
+  options: {
+    today?: string;
+    month: string;
+    upcoming?: UpcomingCharge[];
+    weekly?: boolean;
+    /** A weekly tracker's plan per week: each week then shows what it is expected to cost. */
+    weekPlans?: number[];
+  },
 ): Bucket[] {
   return type === 'variable' || options.weekly
     ? weeklyBuckets(actuals, options)
@@ -70,10 +112,12 @@ export function buildBuckets(
 
 function weeklyBuckets(
   actuals: NormalizedActual[],
-  { today, month }: { today?: string; month: string },
+  { today, month, weekPlans }: { today?: string; month: string; weekPlans?: number[] },
 ): Bucket[] {
   const currentWeek =
     today && today.slice(0, 7) === month ? weekOfMonth(today) : null;
+  const expectedByWeek =
+    weekPlans && today ? weeklyExpected({ weekPlans, actuals, month, today }).byWeek : null;
 
   const byWeek = new Map<number, NormalizedActual[]>();
   for (const actual of actuals) {
@@ -90,7 +134,7 @@ function weeklyBuckets(
       key: `week-${week}`,
       label: `שבוע ${week}`,
       actual,
-      expected: null,
+      expected: expectedByWeek ? (expectedByWeek[index] ?? 0) : null,
       isCurrent: currentWeek === week,
       isEmpty: items.length === 0,
       isUpcoming: false,

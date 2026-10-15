@@ -47,6 +47,8 @@ export interface NormalizedEnvelope {
   upcoming?: UpcomingCharge[];
   /** A tracker RiseUp splits into weekly parts: its breakdown is by week. */
   weekly?: boolean;
+  /** That tracker's plan per calendar week: part `#k` is week k + 1. */
+  weekPlans?: number[];
 }
 
 /** A fixed charge RiseUp expects this month that has not been charged yet. */

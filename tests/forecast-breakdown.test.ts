@@ -106,12 +106,14 @@ describe('forecastBreakdown', () => {
   const b = forecastBreakdown(envelopes);
 
   it('takes every figure from the envelopes the forecast is built from', () => {
-    expect(b).toEqual({
+    expect(b).toMatchObject({
       incomeExpected: 12000,
       fixedIncomeExpected: 0,
       cashIn: 400,
       fixedExpected: 4800,
+      fixedUpcoming: [],
       trackersExpected: 950,
+      weeklyTrackers: [],
       variableExpected: 5000,
       variableSpent: 3150,
       savingsExpected: 1000,

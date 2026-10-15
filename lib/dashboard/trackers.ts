@@ -144,10 +144,13 @@ export function prepareTrackers(
       monthOnly: o.monthOnly,
       categoryLabel: null,
     });
+    const { weekPlans, ...rest } = envelope;
     return {
-      ...envelope,
+      ...rest,
       name: o.name ?? envelope.name,
       plannedIls: o.targetIls ?? envelope.plannedIls,
+      // Our own target is for the whole month: RiseUp's weekly split no longer applies.
+      ...(o.targetIls === null && weekPlans ? { weekPlans } : {}),
     };
   });
 

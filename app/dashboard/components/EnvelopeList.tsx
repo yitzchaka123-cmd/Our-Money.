@@ -184,6 +184,7 @@ export function EnvelopeList({
             actuals={envelope.actuals}
             upcoming={envelope.upcoming}
             weekly={envelope.weekly}
+            weekPlans={envelope.weekPlans}
             month={month}
             today={today}
             showRemaining={envelope.showRemaining}

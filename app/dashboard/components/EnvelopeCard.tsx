@@ -38,6 +38,8 @@ export interface EnvelopeCardProps {
   upcoming?: UpcomingCharge[];
   /** A tracker RiseUp keeps by the week: break it down by week. */
   weekly?: boolean;
+  /** That tracker's plan per week: each week shows what it is expected to cost. */
+  weekPlans?: number[];
 }
 
 /** Column wording differs per envelope type, exactly as RiseUp words it. */
@@ -109,6 +111,7 @@ export function EnvelopeCard({
   onMenu,
   upcoming = [],
   weekly = false,
+  weekPlans,
 }: EnvelopeCardProps) {
   const [open, setOpen] = useState(defaultOpen);
   const text = weekly ? { ...labels(type), expander: 'פירוט שבועי' } : labels(type);
@@ -118,7 +121,7 @@ export function EnvelopeCard({
   const ratio = barRatio(actual, expected);
   // Cash already promised is not free to spend, even before it goes out.
   const remaining = Math.max(expected - actual - pendingTotal, 0);
-  const buckets = buildBuckets(type, actuals, { today, month, upcoming, weekly });
+  const buckets = buildBuckets(type, actuals, { today, month, upcoming, weekly, weekPlans });
 
   return (
     <article className="card envelope" data-type={type}>

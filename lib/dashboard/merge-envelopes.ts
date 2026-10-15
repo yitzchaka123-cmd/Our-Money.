@@ -45,12 +45,14 @@ export function mergeRiseupEnvelopes(
     if (group === 'fixedIncome') return mergeFixed(parts, names, 'fixedIncome');
     if (first.type === 'fixed') return mergeFixed(parts, names, 'fixed');
     if (parts.length === 1) return first;
+    const weekPlans = weekPlansOf(parts);
     return {
       ...first,
       plannedIls: round(sum(parts.map((p) => p.plannedIls))),
       actualIls: round(sum(parts.map((p) => p.actualIls))),
       actuals: parts.flatMap((p) => p.actuals),
-      weekly: parts.some((p) => envelopePart(p.envelopeId) !== null) || undefined,
+      weekly: weekPlans ? true : undefined,
+      ...(weekPlans ? { weekPlans } : {}),
     };
   });
 
@@ -111,6 +113,17 @@ function mergeFixed(
     actuals: parts.flatMap((p) => p.actuals),
     upcoming,
   };
+}
+
+/** A weekly tracker's plan per week, from its `#k` parts; null when it has none. */
+function weekPlansOf(parts: NormalizedEnvelope[]): number[] | undefined {
+  const indexed = parts
+    .map((p) => ({ k: envelopePart(p.envelopeId), planned: p.plannedIls }))
+    .filter((p): p is { k: number; planned: number } => p.k !== null);
+  if (indexed.length === 0) return undefined;
+  const plans = new Array<number>(Math.max(...indexed.map((p) => p.k)) + 1).fill(0);
+  for (const { k, planned } of indexed) plans[k] = round(plans[k]! + planned);
+  return plans;
 }
 
 function sum(values: number[]): number {
