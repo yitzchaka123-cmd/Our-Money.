@@ -38,6 +38,7 @@ import { loadSyncState } from '@/lib/riseup/sync';
 import { matchesWithdrawalName } from '@/lib/riseup/withdrawals';
 import { drawerName, greetingName, memberNameMap, signedInMember } from '@/lib/profile/names';
 import { setupSteps, walletBalanceSet, type SetupStep } from '@/lib/dashboard/steps';
+import { noteMap, type NoteRow } from '@/lib/dashboard/notes';
 import type { CashSpend, CashTopup, CashTransfer, CashWallet, EnvelopeType, HouseholdMember } from '@/lib/types';
 
 export interface EnvelopeView {
@@ -190,6 +191,8 @@ export interface MonthRows {
    * the sum of its plans.
    */
   today?: string;
+  /** Our own notes on RiseUp charges, by transaction id. */
+  notes?: ReadonlyMap<string, string>;
 }
 
 /**
@@ -201,7 +204,7 @@ export function assembleMonth(rows: MonthRows): {
   envelopes: EnvelopeView[];
   riseupEnvelopes: NormalizedEnvelope[];
 } {
-  const actualsByEnvelope = groupActuals(rows.actualRows, rows.accountLabels ?? []);
+  const actualsByEnvelope = groupActuals(rows.actualRows, rows.accountLabels ?? [], rows.notes);
   const overrides = rows.overrides ?? [];
   // One fixed card and one card per tracker, as RiseUp shows them.
   const { envelopes: mergedRiseup, aliases } = mergeRiseupEnvelopes(
@@ -282,6 +285,7 @@ export async function loadDashboard(month: string, sessionMemberId: string | nul
     { data: skipRows },
     names,
     { data: overrideRows },
+    { data: noteRows },
   ] = await Promise.all([
     supabase.from('riseup_envelopes').select('*').eq('month', month).order('position'),
     supabase.from('riseup_envelope_actuals').select('*').eq('month', month),
@@ -318,6 +322,8 @@ export async function loadDashboard(month: string, sessionMemberId: string | nul
     loadNameBook(),
     // Until migration 0006 is applied this errors, and there are simply no overrides.
     supabase.from('tracker_overrides').select('*').in('month', ['', month]),
+    // Our notes on RiseUp charges — a short table; until 0011 is applied this errors and there are none.
+    supabase.from('transaction_notes').select('transaction_id, note'),
   ]);
 
   const wallets = (walletRows ?? []) as CashWallet[];
@@ -343,6 +349,7 @@ export async function loadDashboard(month: string, sessionMemberId: string | nul
     accountLabels,
     overrides: toOverrides(overrideRows as TrackerOverrideRow[] | null),
     today: isoDateInIsrael(),
+    notes: noteMap(noteRows as NoteRow[] | null),
   });
 
   const totals = monthTotals(envelopes);
@@ -422,7 +429,11 @@ export interface ActualRow {
   category_label: string | null;
 }
 
-function groupActuals(rows: ActualRow[], labels: AccountLabel[]): Map<string, NormalizedActual[]> {
+function groupActuals(
+  rows: ActualRow[],
+  labels: AccountLabel[],
+  notes: ReadonlyMap<string, string> = new Map(),
+): Map<string, NormalizedActual[]> {
   const grouped = new Map<string, NormalizedActual[]>();
   const accountOf = (row: ActualRow): AccountRef => ({ source: row.source, hash: row.account_number_hash, nickname: row.account_nickname });
   // Every row's card or account reads the same way: your name for it, else
@@ -450,6 +461,7 @@ function groupActuals(rows: ActualRow[], labels: AccountLabel[]): Map<string, No
         paymentNumber: row.payment_number,
         totalPayments: row.total_payments,
         categoryLabel: row.category_label,
+        ...(notes.has(row.transaction_id) ? { note: notes.get(row.transaction_id) } : {}),
       },
     ]);
   }

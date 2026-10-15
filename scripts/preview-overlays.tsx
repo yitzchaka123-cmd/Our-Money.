@@ -8,27 +8,67 @@
  *   npx tsx scripts/preview-dashboard.tsx out.html assistant-chat     (a mocked conversation)
  *   npx tsx scripts/preview-dashboard.tsx out.html assistant-pending  ("אני על זה...")
  *   npx tsx scripts/preview-dashboard.tsx out.html assistant-history
+ *   npx tsx scripts/preview-dashboard.tsx out.html txn-note           (a RiseUp charge with our note)
+ *   npx tsx scripts/preview-dashboard.tsx out.html note-sheet         (editing that note)
  */
 
 import type { ReactNode } from 'react';
 
 import { AssistantSheet } from '../app/dashboard/components/AssistantSheet';
+import { RiseupNoteSheet } from '../app/dashboard/components/RiseupNoteSheet';
 import { SetupStepsSheet } from '../app/dashboard/components/SetupSteps';
+import { TransactionSheet } from '../app/dashboard/components/TransactionSheet';
 import { setupSteps } from '../lib/dashboard/steps';
+import type { NormalizedActual } from '../lib/riseup/envelopes';
+
+const NOTED: NormalizedActual = {
+  transactionId: 't-delpasto',
+  transactionDate: '2026-10-14',
+  billingDate: '2026-10-14',
+  businessName: 'דל פסטו',
+  amountIls: 42,
+  isIncome: false,
+  accountNickname: null,
+  accountNumberHash: 'cc5910',
+  accountName: 'כרטיס 0848',
+  source: 'leumicard',
+  isInstallment: false,
+  paymentNumber: null,
+  totalPayments: null,
+  categoryLabel: 'אוכל בחוץ',
+  note: 'שניצל לארוחת ערב',
+};
 
 export function previewOverlay(mode: string | undefined): ReactNode {
   switch (mode) {
+    case 'txn-note':
+      return (
+        <TransactionSheet
+          open
+          onClose={() => {}}
+          transaction={{ actual: NOTED, envelopeTitle: 'אוכל בחוץ', envelopeType: 'trackingCategory', envelopeId: 'e-food' }}
+          walletName={null}
+          onCashAction={() => {}}
+          onEditCash={() => {}}
+          onSavings={() => {}}
+          onDeleteCash={() => {}}
+        />
+      );
+    case 'note-sheet':
+      return <RiseupNoteSheet actual={NOTED} month="2026-10" onClose={() => {}} />;
+    // A sync's result is said in the line under the month bar (no bubble):
+    // these draw that line, in place, as it reads right after a tap.
     case 'sync-toast':
       return (
-        <div className="sync-toast" role="status">
+        <p className="sync-line" role="status" style={{ position: 'fixed', top: 116, insetInline: 0 }}>
           סונכרן עכשיו
-        </div>
+        </p>
       );
     case 'sync-error':
       return (
-        <div className="sync-toast" data-tone="error" role="status">
+        <p className="sync-line" data-tone="error" role="status" style={{ position: 'fixed', top: 116, insetInline: 0 }}>
           הטוקן של RiseUp פג תוקף. צריך ליצור חדש ולעדכן אותו.
-        </div>
+        </p>
       );
     case 'steps':
       return (

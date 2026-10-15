@@ -1,0 +1,11 @@
+# Helper U — progress
+
+| Item | Status | Note |
+|---|---|---|
+| V4-1 side menu from the right | done | Drawer always mounted, slides from the physical right edge, rounded inner side, scrim fades; inert while closed; Escape closes; no animation with reduced motion. |
+| V2-3 sync button on accounts and settings | done | Shared `PageTopBar` (back arrow + the dashboard's sync button) on /accounts and /settings; a sync also revalidates those pages. Settings change is the top bar only. |
+| V2-15 always-visible "last synced" line, sticky top bar | done | `SyncLine` under the month bar (and under the top bar on accounts/settings): "עודכן לפני 5 דק׳" / "עודכן היום 20:40", ticks every 30 s and on return to the tab; a sync's progress/result shows in that line (no bubble over the month). Top bar, month bar and line are sticky; body `overflow-x: clip` so nothing unsticks them. In the video frames the bar already stayed on screen — the hardening is defensive. |
+| V2-16 notes on RiseUp charges, "היום"/"אתמול" | done | Migration `0011_transaction_notes.sql` (NOT applied — lead applies). `saveTransactionNote` server action (empty note deletes); the transaction sheet's "להוסיף הערה"/"לערוך את ההערה" works on RiseUp charges (`RiseupNoteSheet`, says the note stays with us); note shows under the merchant in breakdowns, on the sheet and in search results, and search matches it. Before 0011 is applied every read just finds no notes. Rows (breakdowns + search) say "היום"/"אתמול". The daily-brief deck still only closes on note (B's area). |
+| V4-11 stay signed in 90 days | done | Cookie + token now 90 days (httpOnly, secure, sameSite=lax unchanged). New `proxy.ts` (Next 16's middleware) renews a good cookie older than a day on page visits; never signs in or blocks. Existing 30-day cookies roll over to 90 on the next visit. Caveat: a home-screen app and a Telegram in-app browser keep their own cookie jars, so the first open in each still needs one sign-in. |
+
+Checks before the last commit: tsc clean; vitest 49 files / 461 tests; integration 15 files / 91 tests; `next build` OK (only with a temporary `turbopack.root` in next.config, reverted — Turbopack refuses the worktree's node_modules symlink); `npm run lint` cannot run (Next 16 has no `next lint`, and no eslint is installed).

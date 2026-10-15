@@ -79,6 +79,7 @@ export function TransactionSheet({
             <p className="meta">{merchantLine(actual).replace(actual.businessName, '').trim()}</p>
           ) : null}
           <p className="meta">{shortDate(actual.transactionDate)}</p>
+          {!isCash && actual.note ? <p className="meta txn-sheet-note">{actual.note}</p> : null}
         </div>
       </div>
 
@@ -107,13 +108,19 @@ export function TransactionSheet({
           )
         ) : (
           <>
-            <ActionRow icon={<Note />} label="להוסיף הערה" disabled />
+            {/* A note is ours to keep (money.transaction_notes), so it works on a RiseUp charge too. */}
+            <ActionRow
+              icon={<Note />}
+              label={actual.note ? 'לערוך את ההערה' : 'להוסיף הערה'}
+              onClick={() => onCashAction('note')}
+            />
             <ActionRow icon={<Move />} label="להזיז את ההוצאה" disabled />
             <ActionRow icon={<Scissors />} label="לפצל את ההוצאה" disabled />
             <ActionRow icon={<Calendar />} label="להזיז את העסקה לחודש אחר" disabled />
             <ActionRow icon={<Coins />} label="זו הפקדה לחיסכון!" disabled />
             <p style={{ color: 'var(--muted)', fontSize: 14, padding: '4px 8px 12px' }}>
-              עריכת עסקאות רייזאפ אפשרית רק באפליקציה של רייזאפ — הגישה שלנו לנתונים היא לקריאה בלבד.
+              עריכת עסקאות רייזאפ אפשרית רק באפליקציה של רייזאפ — הגישה שלנו לנתונים היא לקריאה בלבד. הערות נשמרות
+              אצלנו בלבד.
             </p>
           </>
         )}

@@ -16,6 +16,7 @@ import { EnvelopeCard } from '@/app/dashboard/components/EnvelopeCard';
 import { EnvelopeMenu, type EnvelopeMenuAction } from '@/app/dashboard/components/EnvelopeMenu';
 import { BulkMoveSheet, HistorySheet, PlansListSheet } from '@/app/dashboard/components/EnvelopeSheets';
 import { newPlanDraft, PlanSheet, planToDraft, type PlanDraft } from '@/app/dashboard/components/PlanSheet';
+import { RiseupNoteSheet } from '@/app/dashboard/components/RiseupNoteSheet';
 import { TrackerSheets, type TrackerSheetKind } from '@/app/dashboard/components/TrackerSheets';
 import { TransferSheet } from '@/app/dashboard/components/TransferSheet';
 import { TransactionSheet, type OpenTransaction } from '@/app/dashboard/components/TransactionSheet';
@@ -239,6 +240,7 @@ export function EnvelopeList({
       />
 
       {current?.cash && action === 'note' ? <NoteSheet actual={current} kind={currentKind} onClose={closeAll} /> : null}
+      {current && !current.cash && action === 'note' ? <RiseupNoteSheet actual={current} month={month} onClose={closeAll} /> : null}
       {current?.cash && action === 'move' ? (
         <MoveEnvelopeSheet
           actual={current}

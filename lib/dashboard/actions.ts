@@ -22,6 +22,7 @@ import {
 } from '@/lib/dashboard/search';
 import { ENVELOPE_TITLES, type NormalizedActual } from '@/lib/riseup/envelopes';
 import { db } from '@/lib/db/client';
+import { noteMap, quotedIdList, type NoteRow } from '@/lib/dashboard/notes';
 import { toOverrides, trackerKey, type TrackerOverrideRow } from '@/lib/dashboard/trackers';
 import { memberNameMap } from '@/lib/profile/names';
 import { monthBounds } from '@/lib/reconcile';
@@ -214,14 +215,23 @@ export async function searchTransactions(
   const amount = amountOf(q);
   const supabase = db();
   const take = SEARCH_PAGE + 1;
-  const match = (columns: string[]) =>
-    [...columns.map((c) => `${c}.ilike.%${q}%`), ...(amount !== null ? [`amount_ils.eq.${amount}`] : [])].join(',');
+  const match = (columns: string[], extra: string[] = []) =>
+    [...columns.map((c) => `${c}.ilike.%${q}%`), ...extra, ...(amount !== null ? [`amount_ils.eq.${amount}`] : [])].join(',');
+
+  // Our own notes on RiseUp charges are searchable too (video 2, item 16).
+  // Until migration 0011 is applied this errors, and nothing matches by note.
+  const { data: notedRows } = await supabase
+    .from('transaction_notes')
+    .select('transaction_id')
+    .ilike('note', `%${q}%`)
+    .limit(200);
+  const notedIds = ((notedRows ?? []) as { transaction_id: string }[]).map((r) => r.transaction_id);
 
   const [card, spends, topups, members] = await Promise.all([
     supabase
       .from('riseup_envelope_actuals')
       .select('*')
-      .or(match(['business_name', 'category_label']))
+      .or(match(['business_name', 'category_label'], notedIds.length ? [`transaction_id.in.${quotedIdList(notedIds)}`] : []))
       .order('transaction_date', { ascending: false, nullsFirst: false })
       .order('id', { ascending: false })
       .range(at.card, at.card + take - 1),
@@ -262,11 +272,19 @@ export async function searchTransactions(
   });
   const nameAccount = accountNamer(cardRows.map(cardAccount), cardRows.length > 0 ? await loadAccountLabels() : []);
 
-  // The envelope each charge sits in, for the sheet's colour and label.
+  // The envelope each charge sits in, for the sheet's colour and label; and
+  // our note on it, whatever the charge was found by.
   const envelopeIds = [...new Set(cardRows.map((r) => r.envelope_id))];
-  const { data: envelopeRows } = envelopeIds.length
-    ? await supabase.from('riseup_envelopes').select('month, envelope_id, envelope_type, name').in('envelope_id', envelopeIds)
-    : { data: [] };
+  const cardIds = [...new Set(cardRows.map((r) => r.transaction_id))];
+  const [{ data: envelopeRows }, { data: cardNoteRows }] = await Promise.all([
+    envelopeIds.length
+      ? supabase.from('riseup_envelopes').select('month, envelope_id, envelope_type, name').in('envelope_id', envelopeIds)
+      : Promise.resolve({ data: [] }),
+    cardIds.length
+      ? supabase.from('transaction_notes').select('transaction_id, note').in('transaction_id', cardIds)
+      : Promise.resolve({ data: [] }),
+  ]);
+  const notes = noteMap(cardNoteRows as NoteRow[] | null);
   const envelopeOf = new Map(
     ((envelopeRows ?? []) as { month: string; envelope_id: string; envelope_type: string; name: string | null }[]).map((e) => [
       `${e.month}|${e.envelope_id}`,
@@ -317,6 +335,7 @@ export async function searchTransactions(
       paymentNumber: row.payment_number,
       totalPayments: row.total_payments,
       categoryLabel: row.category_label,
+      note: notes.get(row.transaction_id) ?? null,
     };
     return {
       key: `card:${row.month}:${row.envelope_id}:${row.transaction_id}`,
@@ -328,7 +347,7 @@ export async function searchTransactions(
       amountIls: actual.amountIls,
       title: actual.businessName || 'עסקה',
       category: row.category_label,
-      note: null,
+      note: actual.note ?? null,
       memberId: null,
       walletId: null,
       fromBank: false,
