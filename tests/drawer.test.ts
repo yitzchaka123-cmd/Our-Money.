@@ -71,7 +71,7 @@ describe('side drawer opens from the right, like RiseUp (V4-1)', () => {
 
   it('is in the page but inert while closed', () => {
     const shell = renderToStaticMarkup(
-      createElement(Shell, { month: '2026-10', months: ['2026-10'], userName: 'יצחק', lastUpdated: null, briefCount: 0 }, null),
+      createElement(Shell, { month: '2026-10', months: ['2026-10'], userName: 'יצחק', lastUpdated: null, briefCount: 0, children: null }),
     );
     expect(shell).toMatch(/<aside class="drawer"[^>]*data-open="false"/);
     expect(shell).toMatch(/<aside class="drawer"[^>]*inert/);

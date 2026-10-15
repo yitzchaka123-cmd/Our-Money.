@@ -53,6 +53,7 @@ export default async function SettingsPage() {
           named: Boolean(a.label),
         })),
         lastSync: formatStamp(syncState.lastSuccessAt),
+        lastSyncAt: syncState.lastSuccessAt,
         month,
         yearAgo: monthsBefore(month, 12),
       }}

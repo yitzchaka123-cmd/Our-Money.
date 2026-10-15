@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
 
 import { NameEditor } from '@/app/settings/NameEditor';
-import { Bank, ChevronLeft, ChevronRight, Download, SparkleBubble } from '@/app/dashboard/components/icons';
+import { PageTopBar } from '@/app/dashboard/components/PageTopBar';
+import { Bank, ChevronLeft, Download } from '@/app/dashboard/components/icons';
 import { Chat, CreditCard, Lock, LogOut } from '@/app/dashboard/components/icons-extra';
 import type { AccountKind } from '@/lib/dashboard/accounts';
 import { monthLabel } from '@/lib/money';
@@ -14,6 +15,8 @@ export interface SettingsData {
   members: { id: string; name: string; telegramName: string; isYou: boolean }[];
   accounts: { key: string; name: string; provider: string; kind: AccountKind; named: boolean }[];
   lastSync: string | null;
+  /** The last successful pull from RiseUp, ISO, for the top bar. */
+  lastSyncAt?: string | null;
   month: string;
   yearAgo: string;
 }
@@ -33,14 +36,7 @@ export function SettingsView({ data }: { data: SettingsData }) {
 
   return (
     <div className="app settings-page">
-      <header className="appbar">
-        <a className="icon-btn" href="/dashboard" aria-label="חזרה">
-          <ChevronRight />
-        </a>
-        <span className="icon-btn" aria-hidden="true">
-          <SparkleBubble />
-        </span>
-      </header>
+      <PageTopBar lastSyncAt={data.lastSyncAt ?? null} />
 
       <section className="settings-hero">
         <span className="settings-avatar" aria-hidden="true">{initial}</span>

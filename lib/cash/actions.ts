@@ -579,6 +579,9 @@ export async function refreshFromRiseup(): Promise<{
   if (!(await sessionMember())) return { ok: false, error: SESSION_EXPIRED_MESSAGE, envelopes: 0 };
   const outcome = await syncIfStale(MANUAL_REFRESH_FLOOR_MS);
   refreshPages();
+  // The accounts and settings pages have the sync button too (video 2, item 3).
+  revalidatePath('/accounts');
+  revalidatePath('/settings');
   if (outcome.skipped) return { ok: true, error: null, envelopes: 0, skipped: outcome.reason };
   const { result } = outcome;
   if (!result.error) return { ok: true, error: null, envelopes: result.envelopesUpserted };

@@ -2,7 +2,8 @@ import type { CSSProperties } from 'react';
 
 import { AccountNameEditor } from '@/app/accounts/AccountNameEditor';
 import { Amount } from '@/app/dashboard/components/Amount';
-import { Alert, Bank, ChevronRight, Coins, Heart, SparkleBubble } from '@/app/dashboard/components/icons';
+import { PageTopBar } from '@/app/dashboard/components/PageTopBar';
+import { Alert, Bank, Coins, Heart } from '@/app/dashboard/components/icons';
 import { CreditCard } from '@/app/dashboard/components/icons-extra';
 import type { AccountSummary } from '@/lib/dashboard/accounts';
 import { monthLabel } from '@/lib/money';
@@ -11,6 +12,8 @@ export interface AccountsPageData {
   month: string;
   /** "11.10.26, 11:20" — the last successful pull from RiseUp. */
   updated: string | null;
+  /** The same moment, ISO, for the top bar's "עודכן לפני…" line. */
+  lastSyncAt?: string | null;
   accounts: AccountSummary[];
   cash: { balance: number; walletCount: number };
 }
@@ -31,14 +34,7 @@ export function AccountsView({ data }: { data: AccountsPageData }) {
 
   return (
     <div className="app accounts-page">
-      <header className="appbar">
-        <a className="icon-btn" href="/dashboard" aria-label="חזרה">
-          <ChevronRight />
-        </a>
-        <span className="icon-btn" aria-hidden="true">
-          <SparkleBubble />
-        </span>
-      </header>
+      <PageTopBar lastSyncAt={data.lastSyncAt ?? null} />
 
       <h1 className="page-title">מצב העו״ש והאשראי</h1>
       <p className="accounts-honest">

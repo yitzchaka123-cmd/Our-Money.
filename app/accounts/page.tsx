@@ -37,6 +37,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
       data={{
         month,
         updated: riseupStamp(syncState.lastSuccessAt),
+        lastSyncAt: syncState.lastSuccessAt,
         accounts,
         cash: { balance: cash.unaccounted, walletCount: walletCount ?? 1 },
       }}
