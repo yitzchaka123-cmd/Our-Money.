@@ -40,7 +40,7 @@ Helper branches are `worktree-agent-*`; check `git log` on each for per-item com
 
 - [x] Downloaded; audio in three versions (plain, evened-out, raised); frames every 0.5 s; scene changes; no black flashes
 - [x] Watched every second (half-second strips where busy) + full-size zooms at the grey dot
-- [~] Three transcriptions: pass 1 and 2 done for all; pass 3 (openai-whisper medium) running in the background
+- [x] Three transcriptions done for all three videos and compared (pass 3 fixed V2-15: "sync button", not "sync line")
 - [x] Item lists written and pushed: 2026-10-15-video2.md, -video3.md, -video4.md (7d321c5); master checklist updated
 - [x] V2-11 tracker names saved in money.tracker_overrides (user asked at 3:06)
 - [x] Helpers started (5): N numbers/forecast/fixed income (0008), W wallets (0009), T Telegram & settings (0010), U drawer/sync line/notes/session (0011), B brief/insights/tips (0012)
