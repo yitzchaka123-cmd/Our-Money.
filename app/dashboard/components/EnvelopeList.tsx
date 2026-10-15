@@ -20,6 +20,7 @@ import { TrackerSheets, type TrackerSheetKind } from '@/app/dashboard/components
 import { TransferSheet } from '@/app/dashboard/components/TransferSheet';
 import { TransactionSheet, type OpenTransaction } from '@/app/dashboard/components/TransactionSheet';
 import { WalletCard } from '@/app/dashboard/components/WalletCard';
+import { WalletMovementOverlays } from '@/app/dashboard/components/WalletMovementSheet';
 import { WalletsSheet, type WalletsSheetFocus } from '@/app/dashboard/components/WalletsSheet';
 import { deleteCashEntry, markCashSpendAsSavings, type CashKind } from '@/lib/cash/actions';
 import type { EnvelopeRef } from '@/lib/cash/envelopes';
@@ -27,6 +28,7 @@ import { settlePlan } from '@/lib/cash/plan-actions';
 import type { CashPlan } from '@/lib/cash/plans';
 import type { EnvelopeView, PendingPlanView, WalletMovement, WalletView } from '@/lib/dashboard/data';
 import { actualDraft, movementDraft } from '@/lib/dashboard/entry-drafts';
+import { movementTransaction } from '@/lib/dashboard/movement-transaction';
 import { summarySlot } from '@/lib/dashboard/summary-slot';
 import { addTrackerSlot } from '@/lib/dashboard/trackers';
 import type { NormalizedActual } from '@/lib/riseup/envelopes';
@@ -71,6 +73,7 @@ export function EnvelopeList({
   const [draft, setDraft] = useState<CashEntryDraft | null>(null);
   const [walletsFocus, setWalletsFocus] = useState<WalletsSheetFocus | null>(null);
   const [transfer, setTransfer] = useState<WalletMovement | null>(null);
+  const [movement, setMovement] = useState<{ movement: WalletMovement; action: CashAction | null } | null>(null);
   const [planDraft, setPlanDraft] = useState<PlanDraft | null>(null);
   const [menuFor, setMenuFor] = useState<EnvelopeView | null>(null);
   const [historyFor, setHistoryFor] = useState<EnvelopeView | null>(null);
@@ -132,17 +135,19 @@ export function EnvelopeList({
     setOpenTxn(null);
   };
 
+  // A wallet row opens the transaction sheet, like a row in an envelope: a
+  // spend or income its envelope row's sheet, a withdrawal or money added the
+  // same kind of sheet for it (V4-07).
   const openMovement = (m: WalletMovement) => {
     if (m.kind === 'transfer') {
       setTransfer(m);
       return;
     }
-    if (m.kind === 'adjustment') {
-      setWalletsFocus({ walletId: m.walletId ?? undefined });
-      return;
-    }
-    setDraft(movementDraft(m, sessionMemberId));
+    const txn = movementTransaction(envelopes, m);
+    if (txn) setOpenTxn(txn);
+    else setMovement({ movement: m, action: null });
   };
+  const closeMovement = () => setMovement(null);
 
   const current = openTxn?.actual ?? null;
   const currentKind = current?.cash?.kind ?? 'spend';
@@ -249,6 +254,27 @@ export function EnvelopeList({
       ) : null}
 
       {transfer ? <TransferSheet transfer={transfer} wallets={wallet.wallets} onClose={() => setTransfer(null)} /> : null}
+      {movement ? (
+        <WalletMovementOverlays
+          open={movement}
+          months={months}
+          onAction={(action) => setMovement({ ...movement, action })}
+          onEdit={() => {
+            closeMovement();
+            setDraft(movementDraft(movement.movement, sessionMemberId));
+          }}
+          onDelete={() => {
+            const { id } = movement.movement;
+            closeMovement();
+            start(async () => { await deleteCashEntry(id, 'withdrawal'); });
+          }}
+          onOpenWallet={() => {
+            closeMovement();
+            setWalletsFocus({ walletId: movement.movement.walletId ?? undefined, panel: 'set' });
+          }}
+          onClose={closeMovement}
+        />
+      ) : null}
 
       {menuFor ? (
         <EnvelopeMenu envelope={menuFor} onPick={(pick) => onMenuPick(menuFor, pick)} onClose={() => setMenuFor(null)} />
