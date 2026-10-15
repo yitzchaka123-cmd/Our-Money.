@@ -46,6 +46,9 @@ export function ForecastSheet({
 
         <ul className="forecast-lines">
           <Line hue="income" label="הכנסות צפויות" value={b.incomeExpected} />
+          {b.fixedIncomeExpected !== 0 ? (
+            <Line hue="income" label="הכנסות קבועות" sub="כמו משכורת שסימנתם ברייזאפ כהכנסה קבועה" value={b.fixedIncomeExpected} />
+          ) : null}
           <Line hue="cash" label="הכנסות במזומן" sub="מה שנכנס ומה שעוד צפוי להיכנס" value={b.cashIn} />
           <Line hue="fixed" label="הוצאות קבועות צפויות" value={-b.fixedExpected} />
           <Line hue="tracking" label="הוצאות במעקב צפויות" value={-b.trackersExpected} />

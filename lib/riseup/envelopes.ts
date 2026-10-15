@@ -62,13 +62,14 @@ export interface UpcomingCharge {
 /**
  * Display order on the dashboard, matching RiseUp's own top-to-bottom order:
  * variable, the trackers (followed by "הוספת קטגוריה למעקב"), fixed (followed
- * by the spending summary), income, our cash income, savings.
+ * by the spending summary), income, fixed income, our cash income, savings.
  */
 export const ENVELOPE_ORDER: EnvelopeType[] = [
   'variable',
   'trackingCategory',
   'fixed',
   'variableIncome',
+  'fixedIncome',
   'cashIncome',
   'riseupGoal',
 ];
@@ -77,6 +78,7 @@ export const ENVELOPE_TITLES: Partial<Record<EnvelopeType, string>> = {
   variableIncome: 'הכנסות',
   variable: 'הוצאות משתנות',
   fixed: 'הוצאות קבועות',
+  fixedIncome: 'הכנסות קבועות',
   riseupGoal: 'הפקדות לחיסכון',
   cashIncome: 'הכנסות במזומן',
 };

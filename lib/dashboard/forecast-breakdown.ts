@@ -8,7 +8,7 @@ import type { EnvelopeType } from '@/lib/types';
  * always add up to the number on the card. It stays free of the server
  * loader so the dashboard can call it in the browser.
  *
- *   income + cash in − fixed − trackers − variable − savings = forecast
+ *   income + fixed income + cash in − fixed − trackers − variable − savings = forecast
  *
  * Cash out is not a line of its own in that sum: cash spending already sits
  * inside the envelopes above it. It is shown so the couple can see it counted.
@@ -16,6 +16,8 @@ import type { EnvelopeType } from '@/lib/types';
 export interface ForecastBreakdown {
   /** RiseUp's expected income (what came in, or the plan if more). */
   incomeExpected: number;
+  /** Income RiseUp keeps as fixed (a salary): what came in, or the plan if more. */
+  fixedIncomeExpected: number;
   /** Cash income: received this month plus what is still due. */
   cashIn: number;
   fixedExpected: number;
@@ -40,6 +42,7 @@ export function forecastBreakdown(envelopes: EnvelopeView[]): ForecastBreakdown 
   const cashOut = sum(expenses, (e) => e.actuals.filter((a) => a.cash).reduce((s, a) => s + a.amountIls, 0) + e.pendingTotal);
 
   const incomeExpected = expected('variableIncome');
+  const fixedIncomeExpected = expected('fixedIncome');
   const cashIn = expected('cashIncome');
   const fixedExpected = expected('fixed');
   const trackersExpected = expected('trackingCategory');
@@ -48,6 +51,7 @@ export function forecastBreakdown(envelopes: EnvelopeView[]): ForecastBreakdown 
 
   return {
     incomeExpected,
+    fixedIncomeExpected,
     cashIn,
     fixedExpected,
     trackersExpected,
@@ -55,7 +59,7 @@ export function forecastBreakdown(envelopes: EnvelopeView[]): ForecastBreakdown 
     variableSpent: sum(of('variable'), (e) => e.actual),
     savingsExpected,
     cashOut,
-    forecast: round(incomeExpected + cashIn - fixedExpected - trackersExpected - variableExpected - savingsExpected),
+    forecast: round(incomeExpected + fixedIncomeExpected + cashIn - fixedExpected - trackersExpected - variableExpected - savingsExpected),
   };
 }
 

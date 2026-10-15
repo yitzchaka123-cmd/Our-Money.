@@ -194,7 +194,7 @@ export function EnvelopeList({
             onAddCash={
               envelope.type === 'cashIncome'
                 ? () => openNew('income')
-                : envelope.type === 'variableIncome' || envelope.type === 'riseupGoal'
+                : envelope.type === 'variableIncome' || envelope.type === 'fixedIncome' || envelope.type === 'riseupGoal'
                   ? undefined
                   : () => openNew('spend', envelope.envelopeId)
             }

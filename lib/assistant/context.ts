@@ -13,13 +13,14 @@ export const MAX_TRANSACTIONS_PER_MONTH = 250;
 const TYPE_LABEL: Record<EnvelopeType, string> = {
   variableIncome: 'הכנסה',
   cashIncome: 'הכנסה במזומן',
+  fixedIncome: 'הכנסה קבועה',
   variable: 'הוצאות משתנות',
   fixed: 'הוצאה קבועה',
   trackingCategory: 'קטגוריה במעקב',
   riseupGoal: 'חיסכון',
 };
 
-const INCOME = new Set<EnvelopeType>(['variableIncome', 'cashIncome']);
+const INCOME = new Set<EnvelopeType>(['variableIncome', 'fixedIncome', 'cashIncome']);
 
 export interface MonthTransaction {
   date: string;

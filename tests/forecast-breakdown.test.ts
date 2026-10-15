@@ -108,6 +108,7 @@ describe('forecastBreakdown', () => {
   it('takes every figure from the envelopes the forecast is built from', () => {
     expect(b).toEqual({
       incomeExpected: 12000,
+      fixedIncomeExpected: 0,
       cashIn: 400,
       fixedExpected: 4800,
       trackersExpected: 950,

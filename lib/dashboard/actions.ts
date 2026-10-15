@@ -294,11 +294,13 @@ export async function searchTransactions(
 
   const titleFor = (type: EnvelopeType, name: string | null) =>
     // Every fixed charge sits in the one "הוצאות קבועות" card.
-    (type === 'fixed' ? ENVELOPE_TITLES.fixed : name) ?? ENVELOPE_TITLES[type] ?? '';
+    (type === 'fixed' || type === 'fixedIncome' ? ENVELOPE_TITLES[type] : name) ?? ENVELOPE_TITLES[type] ?? '';
 
   const cardHits = cardRows.map((row): SearchHit => {
     const envelope = envelopeOf.get(`${row.month}|${row.envelope_id}`);
-    const type = (envelope?.envelope_type ?? 'variable') as EnvelopeType;
+    // A salary RiseUp keeps in the fixed group is fixed income, not a fixed expense.
+    const stored = (envelope?.envelope_type ?? 'variable') as EnvelopeType;
+    const type: EnvelopeType = stored === 'fixed' && row.is_income ? 'fixedIncome' : stored;
     const date = row.transaction_date ?? `${row.month}-01`;
     const actual: NormalizedActual = {
       transactionId: row.transaction_id,

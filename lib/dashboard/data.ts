@@ -149,7 +149,7 @@ export interface DashboardData {
 }
 
 const EXPENSE_TYPES = new Set<EnvelopeType>(['variable', 'fixed', 'trackingCategory', 'riseupGoal']);
-const INCOME_TYPES = new Set<EnvelopeType>(['variableIncome', 'cashIncome']);
+const INCOME_TYPES = new Set<EnvelopeType>(['variableIncome', 'fixedIncome', 'cashIncome']);
 
 export function currentMonth(): string {
   return isoDateInIsrael().slice(0, 7);

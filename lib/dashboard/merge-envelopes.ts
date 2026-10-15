@@ -10,6 +10,10 @@ import { envelopeKey, envelopePart, type NameBook } from '@/lib/riseup/tracker-n
  * - every fixed envelope → one, its actuals together, its plan the sum of
  *   theirs, and each charge that is planned but not charged yet listed as
  *   "upcoming", named from the same charge in earlier months;
+ * - a fixed envelope whose charges are income (a salary the couple marked as
+ *   fixed income in RiseUp) is not an expense: those fold into one
+ *   "הכנסות קבועות" envelope of type `fixedIncome` instead — see
+ *   `isFixedIncome`;
  * - tracker envelopes sharing a category key → one, marked weekly when RiseUp
  *   split it into parts.
  *
@@ -25,7 +29,7 @@ export function mergeRiseupEnvelopes(
   const order: string[] = [];
 
   for (const envelope of [...envelopes].sort((a, b) => a.position - b.position)) {
-    const group = groupOf(envelope);
+    const group = groupOf(envelope, names);
     if (!groups.has(group)) {
       groups.set(group, []);
       order.push(group);
@@ -38,7 +42,8 @@ export function mergeRiseupEnvelopes(
     const [first] = parts as [NormalizedEnvelope, ...NormalizedEnvelope[]];
     for (const part of parts.slice(1)) aliases.set(part.envelopeId, first.envelopeId);
 
-    if (first.type === 'fixed') return mergeFixed(parts, names);
+    if (group === 'fixedIncome') return mergeFixed(parts, names, 'fixedIncome');
+    if (first.type === 'fixed') return mergeFixed(parts, names, 'fixed');
     if (parts.length === 1) return first;
     return {
       ...first,
@@ -52,7 +57,22 @@ export function mergeRiseupEnvelopes(
   return { envelopes: merged, aliases };
 }
 
-function groupOf(envelope: NormalizedEnvelope): string {
+/**
+ * RiseUp sends fixed income in the same `fixed` group as fixed expenses. An
+ * envelope is income when every charge in it came in as income; one with no
+ * charge yet this month is income when the same charge (its key stays the
+ * same from month to month) came in as income in its latest earlier month.
+ */
+export function isFixedIncome(envelope: NormalizedEnvelope, names?: NameBook | null): boolean {
+  if (envelope.type !== 'fixed') return false;
+  const riseup = envelope.actuals.filter((a) => !a.cash);
+  if (riseup.length > 0) return riseup.every((a) => a.isIncome);
+  const key = envelopeKey(envelope.envelopeId);
+  return Boolean(key && names?.fixed.get(key)?.income);
+}
+
+function groupOf(envelope: NormalizedEnvelope, names?: NameBook | null): string {
+  if (isFixedIncome(envelope, names)) return 'fixedIncome';
   if (envelope.type === 'fixed') return 'fixed';
   if (envelope.type === 'trackingCategory') {
     const key = envelopeKey(envelope.envelopeId);
@@ -61,8 +81,13 @@ function groupOf(envelope: NormalizedEnvelope): string {
   return `own:${envelope.envelopeId}`;
 }
 
-function mergeFixed(parts: NormalizedEnvelope[], names?: NameBook | null): NormalizedEnvelope {
+function mergeFixed(
+  parts: NormalizedEnvelope[],
+  names: NameBook | null | undefined,
+  type: 'fixed' | 'fixedIncome',
+): NormalizedEnvelope {
   const first = parts[0]!;
+  const income = type === 'fixedIncome';
   const upcoming: UpcomingCharge[] = parts
     .filter((p) => p.actualIls <= 0 && p.plannedIls > 0)
     .map((p) => {
@@ -78,8 +103,10 @@ function mergeFixed(parts: NormalizedEnvelope[], names?: NameBook | null): Norma
 
   return {
     ...first,
-    name: ENVELOPE_TITLES.fixed ?? first.name,
-    plannedIls: round(sum(parts.map((p) => p.plannedIls))),
+    type,
+    name: ENVELOPE_TITLES[type] ?? first.name,
+    // Income that came in is income expected, as on RiseUp's income card.
+    plannedIls: round(sum(parts.map((p) => (income ? Math.max(p.plannedIls, p.actualIls) : p.plannedIls)))),
     actualIls: round(sum(parts.map((p) => p.actualIls))),
     actuals: parts.flatMap((p) => p.actuals),
     upcoming,

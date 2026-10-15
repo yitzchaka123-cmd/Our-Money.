@@ -59,6 +59,13 @@ function labels(type: EnvelopeType): Labels {
         expectedInTable: 'צפוי להיכנס',
         expander: 'פירוט הכנסות משתנות',
       };
+    case 'fixedIncome':
+      return {
+        actual: 'נכנס',
+        expected: 'צפוי להיכנס',
+        expectedInTable: 'צפוי להיכנס',
+        expander: 'פירוט הכנסות קבועות',
+      };
     case 'cashIncome':
       return {
         actual: 'נכנס',
@@ -165,6 +172,7 @@ export function EnvelopeCard({
         <Breakdown
           buckets={buckets}
           labels={text}
+          upcomingLabel={type === 'fixedIncome' ? 'צפוי להיכנס' : 'צפוי לרדת'}
           envelopeTitle={title}
           expandFirst={defaultOpen}
           onOpenTransaction={onOpenTransaction}
@@ -193,12 +201,14 @@ export function EnvelopeCard({
 function Breakdown({
   buckets,
   labels: text,
+  upcomingLabel,
   envelopeTitle,
   expandFirst = false,
   onOpenTransaction,
 }: {
   buckets: Bucket[];
   labels: Labels;
+  upcomingLabel: string;
   envelopeTitle: string;
   expandFirst?: boolean;
   onOpenTransaction?: (actual: NormalizedActual, envelopeTitle: string) => void;
@@ -215,6 +225,7 @@ function Breakdown({
         <BucketRow
           key={bucket.key}
           bucket={bucket}
+          upcomingLabel={upcomingLabel}
           envelopeTitle={envelopeTitle}
           defaultOpen={expandFirst && index === 0}
           onOpenTransaction={onOpenTransaction}
@@ -226,11 +237,14 @@ function Breakdown({
 
 function BucketRow({
   bucket,
+  upcomingLabel,
   envelopeTitle,
   defaultOpen = false,
   onOpenTransaction,
 }: {
   bucket: Bucket;
+  /** The date column of a charge still to come: "צפוי לרדת", or "צפוי להיכנס" for income. */
+  upcomingLabel: string;
   envelopeTitle: string;
   defaultOpen?: boolean;
   onOpenTransaction?: (actual: NormalizedActual, envelopeTitle: string) => void;
@@ -300,7 +314,7 @@ function BucketRow({
       {open
         ? bucket.upcoming.map((charge) => (
             <div key={charge.key} className="txn-row is-upcoming">
-              <span className="date">צפוי לרדת</span>
+              <span className="date">{upcomingLabel}</span>
               <span className="amount">
                 <Amount value={charge.amountIls} />
               </span>

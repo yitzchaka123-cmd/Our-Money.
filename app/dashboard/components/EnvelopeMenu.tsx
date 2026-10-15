@@ -49,6 +49,9 @@ export function menuItems(envelope: EnvelopeView): MenuItem[] {
     ];
   }
 
+  // RiseUp's fixed income takes no cash: only its earlier months.
+  if (envelope.type === 'fixedIncome') return [{ action: 'history', label: 'חודשים קודמים', icon: <Chart /> }];
+
   if (envelope.type === 'trackingCategory') {
     items.push(
       { action: 'history', label: 'חודשים קודמים', icon: <Bars /> },
@@ -80,6 +83,9 @@ function hint(envelope: EnvelopeView): string {
   }
   if (envelope.type === 'variableIncome') {
     return 'הכנסות מרייזאפ נשארות כמו שהן — הגישה שלנו אליה היא לקריאה בלבד. הצפי שתעדכנו נשמר אצלנו, ורק הכנסות במזומן אפשר להזיז.';
+  }
+  if (envelope.type === 'fixedIncome') {
+    return 'הכנסות שסימנתם ברייזאפ כהכנסה קבועה. הן מגיעות מרייזאפ כמו שהן — הגישה שלנו אליה היא לקריאה בלבד.';
   }
   return 'שינוי התקציב עצמו נעשה באפליקציה של RiseUp — הגישה שלנו לנתונים שלהם היא לקריאה בלבד.';
 }

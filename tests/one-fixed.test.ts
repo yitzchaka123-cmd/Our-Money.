@@ -148,7 +148,7 @@ describe('trackers split into weekly parts', () => {
 
 describe("RiseUp's order", () => {
   it('puts variable, then trackers, then fixed, then income, cash income and savings', () => {
-    expect(ENVELOPE_ORDER).toEqual(['variable', 'trackingCategory', 'fixed', 'variableIncome', 'cashIncome', 'riseupGoal']);
+    expect(ENVELOPE_ORDER).toEqual(['variable', 'trackingCategory', 'fixed', 'variableIncome', 'fixedIncome', 'cashIncome', 'riseupGoal']);
     expect(month().envelopes.map((e) => e.title)).toEqual([
       'הוצאות משתנות',
       'רכב',
