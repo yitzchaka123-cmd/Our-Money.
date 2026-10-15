@@ -924,17 +924,53 @@ a {
 }
 
 /* --- drawer --------------------------------------------------------------- */
+/* RiseUp's slides in from the right edge (video 4, 5:12), rounded on its
+   inner side. Physical `right`, so it stays there whatever the direction. */
 .drawer {
   position: fixed;
   inset-block: 0;
-  inset-inline-end: 0;
+  right: 0;
+  left: auto;
   z-index: 41;
   width: min(88%, 420px);
   background: var(--drawer);
   color: var(--drawer-ink);
+  border-radius: 24px 0 0 24px;
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.12);
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: calc(24px + env(safe-area-inset-top, 0px)) 20px
     calc(24px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(100%);
+  visibility: hidden;
+  transition: transform 0.26s cubic-bezier(0.32, 0.72, 0, 1), visibility 0s linear 0.26s;
+}
+
+.drawer[data-open='true'] {
+  transform: none;
+  visibility: visible;
+  transition: transform 0.26s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.drawer-scrim {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.26s ease, visibility 0s linear 0.26s;
+}
+
+.drawer-scrim[data-open='true'] {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.26s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drawer,
+  .drawer[data-open='true'],
+  .drawer-scrim,
+  .drawer-scrim[data-open='true'] {
+    transition: none;
+  }
 }
 
 .drawer-head {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 
 import { AssistantSheet } from '@/app/dashboard/components/AssistantSheet';
 import { RefreshButton } from '@/app/dashboard/components/RefreshButton';
@@ -47,6 +47,16 @@ export function Shell({
   const [monthSheetOpen, setMonthSheetOpen] = useState(false);
   const [assistantOpen, setAssistantOpen] = useState(false);
   const closeAssistant = useCallback(() => setAssistantOpen(false), []);
+
+  // Escape closes the drawer, like the sheets.
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setDrawerOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [drawerOpen]);
 
   // months arrive newest-first, so the *next* month sits at the lower index.
   const index = months.indexOf(month);
@@ -118,26 +128,36 @@ export function Shell({
         <MonthPicker month={month} months={months} />
       </Sheet>
 
-      {drawerOpen ? (
-        <>
-          <div className="scrim" onClick={() => setDrawerOpen(false)} aria-hidden="true" />
-          <aside className="drawer" role="dialog" aria-modal="true" aria-label="תפריט">
-            <DrawerContent
-              userName={userName}
-              lastUpdated={lastUpdated}
-              briefCount={briefCount}
-              onOpenWallets={
-                onOpenWallets
-                  ? () => {
-                      setDrawerOpen(false);
-                      onOpenWallets();
-                    }
-                  : undefined
-              }
-            />
-          </aside>
-        </>
-      ) : null}
+      {/* Always in the page so it can slide in and out from the right edge,
+          as RiseUp's does (video 4, item 1); inert while closed. */}
+      <div
+        className="scrim drawer-scrim"
+        data-open={drawerOpen}
+        onClick={() => setDrawerOpen(false)}
+        aria-hidden="true"
+      />
+      <aside
+        className="drawer"
+        role="dialog"
+        aria-modal="true"
+        aria-label="תפריט"
+        data-open={drawerOpen}
+        inert={!drawerOpen}
+      >
+        <DrawerContent
+          userName={userName}
+          lastUpdated={lastUpdated}
+          briefCount={briefCount}
+          onOpenWallets={
+            onOpenWallets
+              ? () => {
+                  setDrawerOpen(false);
+                  onOpenWallets();
+                }
+              : undefined
+          }
+        />
+      </aside>
     </>
   );
 }

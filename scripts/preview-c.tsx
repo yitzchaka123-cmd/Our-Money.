@@ -64,8 +64,8 @@ export const screens: Record<string, () => ReactElement> = {
   ),
   drawer: () => (
     <>
-      <div className="scrim" />
-      <aside className="drawer">
+      <div className="scrim drawer-scrim" data-open="true" />
+      <aside className="drawer" data-open="true">
         <DrawerContent userName="יצחק אברגל" lastUpdated="11.10 11:20" briefCount={2} onOpenWallets={() => {}} />
       </aside>
     </>
