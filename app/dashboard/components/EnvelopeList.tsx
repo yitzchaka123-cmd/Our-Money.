@@ -13,6 +13,7 @@ import {
 import { CashEntrySheet, emptyDraft, type CashEntryDraft } from '@/app/dashboard/components/CashEntrySheet';
 import { AddTrackerButton, AddTrackerSheet } from '@/app/dashboard/components/AddTrackerSheet';
 import { EnvelopeCard } from '@/app/dashboard/components/EnvelopeCard';
+import { IncomeKindSheet } from '@/app/dashboard/components/IncomeKind';
 import { EnvelopeMenu, type EnvelopeMenuAction } from '@/app/dashboard/components/EnvelopeMenu';
 import { BulkMoveSheet, HistorySheet, PlansListSheet } from '@/app/dashboard/components/EnvelopeSheets';
 import { newPlanDraft, PlanSheet, planToDraft, type PlanDraft } from '@/app/dashboard/components/PlanSheet';
@@ -73,6 +74,7 @@ export function EnvelopeList({
   const [draft, setDraft] = useState<CashEntryDraft | null>(null);
   const [walletsFocus, setWalletsFocus] = useState<WalletsSheetFocus | null>(null);
   const [transfer, setTransfer] = useState<WalletMovement | null>(null);
+  const [incomeKindFor, setIncomeKindFor] = useState<NormalizedActual | null>(null);
   const [movement, setMovement] = useState<{ movement: WalletMovement; action: CashAction | null } | null>(null);
   const [planDraft, setPlanDraft] = useState<PlanDraft | null>(null);
   const [menuFor, setMenuFor] = useState<EnvelopeView | null>(null);
@@ -231,7 +233,16 @@ export function EnvelopeList({
           closeAll();
           start(async () => { await deleteCashEntry(id, kind); });
         }}
+        onIncomeKind={() => {
+          if (!current?.cash) return;
+          const income = current;
+          closeAll();
+          setIncomeKindFor(income);
+        }}
       />
+      {incomeKindFor ? (
+        <IncomeKindSheet actual={incomeKindFor} choices={wallet.incomeCategories} onClose={() => setIncomeKindFor(null)} />
+      ) : null}
 
       {current?.cash && action === 'note' ? <NoteSheet actual={current} kind={currentKind} onClose={closeAll} /> : null}
       {current?.cash && action === 'move' ? (
@@ -247,11 +258,11 @@ export function EnvelopeList({
       {current?.cash && action === 'month' ? <MoveMonthSheet actual={current} kind={currentKind} months={months} onClose={closeAll} /> : null}
 
       {draft ? (
-        <CashEntrySheet open draft={draft} envelopes={envelopeChoices} members={members} wallets={wallet.wallets} onClose={() => setDraft(null)} />
+        <CashEntrySheet open draft={draft} envelopes={envelopeChoices} members={members} wallets={wallet.wallets} incomeCategories={wallet.incomeCategories} onClose={() => setDraft(null)} />
       ) : null}
 
       {walletsFocus ? (
-        <WalletsSheet wallets={wallet.wallets} members={members} movements={wallet.movements} focus={walletsFocus} onClose={() => setWalletsFocus(null)} />
+        <WalletsSheet wallets={wallet.wallets} members={members} movements={wallet.movements} focus={walletsFocus} incomeCategories={wallet.incomeCategories} onClose={() => setWalletsFocus(null)} />
       ) : null}
 
       {transfer ? <TransferSheet transfer={transfer} wallets={wallet.wallets} onClose={() => setTransfer(null)} /> : null}

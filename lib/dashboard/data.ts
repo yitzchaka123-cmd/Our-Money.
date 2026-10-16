@@ -1,5 +1,6 @@
 import { envelopeChoices, resolveEnvelopeForCategory, type EnvelopeRef } from '@/lib/cash/envelopes';
 import { cashFlowsByMonth, inflowForecast, previousMonths, type CashMonthFlow, type InflowForecast } from '@/lib/cash/inflow';
+import { countsInCashflow, incomeCategoryChoices, incomeKindOf, type IncomeKind } from '@/lib/cash/income-kinds';
 import { loadAccountLabels } from '@/lib/dashboard/account-labels';
 import { accountNamer, type AccountLabel, type AccountRef } from '@/lib/dashboard/accounts';
 import {
@@ -98,6 +99,8 @@ export interface WalletMovement {
   /** Transfers only. */
   fromWalletId?: string;
   toWalletId?: string;
+  /** Cash income only: "איזו הכנסה זו?". */
+  incomeKind?: IncomeKind;
 }
 
 export interface WalletSummary {
@@ -121,6 +124,8 @@ export interface WalletView {
   inflow?: InflowForecast;
   /** Cash in and out for the last five months, this one last: "חודשים קודמים". */
   history?: CashMonthFlow[];
+  /** The cash income categories to offer: RiseUp's, then the couple's own. */
+  incomeCategories?: string[];
 }
 
 export interface DashboardData {
@@ -721,17 +726,21 @@ function incomeToActual(topup: CashTopup, memberNames: Map<string, string>): Nor
       inputKind: topup.input_kind ?? 'text',
       status: 'confirmed',
       walletId: topup.wallet_id,
+      incomeKind: incomeKindOf(topup),
     },
   };
 }
 
-/** Cash received this month, as an envelope beside RiseUp's own income. */
+/**
+ * Cash received this month, as an envelope beside RiseUp's own income.
+ * Income marked "לא תזרימית" stays in the wallet but out of the cashflow.
+ */
 function cashIncomeEnvelope(
   topups: CashTopup[],
   memberNames: Map<string, string>,
   hasPlans: boolean,
 ): NormalizedEnvelope | null {
-  const incomes = topups.filter((t) => t.source === 'cash_income');
+  const incomes = topups.filter((t) => t.source === 'cash_income' && countsInCashflow(t));
   if (incomes.length === 0 && !hasPlans) return null;
   const actuals = incomes.map((t) => incomeToActual(t, memberNames));
   const total = round(actuals.reduce((sum, a) => sum + a.amountIls, 0));
@@ -816,6 +825,7 @@ export function buildWallet({
       walletName: nameOf(t.wallet_id),
       note: t.note,
       fromBank: t.source === 'riseup_withdrawal' || t.riseup_transaction_id !== null,
+      ...(t.source === 'cash_income' ? { incomeKind: incomeKindOf(t) } : {}),
     })),
     ...monthSpends.map((s): WalletMovement => ({
       id: s.id,
@@ -857,6 +867,7 @@ export function buildWallet({
     spent: round(monthSpends.reduce((s, x) => s + Number(x.amount_ils), 0)),
     movements,
     ...forecast,
+    incomeCategories: incomeCategoryChoices(allTopups),
   };
 }
 

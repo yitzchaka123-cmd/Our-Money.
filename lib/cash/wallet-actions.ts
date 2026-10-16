@@ -3,6 +3,8 @@
 import { revalidatePath } from 'next/cache';
 
 import { SESSION_EXPIRED_MESSAGE, sessionMember } from '@/lib/auth/member';
+import { applyIncomeKind } from '@/lib/cash/income-kind-store';
+import { isIncomeKind, type IncomeKind } from '@/lib/cash/income-kinds';
 import { assignWithdrawal } from '@/lib/cash/withdrawal-wallet';
 import { db } from '@/lib/db/client';
 import { isoDateInIsrael } from '@/lib/dates';
@@ -31,6 +33,9 @@ export interface AddMoneyInput {
   from: MoneySource;
   note: string | null;
   date: string;
+  /** Income only: "איזו הכנסה זו?" — its kind and category. */
+  incomeKind?: IncomeKind | null;
+  category?: string | null;
 }
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -130,11 +135,17 @@ export async function addMoneyToWallet(input: AddMoneyInput): Promise<WalletActi
   if (!wallet) return { ok: false, error: 'הארנק לא נמצא.' };
 
   const note = input.note?.trim() || null;
+  const incomeKind = input.from === 'income' && isIncomeKind(input.incomeKind) ? input.incomeKind : null;
   const row =
     input.from === 'withdrawal'
       ? { source: 'manual', category: 'משיכה', note }
       : input.from === 'income'
-        ? { source: 'cash_income', category: note ?? 'הכנסה במזומן', note }
+        ? {
+            source: 'cash_income',
+            category: input.category?.trim() || note || 'הכנסה במזומן',
+            note,
+            ...(incomeKind ? { income_kind: incomeKind } : {}),
+          }
         : { source: 'adjustment', category: null, note: note ?? 'הוספת כסף לארנק' };
 
   const { data, error } = await supabase
@@ -150,6 +161,7 @@ export async function addMoneyToWallet(input: AddMoneyInput): Promise<WalletActi
     .select('id')
     .single();
   if (error) return dbFail(error);
+  if (incomeKind) await applyIncomeKind(data.id as string, null);
   refreshPages();
   return { ok: true, id: data.id as string };
 }

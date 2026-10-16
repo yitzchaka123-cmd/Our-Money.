@@ -4,7 +4,8 @@
  *   npx tsx scripts/preview-wallet.tsx out.html [mode]
  *
  * Modes: card (default), open (movements listed), menu, history, inflow,
- * withdrawal, add-withdrawal, movement.
+ * withdrawal, add-withdrawal, movement, income-kind (the transaction sheet's
+ * "איזו הכנסה זו?"), income-new (a new cash income), add-income.
  * Shoot with scripts/wallet-shots.sh.
  */
 
@@ -14,10 +15,12 @@ import type { ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 import { CashEntrySheet, emptyDraft } from '../app/dashboard/components/CashEntrySheet';
+import { IncomeKindSheet } from '../app/dashboard/components/IncomeKind';
 import { WalletMovementSheet } from '../app/dashboard/components/WalletMovementSheet';
 import { WalletSection } from '../app/dashboard/components/WalletSection';
 import { WalletSettingsSheet } from '../app/dashboard/components/WalletSettingsSheet';
 import type { WalletMovement, WalletView } from '../lib/dashboard/data';
+import type { NormalizedActual } from '../lib/riseup/envelopes';
 
 const movements: WalletMovement[] = [
   { id: 'a1', kind: 'adjustment', amountIls: 3540, date: '2026-10-15', label: 'הוספת כסף לארנק', memberName: 'יצחק', memberId: 'm1', category: null, walletId: 'w-main', walletName: 'ארנק ראשי', note: 'הוספת כסף לארנק', fromBank: false },
@@ -48,6 +51,14 @@ export const wallet: WalletView = {
   ],
 };
 
+const categories = ['משכורת', 'דיור', 'קצבאות', 'שיעורים פרטיים', 'מתנה'];
+const incomeActual: NormalizedActual = {
+  transactionId: 'cash-income:i1', transactionDate: '2026-10-08', billingDate: '2026-10-08', businessName: 'שיעורים פרטיים', amountIls: 600,
+  isIncome: true, accountNickname: 'מזומן', accountNumberHash: null, source: 'cash', isInstallment: false, paymentNumber: null,
+  totalPayments: null, categoryLabel: 'שיעורים פרטיים',
+  cash: { id: 'i1', kind: 'income', memberId: 'm2', memberName: 'שרה', inputKind: 'web', status: 'confirmed', walletId: 'w-test', incomeKind: 'fixed' },
+};
+
 const mode = process.argv[3] ?? 'card';
 const noop = () => {};
 
@@ -57,6 +68,12 @@ function overlay(): ReactNode {
       return <CashEntrySheet open draft={{ ...emptyDraft('withdrawal', 'm1'), amountIls: 500 }} envelopes={[]} members={[]} wallets={wallet.wallets} onClose={noop} />;
     case 'add-withdrawal':
       return <WalletSettingsSheet wallet={wallet.wallets[0]!} wallets={wallet.wallets} initialPanel="add" initialSource="withdrawal" onClose={noop} />;
+    case 'income-kind':
+      return <IncomeKindSheet actual={incomeActual} choices={categories} onClose={noop} />;
+    case 'income-new':
+      return <CashEntrySheet open draft={{ ...emptyDraft('income', 'm1'), amountIls: 2000, incomeKind: 'fixed', category: 'משכורת' }} envelopes={[]} members={[]} wallets={wallet.wallets} incomeCategories={categories} onClose={noop} />;
+    case 'add-income':
+      return <WalletSettingsSheet wallet={wallet.wallets[0]!} wallets={wallet.wallets} incomeCategories={categories} initialPanel="add" initialSource="income" onClose={noop} />;
     case 'movement':
       return <WalletMovementSheet movement={movements[0]!} onClose={noop} onAction={noop} onEdit={noop} onDelete={noop} onOpenWallet={noop} />;
     default:

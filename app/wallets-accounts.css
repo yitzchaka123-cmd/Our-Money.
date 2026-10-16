@@ -812,6 +812,24 @@
   border-radius: 3px;
 }
 
+/* "איזו הכנסה זו?" — RiseUp's dark green kind icons. */
+.income-kind-icon {
+  background: #0d6b3a;
+  color: #ffffff;
+}
+
+.income-kind-icon[data-kind='non_cashflow'] {
+  background: #6b6b6b;
+}
+
+.income-kind-list {
+  margin-bottom: 8px;
+}
+
+.income-kind-hint {
+  margin: 0 4px 16px;
+}
+
 .inflow-explain {
   margin: 0 0 14px;
   font-size: 15px;

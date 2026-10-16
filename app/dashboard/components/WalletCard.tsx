@@ -97,6 +97,7 @@ export function WalletCard({
                 {m.label}
                 {m.memberName ? ` · ${m.memberName}` : ''}
                 {m.kind === 'withdrawal' ? ' · משיכה' : ''}
+                {m.incomeKind === 'non_cashflow' ? ' · לא תזרימית' : m.incomeKind === 'fixed' ? ' · הכנסה קבועה' : ''}
                 {m.kind === 'adjustment' && m.label !== 'עדכון יתרה' ? ' · עדכון יתרה' : ''}
                 {several && m.walletName && m.kind !== 'transfer' ? ` · ${m.walletName}` : ''}
               </span>

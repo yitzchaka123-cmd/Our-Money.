@@ -31,6 +31,7 @@ export function WalletsSheet({
   members,
   movements = [],
   focus = null,
+  incomeCategories,
   onClose,
 }: {
   wallets: WalletSummary[];
@@ -38,6 +39,8 @@ export function WalletsSheet({
   /** This month's wallet movements; the settings screen lists its balance updates. */
   movements?: WalletMovement[];
   focus?: WalletsSheetFocus | null;
+  /** Cash income categories, for money added as income. */
+  incomeCategories?: string[];
   onClose: () => void;
 }) {
   const [tab, setTab] = useState<'list' | 'transfer'>(focus?.tab === 'transfer' && wallets.length > 1 ? 'transfer' : 'list');
@@ -76,6 +79,7 @@ export function WalletsSheet({
         initialPanel={settings.panel}
         initialSource={focus?.source}
         wallets={wallets}
+        incomeCategories={incomeCategories}
         onBack={() => setSettings(null)}
         onClose={onClose}
       />

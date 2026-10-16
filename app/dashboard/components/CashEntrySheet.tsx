@@ -5,11 +5,13 @@ import { useState, useTransition } from 'react';
 import { Amount } from '@/app/dashboard/components/Amount';
 import { Sheet } from '@/app/dashboard/components/Sheet';
 import { Close } from '@/app/dashboard/components/icons';
+import { IncomeKindFields } from '@/app/dashboard/components/IncomeKind';
 import { WalletPicker } from '@/app/dashboard/components/WalletPicker';
 import { addCashEntry, deleteCashEntry, updateCashEntry, type CashEntryInput, type CashKind } from '@/lib/cash/actions';
 import type { EnvelopeRef } from '@/lib/cash/envelopes';
 import type { WalletSummary } from '@/lib/dashboard/data';
 import { isoDateInIsrael } from '@/lib/dates';
+import type { IncomeKind } from '@/lib/cash/income-kinds';
 import type { EnvelopeType, HouseholdMember } from '@/lib/types';
 
 export interface CashEntryDraft {
@@ -24,6 +26,8 @@ export interface CashEntryDraft {
   envelopeId: string | null;
   memberId: string | null;
   walletId: string | null;
+  /** Cash income: "איזו הכנסה זו?". Unset on an edit until it is changed. */
+  incomeKind?: IncomeKind;
 }
 
 export function emptyDraft(
@@ -43,8 +47,6 @@ export function emptyDraft(
     walletId,
   };
 }
-
-const INCOME_SUGGESTIONS = ['משכורת במזומן', 'מתנה', 'החזר', 'מכירה', 'אחר'];
 
 const KIND_LABELS: Record<CashKind, string> = {
   spend: 'הוצאה',
@@ -69,6 +71,7 @@ export function CashEntrySheet({
   envelopes,
   members,
   wallets,
+  incomeCategories,
   onClose,
 }: {
   open: boolean;
@@ -76,6 +79,8 @@ export function CashEntrySheet({
   envelopes: EnvelopeRef[];
   members: Pick<HouseholdMember, 'id' | 'display_name'>[];
   wallets: WalletSummary[];
+  /** Cash income categories: RiseUp's and the couple's own (WalletView.incomeCategories). */
+  incomeCategories?: string[];
   onClose: () => void;
 }) {
   const [form, setForm] = useState<CashEntryDraft>(draft);
@@ -93,8 +98,8 @@ export function CashEntrySheet({
   const chosen = envelopes.find((e) => e.envelopeId === form.envelopeId) ?? null;
   const headerType: EnvelopeType =
     form.kind === 'income' ? 'cashIncome' : form.kind === 'withdrawal' ? 'trackingCategory' : (chosen?.type ?? 'variable');
-  const needsFreeCategory =
-    form.kind === 'income' || (form.kind === 'spend' && (!chosen || chosen.type !== 'trackingCategory'));
+  // Income asks RiseUp's "איזו הכנסה זו?" (kind and category) instead.
+  const needsFreeCategory = form.kind === 'spend' && (!chosen || chosen.type !== 'trackingCategory');
   // Switching kind moves a row between tables, so it is offered only for a new entry.
   const canSwitchKind = form.id === null;
   const locked = form.fromBank === true;
@@ -118,6 +123,8 @@ export function CashEntrySheet({
       envelopeId: form.kind === 'spend' ? form.envelopeId : null,
       memberId: form.memberId,
       walletId: form.walletId,
+      // A new income is variable unless chosen; an edit keeps its kind unless changed.
+      ...(form.kind === 'income' ? { incomeKind: form.incomeKind ?? (form.id ? undefined : 'variable') } : {}),
     };
     start(async () => {
       const result = form.id ? await updateCashEntry(form.id, input) : await addCashEntry(input);
@@ -219,23 +226,25 @@ export function CashEntrySheet({
           </>
         ) : null}
 
+        {form.kind === 'income' ? (
+          <IncomeKindFields
+            key={form.id ?? 'new'}
+            kind={form.incomeKind ?? 'variable'}
+            category={form.category}
+            choices={incomeCategories}
+            onChange={(next) => patch({ ...(next.kind ? { incomeKind: next.kind } : {}), ...(next.category !== undefined ? { category: next.category } : {}) })}
+          />
+        ) : null}
+
         {needsFreeCategory ? (
           <label className="field">
             <span>קטגוריה</span>
             <input
               type="text"
-              list={form.kind === 'income' ? 'cash-income-suggestions' : undefined}
-              placeholder={form.kind === 'income' ? 'למשל: משכורת במזומן' : 'למשל: מתנות'}
+              placeholder="למשל: מתנות"
               value={form.category}
               onChange={(e) => patch({ category: e.target.value })}
             />
-            {form.kind === 'income' ? (
-              <datalist id="cash-income-suggestions">
-                {INCOME_SUGGESTIONS.map((s) => (
-                  <option key={s} value={s} />
-                ))}
-              </datalist>
-            ) : null}
           </label>
         ) : null}
 

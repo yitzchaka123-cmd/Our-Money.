@@ -58,6 +58,7 @@ export function movementActual(m: WalletMovement, kind: 'spend' | 'income' = 'sp
       inputKind: 'web',
       status: 'confirmed',
       walletId: m.walletId,
+      ...(m.incomeKind ? { incomeKind: m.incomeKind } : {}),
     },
   };
 }

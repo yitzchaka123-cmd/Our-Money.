@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache';
 
 import { SESSION_EXPIRED_MESSAGE, sessionMember } from '@/lib/auth/member';
 import { resolveEnvelopeForCategory } from '@/lib/cash/envelopes';
+import { applyIncomeKind } from '@/lib/cash/income-kind-store';
+import { isIncomeKind, type IncomeKind } from '@/lib/cash/income-kinds';
 import { db } from '@/lib/db/client';
 import { envelopeRefsForMonth } from '@/lib/db/queries';
 import { syncIfStale } from '@/lib/riseup/sync';
@@ -38,6 +40,8 @@ export interface CashEntryInput {
   envelopeId: string | null;
   memberId: string | null;
   walletId: string | null;
+  /** Cash income: "איזו הכנסה זו?". Left out, the stored kind stays as it is. */
+  incomeKind?: IncomeKind | null;
 }
 
 export interface SplitPart {
@@ -132,10 +136,12 @@ export async function addCashEntry(input: CashEntryInput): Promise<ActionResult>
         member_id: memberId,
         input_kind: 'web',
         wallet_id: walletId,
+        ...(input.kind === 'income' && isIncomeKind(input.incomeKind) ? { income_kind: input.incomeKind } : {}),
       })
       .select('id')
       .single();
     if (error) return dbFail(error);
+    if (input.kind === 'income' && isIncomeKind(input.incomeKind)) await applyIncomeKind(data.id as string, null);
     refreshPages();
     return { ok: true, id: data.id as string };
   }
@@ -171,6 +177,10 @@ export async function updateCashEntry(id: string, input: CashEntryInput): Promis
   const now = new Date().toISOString();
 
   if (input.kind === 'income') {
+    const kind = isIncomeKind(input.incomeKind) ? input.incomeKind : null;
+    const { data: before } = kind
+      ? await supabase.from('cash_topups').select('income_kind, plan_id').eq('id', id).maybeSingle()
+      : { data: null };
     const { error } = await supabase
       .from('cash_topups')
       .update({
@@ -180,11 +190,13 @@ export async function updateCashEntry(id: string, input: CashEntryInput): Promis
         note: input.note?.trim() || null,
         ...(input.memberId ? { member_id: input.memberId } : {}),
         ...(input.walletId ? { wallet_id: input.walletId } : {}),
+        ...(kind ? { income_kind: kind } : {}),
         updated_at: now,
       })
       .eq('id', id)
       .eq('source', 'cash_income');
     if (error) return dbFail(error);
+    if (kind) await applyIncomeKind(id, before);
   } else if (input.kind === 'withdrawal') {
     const { data: row } = await supabase.from('cash_topups').select('source').eq('id', id).maybeSingle();
     if (!row || row.source === 'cash_income') return fail('הרישום לא נמצא.');
