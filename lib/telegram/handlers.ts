@@ -33,7 +33,9 @@ import {
   savedMessage,
   spendKeyboard,
   spendLine,
+  walletTag,
 } from '@/lib/telegram/format';
+import { assignWithdrawal } from '@/lib/cash/withdrawal-wallet';
 import type {
   TelegramChat,
   TelegramChatMemberUpdated,
@@ -642,6 +644,34 @@ async function handleCallback(update: TelegramUpdate): Promise<void> {
     return;
   }
 
+  // "Which wallet did this withdrawal go into?" (asked after a sync).
+  if (action.kind === 'assign_wallet') {
+    const topup = await getTopup(action.spendId);
+    if (!topup || topup.is_dismissed) {
+      await answerCallbackQuery(query.id, 'המשיכה כבר לא קיימת');
+      return;
+    }
+    const wallets = await listWallets();
+    const wallet = wallets[action.walletIndex];
+    if (!wallet || walletTag(wallet.id) !== action.walletTag) {
+      await answerCallbackQuery(query.id, 'רשימת הארנקים השתנתה — אפשר לבחור באפליקציה');
+      return;
+    }
+    // The member was checked above: only the household's Telegram users get here.
+    const result = await assignWithdrawal(topup.id, wallet.id);
+    if (!result.ok) {
+      await answerCallbackQuery(query.id, result.error);
+      return;
+    }
+    await editMessageText(
+      query.message.chat.id,
+      query.message.message_id,
+      `✅ המשיכה של <b>${formatIls(Number(topup.amount_ils))}</b> מ-${friendlyDate(topup.occurred_at, isoDateInIsrael())} נכנסה ל${escapeHtml(result.walletName)} · ${escapeHtml(memberName(member))}`,
+    );
+    await answerCallbackQuery(query.id, wallet.name);
+    return;
+  }
+
   // Top-up actions (cash income, manual or detected withdrawals) act on
   // cash_topups, not on a spend.
   if (action.kind === 'delete_income' || action.kind === 'dismiss_topup') {
@@ -959,27 +989,9 @@ async function runSync(chatId: number): Promise<void> {
     `מעטפות: ${result.envelopesUpserted}`,
   ];
 
-  await sendMessage(chatId, lines.join('\n'));
-  await announceWithdrawals(chatId, result.newTopups);
-}
-
-/**
- * One message per newly detected withdrawal, each with a "not a withdrawal"
- * button: the detector matches on wording, and a false positive would
- * otherwise inflate the wallet forever.
- */
-export async function announceWithdrawals(
-  chatId: number,
-  topups: { id: string; amount_ils: number | string; business_name: string | null; occurred_at: string }[],
-): Promise<void> {
-  const today = isoDateInIsrael();
-  for (const topup of topups) {
-    await sendMessage(
-      chatId,
-      `🏧 משיכה חדשה נוספה לארנק: <b>${formatIls(Number(topup.amount_ils))}</b> · ${escapeHtml(
-        topup.business_name ?? 'משיכה',
-      )} · ${friendlyDate(topup.occurred_at, today)}`,
-      [[{ text: '↩️ זו לא משיכה', callback_data: encodeCallback({ kind: 'dismiss_topup', spendId: topup.id }) }]],
-    );
+  if (result.newTopups.length > 0) {
+    lines.push(`משיכות חדשות מהכספומט: ${result.newTopups.length} — שאלתי לאיזה ארנק נכנס הכסף.`);
   }
+  // Each new withdrawal's "which wallet?" question was sent by the sync itself.
+  await sendMessage(chatId, lines.join('\n'));
 }

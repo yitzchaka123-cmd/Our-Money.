@@ -21,6 +21,12 @@ export type CallbackAction =
   | { kind: 'delete_income'; spendId: string }
   /** "Not a withdrawal": dismiss a detected withdrawal top-up. */
   | { kind: 'dismiss_topup'; spendId: string }
+  /**
+   * "Which wallet did this withdrawal go into?": spendId carries the top-up
+   * id; the wallet travels as its place in the list plus the start of its id,
+   * so a list that changed in between is noticed rather than misfiled.
+   */
+  | { kind: 'assign_wallet'; spendId: string; walletIndex: number; walletTag: string }
   /** For these two, spendId carries the plan id and month the occurrence. */
   | { kind: 'settle_plan'; spendId: string; month: string }
   | { kind: 'skip_plan'; spendId: string; month: string };
@@ -33,6 +39,7 @@ const PREFIX = {
   back: 'bk',
   delete_income: 'di',
   dismiss_topup: 'dt',
+  assign_wallet: 'aw',
   settle_plan: 'sp',
   skip_plan: 'kp',
 } as const;
@@ -69,6 +76,8 @@ export function encodeCallback(action: CallbackAction): string {
       return `${PREFIX.delete_income}:${id}`;
     case 'dismiss_topup':
       return `${PREFIX.dismiss_topup}:${id}`;
+    case 'assign_wallet':
+      return `${PREFIX.assign_wallet}:${id}:${action.walletIndex}:${action.walletTag}`;
     case 'set_category':
       return `${PREFIX.set_category}:${id}:${action.categoryIndex}`;
     case 'settle_plan':
@@ -80,7 +89,7 @@ export function encodeCallback(action: CallbackAction): string {
 
 export function decodeCallback(data: string): CallbackAction | null {
   const parts = data.split(':');
-  const [prefix, packed, extra] = parts;
+  const [prefix, packed, extra, more] = parts;
   if (!prefix || !packed) return null;
 
   let spendId: string;
@@ -103,6 +112,11 @@ export function decodeCallback(data: string): CallbackAction | null {
       return { kind: 'delete_income', spendId };
     case PREFIX.dismiss_topup:
       return { kind: 'dismiss_topup', spendId };
+    case PREFIX.assign_wallet: {
+      const walletIndex = Number(extra);
+      if (!Number.isInteger(walletIndex) || walletIndex < 0 || !more || !/^[0-9a-f]{1,8}$/i.test(more)) return null;
+      return { kind: 'assign_wallet', spendId, walletIndex, walletTag: more };
+    }
     case PREFIX.settle_plan:
     case PREFIX.skip_plan: {
       if (!extra || !/^\d{6}$/.test(extra)) return null;
@@ -198,4 +212,9 @@ export function categoryKeyboard(spendId: string, categories: string[]): InlineK
   }
   rows.push([{ text: '↩️ חזרה', callback_data: encodeCallback({ kind: 'back', spendId }) }]);
   return rows;
+}
+
+/** The start of a wallet id, enough to tell wallets apart inside callback data. */
+export function walletTag(walletId: string): string {
+  return walletId.replace(/-/g, '').slice(0, 6);
 }

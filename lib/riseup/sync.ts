@@ -17,6 +17,7 @@ import {
   toDateOnly,
   WITHDRAWAL_MATCH_WINDOW_DAYS,
 } from '@/lib/riseup/withdrawals';
+import { askWhichWallet } from '@/lib/telegram/withdrawal-question';
 import type { CashTopup, RiseupBudget, RiseupTransaction } from '@/lib/types';
 
 export type SyncErrorKind = 'auth' | 'rate_limit' | 'network' | 'other';
@@ -108,6 +109,10 @@ export async function syncRiseup(monthsBack = 2): Promise<SyncResult> {
     for (const [index, month] of months.entries()) {
       envelopesUpserted += await storeEnvelopes(month, normalizeBudget(budgets[index]!, names));
     }
+
+    // Telegram: "which wallet did this withdrawal go into?", once per withdrawal.
+    // Never lets a Telegram hiccup fail the sync.
+    await askWhichWallet().catch((askError) => console.error('Could not ask about new withdrawals', askError));
 
     await finish({
       status: 'succeeded',

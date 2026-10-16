@@ -4,7 +4,6 @@ import { env } from '@/lib/env';
 import { ensureWebhook, escapeHtml, sendMessage } from '@/lib/telegram/client';
 import { pruneOldData } from '@/lib/riseup/prune';
 import { syncRiseup } from '@/lib/riseup/sync';
-import { announceWithdrawals } from '@/lib/telegram/handlers';
 import { familyGroupChatId } from '@/lib/telegram/group';
 
 export const runtime = 'nodejs';
@@ -47,9 +46,8 @@ export async function GET(request: Request): Promise<NextResponse> {
       groupChatId,
       `⚠️ סנכרון רייזאפ נכשל:\n<code>${escapeHtml(result.error)}</code>`,
     );
-  } else if (result.newTopups.length > 0 && groupChatId) {
-    await announceWithdrawals(groupChatId, result.newTopups);
   }
+  // New withdrawals: the sync itself asked which wallet each one went into.
 
   return NextResponse.json({
     ok: !result.error,

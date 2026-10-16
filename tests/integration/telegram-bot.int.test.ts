@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { IntakeResult } from '@/lib/intake/parse';
 import type { TelegramUpdate } from '@/lib/telegram/types';
+import type { RiseupTransaction } from '@/lib/types';
 
 import { resetDb, seedMember, seedMonth, signIn, sql } from './helpers';
 
@@ -18,12 +19,15 @@ const telegram = vi.hoisted(() => ({
   sent: [] as Array<{ chatId: number; text: string; keyboard?: Array<Array<{ text: string; callback_data: string }>> }>,
   edits: [] as Array<{ chatId: number; messageId: number; text: string; keyboard?: Array<Array<{ text: string; callback_data: string }>> }>,
   left: [] as number[],
+  /** Chats that cannot be messaged (a member who never opened the bot). */
+  unreachable: [] as number[],
 }));
 vi.mock('@/lib/telegram/client', async (importOriginal) => {
   const original = await importOriginal<typeof import('@/lib/telegram/client')>();
   return {
     ...original,
     sendMessage: async (chatId: number, text: string, keyboard?: Array<Array<{ text: string; callback_data: string }>>) => {
+      if (telegram.unreachable.includes(chatId)) throw new Error('Forbidden: bot was blocked by the user');
       telegram.sent.push({ chatId, text, keyboard });
       return { message_id: 1000 + telegram.sent.length, chat: { id: chatId, type: 'private' }, date: 0 };
     },
@@ -36,6 +40,18 @@ vi.mock('@/lib/telegram/client', async (importOriginal) => {
     leaveChat: async (chatId: number) => {
       telegram.left.push(chatId);
     },
+  };
+});
+
+// RiseUp: a month we do not otherwise use, with whatever transactions a test puts in.
+const riseup = vi.hoisted(() => ({ transactions: [] as RiseupTransaction[] }));
+vi.mock('@/lib/riseup/client', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@/lib/riseup/client')>();
+  return {
+    ...original,
+    recentMonths: () => ['2026-10'],
+    fetchTransactions: async () => riseup.transactions,
+    fetchBudget: async () => ({ envelopes: [] }),
   };
 });
 
@@ -101,6 +117,8 @@ beforeEach(async () => {
   telegram.sent = [];
   telegram.edits = [];
   telegram.left = [];
+  telegram.unreachable = [];
+  riseup.transactions = [];
 });
 
 describe('V3-3: the bot uses the name you chose', () => {
@@ -507,5 +525,98 @@ describe('V4-3 / V3-1: the family group, set up with one tap', () => {
       message: { message_id: updateId, date: 0, chat: { id: GROUP, type: 'group' }, from: { id: 111, is_bot: false }, migrate_to_chat_id: -1009999 },
     } as TelegramUpdate);
     expect(storedGroup()).toEqual([{ value: '-1009999' }]);
+  });
+});
+
+describe('V2-6b: a new ATM withdrawal asks which wallet the cash went into', () => {
+  const atm = (id: string, amount = 500): RiseupTransaction => ({
+    transactionId: id,
+    transactionDate: '2026-10-14T00:00:00.000Z',
+    cashflowDate: '2026-10',
+    businessName: 'משיכת מזומן',
+    isIncome: false,
+    amount,
+    sourceType: 'checkingAccount',
+  });
+
+  let saraWallet: string;
+  beforeEach(() => {
+    run(`insert into cash_wallets (name, is_default, position) values ('הארנק של שרה', false, 1)`);
+    saraWallet = sql<{ id: string }>(`select id from cash_wallets where name = 'הארנק של שרה'`)[0]!.id;
+  });
+
+  const questions = () => telegram.sent.filter((m) => m.text.includes('זיהינו משיכה'));
+
+  it('sends one message with a button per wallet, and never asks twice', async () => {
+    const { syncRiseup } = await import('@/lib/riseup/sync');
+    riseup.transactions = [atm('bank-1')];
+    expect((await syncRiseup()).error).toBeNull();
+
+    expect(questions()).toHaveLength(1);
+    const q = questions()[0]!;
+    expect(q.chatId).toBe(111);
+    expect(q.text).toContain('זיהינו משיכה של <b>₪500</b> מהכספומט ב-14.10. לאיזה ארנק נכנס הכסף?');
+    expect(buttonTexts(q.keyboard)).toEqual(['👛 ארנק ראשי', '👛 הארנק של שרה', '↩️ זו לא משיכה']);
+
+    await syncRiseup();
+    const { askWhichWallet } = await import('@/lib/telegram/withdrawal-question');
+    expect(await askWhichWallet()).toBe(0);
+    expect(questions()).toHaveLength(1);
+    expect(sql('select wallet_asked_at is not null as asked from cash_topups')).toEqual([{ asked: true }]);
+  });
+
+  it('the button moves the withdrawal into that wallet', async () => {
+    const { syncRiseup } = await import('@/lib/riseup/sync');
+    const { handleUpdate } = await import('@/lib/telegram/handlers');
+    riseup.transactions = [atm('bank-1')];
+    await syncRiseup();
+    const q = questions()[0]!;
+
+    await handleUpdate(tap(buttonData(q.keyboard, '👛 הארנק של שרה'), { chatId: 111, messageId: 1001 }));
+    expect(sql('select wallet_id from cash_topups')).toEqual([{ wallet_id: saraWallet }]);
+    expect(telegram.edits.at(-1)!.text).toContain('נכנסה להארנק של שרה');
+  });
+
+  it('asks in the family group instead, when there is one', async () => {
+    await seedMember(222, 'שרה');
+    const { handleUpdate } = await import('@/lib/telegram/handlers');
+    await handleUpdate(botAdded());
+    const { syncRiseup } = await import('@/lib/riseup/sync');
+    riseup.transactions = [atm('bank-1')];
+    await syncRiseup();
+    expect(questions().map((m) => m.chatId)).toEqual([GROUP]);
+  });
+
+  it('refuses a button from a wallet list that has since changed', async () => {
+    const { syncRiseup } = await import('@/lib/riseup/sync');
+    const { handleUpdate } = await import('@/lib/telegram/handlers');
+    riseup.transactions = [atm('bank-1')];
+    await syncRiseup();
+    const q = questions()[0]!;
+    run(`update cash_wallets set position = -1 where id = '${saraWallet}'`);
+
+    await handleUpdate(tap(buttonData(q.keyboard, '👛 הארנק של שרה'), { chatId: 111, messageId: 1001 }));
+    expect(sql('select wallet_id <> \'' + saraWallet + '\' as untouched from cash_topups')).toEqual([{ untouched: true }]);
+  });
+
+  it('tries again on the next sync when nobody could be reached', async () => {
+    telegram.unreachable = [111];
+    const { syncRiseup } = await import('@/lib/riseup/sync');
+    riseup.transactions = [atm('bank-1')];
+    await syncRiseup();
+    expect(sql('select wallet_asked_at is null as open from cash_topups')).toEqual([{ open: true }]);
+
+    telegram.unreachable = [];
+    await syncRiseup();
+    expect(questions()).toHaveLength(1);
+  });
+
+  it('with one wallet, just says where the cash went', async () => {
+    run(`delete from cash_wallets where id = '${saraWallet}'`);
+    const { syncRiseup } = await import('@/lib/riseup/sync');
+    riseup.transactions = [atm('bank-1')];
+    await syncRiseup();
+    expect(questions()[0]!.text).toContain('הכסף נכנס לארנק ראשי');
+    expect(buttonTexts(questions()[0]!.keyboard)).toEqual(['↩️ זו לא משיכה']);
   });
 });

@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
 import { TelegramSettings } from '@/app/settings/TelegramSettings';
-import { categoryKeyboard, decodeCallback, encodeCallback, savedMessage, spendKeyboard } from '@/lib/telegram/format';
+import { categoryKeyboard, decodeCallback, encodeCallback, savedMessage, spendKeyboard, walletTag } from '@/lib/telegram/format';
 import type { CashSpend } from '@/lib/types';
 
 const ID = '5f0c2b8e-1d2a-4c3b-9e4f-0a1b2c3d4e5f';
@@ -66,5 +66,12 @@ describe('V4-4: the bot reply and its buttons', () => {
     );
     expect(html).toContain('לרשום מיד');
     expect(html).toMatch(/aria-checked="true"[^>]*data-selected="true"[^>]*>לשאול לפני שרושמים/);
+  });
+
+  it('V2-6b: a wallet button carries the withdrawal, the wallet’s place and the start of its id, within 64 bytes', () => {
+    const data = encodeCallback({ kind: 'assign_wallet', spendId: ID, walletIndex: 3, walletTag: walletTag('a1b2c3d4-0000-4000-8000-000000000000') });
+    expect(new TextEncoder().encode(data).length).toBeLessThanOrEqual(64);
+    expect(decodeCallback(data)).toEqual({ kind: 'assign_wallet', spendId: ID, walletIndex: 3, walletTag: 'a1b2c3' });
+    expect(decodeCallback(`aw:${ID.replace(/-/g, '')}:1`)).toBeNull();
   });
 });
