@@ -89,11 +89,12 @@ describe('friendlyDate', () => {
 });
 
 describe('categoryKeyboard', () => {
-  it('lays categories out two per row', () => {
+  it('lays categories out two per row, then a row with חזרה', () => {
     const keyboard = categoryKeyboard(UUID, ['א', 'ב', 'ג']);
-    expect(keyboard).toHaveLength(2);
+    expect(keyboard).toHaveLength(3);
     expect(keyboard[0]).toHaveLength(2);
     expect(keyboard[1]).toHaveLength(1);
+    expect(keyboard[2]!.map((b) => b.text)).toEqual(['↩️ חזרה']);
   });
 
   it('encodes each button with its own index', () => {

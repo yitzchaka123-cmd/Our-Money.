@@ -4,7 +4,8 @@ import { z } from 'zod';
 
 import { hebrewWeekday, isoDateInIsrael } from '@/lib/dates';
 import { env } from '@/lib/env';
-import { activeCategories, CATCH_ALL_CATEGORY } from '@/lib/intake/categories';
+import { loadBotEnvelopes } from '@/lib/intake/categories';
+import { fileExpense, VARIABLE_NAME, type BotEnvelope } from '@/lib/intake/envelopes';
 import type { Confidence } from '@/lib/types';
 
 /**
@@ -38,11 +39,11 @@ function anthropic(): Anthropic {
 }
 
 /**
- * The system prompt is deliberately stable: the category list is the only part
+ * The system prompt is deliberately stable: the envelope list is the only part
  * that ever changes, and it changes rarely. That keeps the cached prefix warm
  * across the dozens of short calls a day this bot makes.
  */
-function buildSystemPrompt(categories: string[], wallets: string[]): string {
+export function buildSystemPrompt(envelopes: BotEnvelope[], wallets: string[]): string {
   return [
     'You extract cash movements — money spent in cash, and cash received — from short messages sent by a married couple to their household cash bot.',
     'They write in Hebrew, English, or a mix, casually, often mid-errand. Voice notes arrive as transcripts, so expect filler words, false starts, and transcription noise.',
@@ -55,10 +56,11 @@ function buildSystemPrompt(categories: string[], wallets: string[]): string {
     '- Resolve relative dates against the supplied current date: היום/today, אתמול/yesterday, שלשום = two days ago, "ביום ראשון" = the most recent past Sunday. Never return a future date. Default to the current date when no date is mentioned.',
     '- spent_at must be YYYY-MM-DD.',
     '- note: a short, human description of what was bought, in the language the user used. Keep the merchant name if one was given. No more than 60 characters.',
-    '- category MUST be exactly one of the allowed categories listed below. Pick the closest fit; use the catch-all only when nothing fits.',
+    "- For an expense, category MUST be exactly the name of one of the household's envelopes listed below — their own budget envelopes, the same ones they see in their app. Pick the envelope whose description fits. Supermarket and grocery shopping goes to the supermarket envelope; restaurants, cafés and takeaway go to the eating-out envelope.",
+    `- When no envelope fits, use "${VARIABLE_NAME}". Never invent a category, never use "אחר", and never use a general label that is not in the list.`,
     '- confidence reflects how sure you are about the amount and category together: "high" when both are explicit, "medium" when you inferred the category, "low" when the amount itself was ambiguous.',
     '- direction: "expense" when cash was paid out. "income" when cash came IN from outside — a cash salary, a gift ("קיבלתי 200 מסבתא"), a refund, something sold. "withdrawal" when they took cash out of the bank ("משכתי 500", "took 300 from the ATM") — that is cash moving from the bank into a wallet, not income; set category to "משיכה".',
-    '- For an income entry, category is free text describing the source (e.g. "מתנה", "משכורת במזומן", "החזר") rather than one of the expense categories.',
+    '- For an income entry, category is free text describing the source (e.g. "מתנה", "משכורת במזומן", "החזר") rather than one of the envelopes.',
     '',
     'Intent:',
     '- "log_expense" when the message reports cash spent or cash received. This is the common case.',
@@ -69,8 +71,8 @@ function buildSystemPrompt(categories: string[], wallets: string[]): string {
     '',
     'Only report expenses actually paid in cash context — this bot exists because card and bank spending is already tracked elsewhere. If the user explicitly says they paid by card ("בכרטיס", "באשראי"), set intent to "unclear" and explain in reply_note that card spending is tracked automatically.',
     '',
-    `Allowed categories (use the exact string): ${categories.join(' | ')}`,
-    `Catch-all category: ${CATCH_ALL_CATEGORY}`,
+    'Envelopes (use the exact name before the colon):',
+    ...envelopes.map((e) => `- ${e.name}${e.hint ? `: ${e.hint}` : ''}`),
     '',
     wallets.length > 1
       ? `The household keeps cash in several wallets: ${wallets.join(' | ')}. If the message says which wallet the cash came from or went into ("מהארנק של שרה", "from the drawer"), set wallet to that exact name; otherwise null.`
@@ -134,14 +136,17 @@ export interface ParseOptions {
   speakerName?: string;
   /** Names of the household's cash wallets, so a message can name one. */
   wallets?: string[];
+  /** The envelopes to file into; loaded for the current month when absent. */
+  envelopes?: BotEnvelope[];
 }
 
 export async function parseIntake(
   message: string,
   options: ParseOptions = {},
 ): Promise<IntakeResult> {
-  const categories = await activeCategories();
   const today = options.today ?? isoDateInIsrael();
+  const envelopes = options.envelopes ?? (await loadBotEnvelopes(today.slice(0, 7)));
+  const categories = envelopes.map((e) => e.name);
   const wallets = options.wallets ?? [];
   const schema = buildSchema(categories, wallets);
 
@@ -151,7 +156,7 @@ export async function parseIntake(
     system: [
       {
         type: 'text',
-        text: buildSystemPrompt(categories, wallets),
+        text: buildSystemPrompt(envelopes, wallets),
         cache_control: { type: 'ephemeral' },
       },
     ],
@@ -195,9 +200,9 @@ export async function parseIntake(
         ? 'משיכה'
         : isIncome
         ? entry.category.trim() || 'הכנסה במזומן'
-        : categories.includes(entry.category)
-          ? entry.category
-          : CATCH_ALL_CATEGORY,
+        : // Only ever one of the household's envelopes; the words are the safety net.
+          // With one entry the whole message is its words; with several, only its note.
+          fileExpense(entry.category, parsed.entries.length === 1 ? `${entry.note} ${message}` : entry.note, envelopes).name,
       note: entry.note.slice(0, 60),
       spentAt: date,
       // A date we had to correct is a signal the parse was shaky overall.

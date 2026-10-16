@@ -1,68 +1,71 @@
 import { db } from '@/lib/db/client';
-import { isUnresolvedName } from '@/lib/riseup/tracker-names';
+import { envelopeRefsForMonth } from '@/lib/db/queries';
+import { toOverrides, type TrackerOverrideRow } from '@/lib/dashboard/trackers';
+import { botEnvelopes, type BotEnvelope } from '@/lib/intake/envelopes';
 
 /**
- * Fallback list, mirroring the seed rows in the migration. Used when the
- * categories table cannot be read, so a database hiccup degrades intake
- * quality instead of dropping the message on the floor.
+ * The bot's categories are the household's own envelopes for the month (see
+ * lib/intake/envelopes.ts): every tracker by the name the dashboard shows,
+ * "הוצאות משתנות" and "הוצאות קבועות". RiseUp's raw labels are still
+ * recorded below, but only so cash rows can reference them — the bot never
+ * offers them.
  */
-export const FALLBACK_CATEGORIES = [
-  'מזון וצריכה',
-  'מסעדות',
-  'תחבורה ורכב',
-  'בריאות',
-  'ביגוד והנעלה',
-  'פנאי ובידור',
-  'חינוך וילדים',
-  'בית ותחזוקה',
-  'טיפוח',
-  'מתנות ותרומות',
-  'תקשורת',
-  'אחר',
-] as const;
 
-export const CATCH_ALL_CATEGORY = 'אחר';
+// Cached briefly per instance and month: a burst of messages costs one read,
+// and a rename on the dashboard shows up in the bot within a minute.
+const cache = new Map<string, { envelopes: BotEnvelope[]; at: number }>();
+const CACHE_TTL_MS = 60 * 1000;
 
-// Cached for the lifetime of the serverless instance. The list changes only
-// when a sync discovers a new RiseUp category, so staleness costs nothing.
-let cache: { labels: string[]; at: number } | null = null;
-const CACHE_TTL_MS = 5 * 60 * 1000;
+async function overridesFor(month: string) {
+  // Until migration 0006 is applied this errors, and there are simply no overrides.
+  const { data } = await db().from('tracker_overrides').select('*').in('month', ['', month]);
+  return toOverrides(data as TrackerOverrideRow[] | null);
+}
 
-export async function activeCategories(): Promise<string[]> {
-  if (cache && Date.now() - cache.at < CACHE_TTL_MS) return cache.labels;
-
-  try {
-    const supabase = db();
-    const [{ data: rows, error }, { data: trackers }] = await Promise.all([
-      supabase.from('categories').select('label').eq('is_active', true).order('label'),
-      // RiseUp's tracking categories come first: naming one files the spend
-      // straight into that envelope on the dashboard.
-      supabase
-        .from('riseup_envelopes')
-        .select('name, month')
-        .eq('envelope_type', 'trackingCategory')
-        .order('month', { ascending: false })
-        .limit(60),
-    ]);
-    if (error) throw new Error(error.message);
-
-    // Rows synced before trackers had names hold the raw id: not a category.
-    const trackerNames = (trackers ?? []).map((t) => t.name as string).filter((name) => !isUnresolvedName(name));
-    const labels = [
-      ...new Set([...trackerNames, ...(rows ?? []).map((row) => row.label as string)]),
-    ];
-    if (labels.length === 0) return [...FALLBACK_CATEGORIES];
-
-    cache = { labels, at: Date.now() };
-    return labels;
-  } catch {
-    return [...FALLBACK_CATEGORIES];
-  }
+/** The latest synced month at or before `month`, for a month RiseUp has not planned yet. */
+async function latestSyncedMonth(month: string): Promise<string | null> {
+  const { data } = await db()
+    .from('riseup_envelopes')
+    .select('month')
+    .lte('month', month)
+    .order('month', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return (data?.month as string | undefined) ?? null;
 }
 
 /**
- * Record categories seen in RiseUp data so the bot's vocabulary converges on
- * the labels actually in use, rather than the ones we guessed at build time.
+ * The month's envelopes as the bot offers them. Before RiseUp has planned the
+ * month, the trackers of the latest synced month are offered by name, not
+ * pinned (the dashboard files them by name once the month exists).
+ */
+export async function loadBotEnvelopes(month: string): Promise<BotEnvelope[]> {
+  const hit = cache.get(month);
+  if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.envelopes;
+
+  let envelopes: BotEnvelope[];
+  try {
+    const [refs, overrides] = await Promise.all([envelopeRefsForMonth(month), overridesFor(month)]);
+    if (refs.some((r) => r.type === 'variable' || r.type === 'trackingCategory')) {
+      envelopes = botEnvelopes(refs, overrides, month);
+    } else {
+      const previous = await latestSyncedMonth(month);
+      const borrowed = previous && previous !== month ? await envelopeRefsForMonth(previous) : refs;
+      envelopes = botEnvelopes(borrowed, overrides, month).map((e) => ({ ...e, envelopeId: null }));
+    }
+  } catch (error) {
+    // A database hiccup degrades to the two big envelopes rather than losing the message.
+    console.error('Loading the envelopes for the bot failed', error);
+    envelopes = botEnvelopes([], [], month);
+  }
+
+  cache.set(month, { envelopes, at: Date.now() });
+  return envelopes;
+}
+
+/**
+ * Record categories seen in RiseUp data, so a cash row may carry any label
+ * RiseUp uses (cash_spends.category references money.categories).
  */
 export async function recordRiseupCategories(labels: string[]): Promise<void> {
   const unique = [...new Set(labels.filter((l) => l && l.trim().length > 0))];
@@ -75,9 +78,9 @@ export async function recordRiseupCategories(labels: string[]): Promise<void> {
       { onConflict: 'label', ignoreDuplicates: true },
     );
   if (error) throw new Error(`Failed to record categories: ${error.message}`);
-  cache = null;
+  cache.clear();
 }
 
 export function resetCategoryCache(): void {
-  cache = null;
+  cache.clear();
 }

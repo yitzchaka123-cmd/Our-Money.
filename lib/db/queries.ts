@@ -18,7 +18,9 @@ export async function resolveMember(
 
   const { data: existing, error } = await supabase
     .from('household_members')
-    .select('id, telegram_user_id, display_name, is_active')
+    // '*': the chosen name and the bot settings arrive with later migrations;
+    // until they are applied the fields are simply absent.
+    .select('*')
     .eq('telegram_user_id', telegramUserId)
     .maybeSingle();
 
@@ -33,7 +35,7 @@ export async function resolveMember(
       telegram_user_id: telegramUserId,
       display_name: fallbackName || String(telegramUserId),
     })
-    .select('id, telegram_user_id, display_name, is_active')
+    .select('*')
     .single();
 
   if (insertError) throw new Error(`Failed to create member: ${insertError.message}`);
@@ -89,6 +91,24 @@ export async function attachBotMessage(
     .update({ bot_message_id: botMessageId, updated_at: new Date().toISOString() })
     .in('id', spendIds);
   if (error) throw new Error(`Failed to attach bot message: ${error.message}`);
+}
+
+/**
+ * The live spends one bot reply is about (a message may log several), the
+ * first-logged first — so its buttons and text can be redrawn as they are now.
+ */
+export async function spendsOfBotMessage(chatId: number, botMessageId: number): Promise<CashSpend[]> {
+  const { data, error } = await db()
+    .from('cash_spends')
+    .select('*')
+    .eq('telegram_chat_id', chatId)
+    .eq('bot_message_id', botMessageId)
+    .neq('status', 'deleted')
+    .order('created_at')
+    .order('telegram_update_id', { nullsFirst: false })
+    .order('id');
+  if (error) throw new Error(`Failed to load the message's spends: ${error.message}`);
+  return (data ?? []) as CashSpend[];
 }
 
 export async function getSpend(id: string): Promise<CashSpend | null> {
@@ -167,7 +187,7 @@ export async function activeTopups(): Promise<CashTopup[]> {
 export async function membersById(): Promise<Map<string, HouseholdMember>> {
   const { data, error } = await db()
     .from('household_members')
-    .select('id, telegram_user_id, display_name, is_active');
+    .select('*');
   if (error) throw new Error(`Failed to load members: ${error.message}`);
   return new Map((data ?? []).map((m) => [m.id, m as HouseholdMember]));
 }

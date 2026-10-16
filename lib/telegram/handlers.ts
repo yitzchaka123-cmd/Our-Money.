@@ -2,11 +2,11 @@ import { issueLoginCode } from '@/lib/auth/codes';
 import { createSessionToken } from '@/lib/auth/session';
 import { loadPlan, settlePlanOccurrence, skipPlanOccurrence } from '@/lib/cash/plan-store';
 import { env } from '@/lib/env';
-import { activeCategories } from '@/lib/intake/categories';
+import { loadBotEnvelopes } from '@/lib/intake/categories';
+import { envelopeOfSpend, fileExpense, sameEnvelopeIn, type BotEnvelope } from '@/lib/intake/envelopes';
 import { isoDateInIsrael, parseIntake } from '@/lib/intake/parse';
 import {
   monthBounds,
-  totalsByCategory,
   totalsByMember,
   walletBalances,
   walletState,
@@ -20,6 +20,7 @@ import {
   downloadFile,
   editMessageText,
   escapeHtml,
+  leaveChat,
   sendMessage,
   sendTyping,
 } from '@/lib/telegram/client';
@@ -32,15 +33,32 @@ import {
   savedMessage,
   spendKeyboard,
   spendLine,
+  walletTag,
 } from '@/lib/telegram/format';
-import type { TelegramMessage, TelegramUpdate } from '@/lib/telegram/types';
-import { resolveEnvelopeForCategory } from '@/lib/cash/envelopes';
+import { assignWithdrawal } from '@/lib/cash/withdrawal-wallet';
+import type {
+  TelegramChat,
+  TelegramChatMemberUpdated,
+  TelegramMessage,
+  TelegramUpdate,
+  TelegramUser,
+} from '@/lib/telegram/types';
+import { announceToFamily, announcement, entryLine } from '@/lib/telegram/announce';
+import {
+  addToGroupUrl,
+  botIdentity,
+  familyGroupChatId,
+  forgetFamilyGroup,
+  getFamilyGroup,
+  moveFamilyGroup,
+  saveFamilyGroup,
+  STARTGROUP_PAYLOAD,
+} from '@/lib/telegram/group';
 import {
   activeTopups,
   allLiveSpends,
   attachBotMessage,
   dismissTopup,
-  envelopeRefsForMonth,
   getTopup,
   insertCashIncomes,
   insertManualWithdrawals,
@@ -52,11 +70,14 @@ import {
   membersById,
   resolveMember,
   spendsBetween,
+  spendsOfBotMessage,
   updateAlreadyProcessed,
   updateSpend,
   type NewSpend,
 } from '@/lib/db/queries';
-import type { HouseholdMember } from '@/lib/types';
+import type { CashSpend, HouseholdMember } from '@/lib/types';
+import { confirmModeOf } from '@/lib/telegram/settings';
+import { memberName } from '@/lib/profile/names';
 
 const HELP = [
   '<b>Our Money</b> — יומן המזומן שלנו 💸',
@@ -74,8 +95,9 @@ const HELP = [
   '/undo — מחיקת הרישום האחרון',
   '/dashboard — קישור לדאשבורד המלא',
   '/sync — משיכת נתונים מרייזאפ עכשיו',
-  '/categories — רשימת הקטגוריות',
-  '/id — מזהי הצ׳אט (שימושי להגדרת קבוצה)',
+  '/categories — המעטפות שאפשר לרשום אליהן',
+  '/group — קבוצה משפחתית: שניכם רואים כל רישום',
+  '/id — המזהים של הצ׳אט הזה',
 ].join('\n');
 
 /** Includes the sender's own id: it is theirs to know, and it is exactly what setup needs. */
@@ -88,20 +110,29 @@ function notAuthorized(telegramUserId: number): string {
   ].join('\n');
 }
 
-let cachedBotUsername: string | null = null;
-
 async function botUsername(): Promise<string> {
-  if (cachedBotUsername) return cachedBotUsername;
-  const response = await fetch(`https://api.telegram.org/bot${env.telegramBotToken}/getMe`);
-  const payload = (await response.json()) as { result?: { username?: string } };
-  cachedBotUsername = payload.result?.username ?? '';
-  return cachedBotUsername;
+  return (await botIdentity())?.username ?? '';
 }
 
 export async function handleUpdate(update: TelegramUpdate): Promise<void> {
   if (update.callback_query) return handleCallback(update);
+  if (update.my_chat_member) return handleMembership(update.my_chat_member);
   const message = update.message;
   if (!message?.from) return;
+
+  // A group that became a supergroup changes its id; keep following it.
+  if (message.migrate_to_chat_id) {
+    await moveFamilyGroup(message.chat.id, message.migrate_to_chat_id);
+    return;
+  }
+  // "X added the bot": the service message that comes with being added.
+  if (message.new_chat_members?.length) {
+    const bot = await botIdentity();
+    if (bot && message.new_chat_members.some((u) => u.id === bot.id)) {
+      await botAddedToGroup(message.chat, message.from);
+    }
+    return;
+  }
 
   const member = await resolveMember(
     message.from.id,
@@ -117,13 +148,100 @@ export async function handleUpdate(update: TelegramUpdate): Promise<void> {
     return;
   }
 
-  if (!isPrivate && !(await isAddressedToBot(message))) return;
+  // In the family group every message from the two of them is for the bot
+  // (it stays quiet when there is no amount); in any other group, only what
+  // is addressed to it.
+  const addressed = isPrivate || (await isAddressedToBot(message));
+  const inFamilyGroup = !isPrivate && (await familyGroupChatId()) === message.chat.id;
+  if (!addressed && !inFamilyGroup) return;
+  const quiet = !addressed;
 
   const text = (message.text ?? message.caption ?? '').trim();
   if (text.startsWith('/')) return handleCommand(message, member, text);
 
-  if (message.voice || message.audio) return handleVoice(update, message, member);
-  if (text) return handleText(update, message, member, text);
+  if (message.voice || message.audio) return handleVoice(update, message, member, quiet);
+  if (text) return handleText(update, message, member, text, quiet);
+}
+
+/** The bot's own membership changed: added to a group, or removed from one. */
+async function handleMembership(change: TelegramChatMemberUpdated): Promise<void> {
+  if (change.chat.type !== 'group' && change.chat.type !== 'supergroup') return;
+  const before = change.old_chat_member.status;
+  const after = change.new_chat_member.status;
+  const wasIn = before === 'member' || before === 'administrator' || before === 'creator' || before === 'restricted';
+  const isIn = after === 'member' || after === 'administrator' || after === 'creator' || after === 'restricted';
+
+  if (isIn && !wasIn) {
+    await botAddedToGroup(change.chat, change.from);
+    return;
+  }
+  if (!isIn && wasIn) await forgetFamilyGroup(change.chat.id);
+}
+
+/**
+ * Someone added the bot to a group. If it is one of the two of them, this is
+ * the family group from now on: remember it and say hello there, once.
+ * Anyone else gets a polite no, and the bot leaves.
+ */
+async function botAddedToGroup(chat: TelegramChat, from: TelegramUser): Promise<void> {
+  if (chat.type !== 'group' && chat.type !== 'supergroup') return;
+  const member = await resolveMember(from.id, [from.first_name, from.last_name].filter(Boolean).join(' '));
+  if (!member) {
+    await sendMessage(chat.id, '🔒 הבוט הזה פרטי, ורק בני הבית יכולים להוסיף אותו לקבוצה. להתראות!').catch(() => undefined);
+    await leaveChat(chat.id);
+    return;
+  }
+
+  const isNew = await saveFamilyGroup(chat.id, chat.title ?? null, member.id);
+  if (!isNew) return;
+  await sendMessage(chat.id, familyGroupWelcome(await botUsername()));
+}
+
+function familyGroupWelcome(username: string): string {
+  return [
+    '👋 <b>הקבוצה המשפחתית מחוברת!</b>',
+    '',
+    'מעכשיו כל הוצאה והכנסה במזומן שתרשמו — כאן או אצלי בפרטי — תופיע בקבוצה: מי רשם, כמה, ובאיזו מעטפה.',
+    '',
+    'אפשר לרשום גם מכאן: פשוט כתבו או הקליטו, למשל <i>"80 בסופר"</i>.',
+    username
+      ? `אם אני לא מגיב להודעה רגילה, ענו להודעה שלי או כתבו @${escapeHtml(username)} — או הפכו אותי למנהל בקבוצה, ואז אראה כל הודעה.`
+      : 'אם אני לא מגיב להודעה רגילה, ענו להודעה שלי — או הפכו אותי למנהל בקבוצה, ואז אראה כל הודעה.',
+  ].join('\n');
+}
+
+/** /group: how to set up the family group, or which one is connected. */
+async function sendGroupHelp(chatId: number): Promise<void> {
+  const [group, username] = await Promise.all([getFamilyGroup(), botUsername()]);
+  if (group) {
+    await sendMessage(
+      chatId,
+      [
+        `✅ <b>הקבוצה המשפחתית מחוברת</b>${group.title ? `: ${escapeHtml(group.title)}` : ''}`,
+        '',
+        'כל הוצאה והכנסה במזומן נשלחת לשם — מי רשם, כמה, ובאיזו מעטפה. שניכם יכולים לרשום גם מתוך הקבוצה.',
+        '',
+        'רוצים קבוצה אחרת? פשוט הוסיפו אותי אליה, והיא תחליף את הנוכחית.',
+      ].join('\n'),
+      username ? [[{ text: '➕ להוסיף לקבוצה אחרת', url: addToGroupUrl(username) }]] : undefined,
+    );
+    return;
+  }
+  await sendMessage(
+    chatId,
+    [
+      '👨‍👩‍👧 <b>קבוצה משפחתית — שלושה צעדים</b>',
+      '',
+      '1. פתחו בטלגרם קבוצה עם בן או בת הזוג (או בחרו קבוצה שכבר יש לכם).',
+      username
+        ? '2. לחצו על הכפתור למטה ובחרו את הקבוצה.'
+        : '2. בקבוצה: לחצו על שם הקבוצה ← הוספת משתתפים ← חפשו אותי והוסיפו.',
+      '3. זהו! אכתוב בקבוצה שהיא מחוברת, ומאז כל רישום במזומן יופיע שם.',
+      '',
+      'שניכם יכולים לרשום גם מתוך הקבוצה.',
+    ].join('\n'),
+    username ? [[{ text: '➕ הוספה לקבוצה', url: addToGroupUrl(username) }]] : undefined,
+  );
 }
 
 /**
@@ -152,27 +270,53 @@ async function handleCommand(
 
   switch (command) {
     case '/start':
+      // "Add to group" ends with "/start family" in the new group.
+      if (message.chat.type !== 'private' && args[0] === STARTGROUP_PAYLOAD && message.from) {
+        await botAddedToGroup(message.chat, message.from);
+        return;
+      }
+      await sendMessage(chatId, HELP);
+      return;
+
     case '/help':
       await sendMessage(chatId, HELP);
       return;
 
-    case '/id':
+    case '/group':
+      await sendGroupHelp(chatId);
+      return;
+
+    case '/id': {
+      const group = await getFamilyGroup();
+      const here = message.chat.type === 'private' ? 'הצ׳אט הפרטי שלך איתי' : 'הקבוצה הזו';
       await sendMessage(
         chatId,
         [
-          `Chat id: <code>${chatId}</code>`,
-          `Your user id: <code>${message.from?.id}</code>`,
+          '🆔 <b>המזהים כאן</b>',
+          `${here}: <code>${chatId}</code>`,
+          `המשתמש שלך בטלגרם: <code>${message.from?.id}</code>`,
           '',
-          'לקבוצה משותפת — הכניסו את ה-Chat id ל-TELEGRAM_GROUP_CHAT_ID.',
+          group?.chatId === chatId
+            ? '✅ זו הקבוצה המשפחתית — כל רישום במזומן מופיע כאן.'
+            : group
+              ? '✅ יש לכם קבוצה משפחתית מחוברת. /group לפרטים.'
+              : 'אין צורך להעתיק מספרים לשום מקום. רוצים ששניכם תראו כל רישום? שלחו /group ואסביר בשלושה צעדים.',
         ].join('\n'),
       );
       return;
+    }
 
     case '/categories': {
-      const categories = await activeCategories();
+      const envelopes = await loadBotEnvelopes(isoDateInIsrael().slice(0, 7));
       await sendMessage(
         chatId,
-        ['<b>קטגוריות פעילות</b>', '', ...categories.map((c) => `• ${escapeHtml(c)}`)].join('\n'),
+        [
+          '<b>המעטפות שלכם החודש</b>',
+          '',
+          ...envelopes.map((e) => `• ${escapeHtml(e.name)}`),
+          '',
+          'כל הוצאה נרשמת לאחת מהן. מה שלא מתאים לאף אחת נכנס להוצאות המשתנות.',
+        ].join('\n'),
       );
       return;
     }
@@ -239,19 +383,21 @@ async function handleText(
   message: TelegramMessage,
   member: HouseholdMember,
   text: string,
+  quiet = false,
 ): Promise<void> {
   if (await updateAlreadyProcessed(update.update_id)) return;
-  await sendTyping(message.chat.id);
-  await logFromNaturalLanguage(update, message, member, text, 'text', null);
+  if (!quiet) await sendTyping(message.chat.id);
+  await logFromNaturalLanguage(update, message, member, text, 'text', null, quiet);
 }
 
 async function handleVoice(
   update: TelegramUpdate,
   message: TelegramMessage,
   member: HouseholdMember,
+  quiet = false,
 ): Promise<void> {
   if (await updateAlreadyProcessed(update.update_id)) return;
-  await sendTyping(message.chat.id);
+  if (!quiet) await sendTyping(message.chat.id);
 
   const clip = message.voice ?? message.audio;
   if (!clip) return;
@@ -267,6 +413,7 @@ async function handleVoice(
     transcript = result.text;
   } catch (error) {
     console.error('Transcription failed', error);
+    if (quiet) return;
     await sendMessage(
       message.chat.id,
       '🎤 לא הצלחתי לתמלל את ההקלטה. אפשר להקליט שוב, או פשוט לכתוב — שום דבר לא נרשם.',
@@ -274,7 +421,7 @@ async function handleVoice(
     return;
   }
 
-  await logFromNaturalLanguage(update, message, member, transcript, 'voice', transcript);
+  await logFromNaturalLanguage(update, message, member, transcript, 'voice', transcript, quiet);
 }
 
 async function logFromNaturalLanguage(
@@ -284,20 +431,25 @@ async function logFromNaturalLanguage(
   input: string,
   inputKind: 'text' | 'voice',
   transcript: string | null,
+  /** In the family group, chat that is not about money gets no reply. */
+  quiet = false,
 ): Promise<void> {
   const chatId = message.chat.id;
   const today = isoDateInIsrael();
 
   const wallets = await listWallets();
+  const envelopes = await loadBotEnvelopes(today.slice(0, 7));
   let parsed;
   try {
     parsed = await parseIntake(input, {
-      speakerName: member.display_name,
+      speakerName: memberName(member),
       wallets: wallets.map((w) => w.name),
+      envelopes,
     });
   } catch (error) {
     // The detail is for the logs; the couple needs to know what to do.
     console.error('Intake parse failed', error);
+    if (quiet) return;
     await sendMessage(chatId, '😕 לא הצלחתי לעבד את ההודעה כרגע. נסו לשלוח שוב בעוד רגע — שום דבר לא נרשם.');
     return;
   }
@@ -305,6 +457,7 @@ async function logFromNaturalLanguage(
   // A voice note that transcribed into nothing useful should show what was
   // heard — otherwise "I didn't understand" is impossible to debug by ear.
   if (parsed.entries.length === 0) {
+    if (quiet) return;
     const heard =
       inputKind === 'voice' ? `\n\n<i>שמעתי:</i> ${escapeHtml(input)}` : '';
     await sendMessage(
@@ -318,26 +471,31 @@ async function logFromNaturalLanguage(
   const incomes = parsed.entries.filter((e) => e.direction === 'income');
   const withdrawals = parsed.entries.filter((e) => e.direction === 'withdrawal');
 
-  // Cash is filed into RiseUp's own envelopes, so it shows up in the same card
-  // a card spend would. The pin is resolved now, against the entry's month,
-  // the same way RiseUp files an uncategorised charge.
+  // Cash is filed into the household's own envelopes, so it shows up in the
+  // same card a card spend would. The pin is resolved now, against the
+  // entry's month (yesterday may be last month).
   const monthsNeeded = [...new Set(expenses.map((e) => e.spentAt.slice(0, 7)))];
-  const refsByMonth = new Map(
-    await Promise.all(monthsNeeded.map(async (m) => [m, await envelopeRefsForMonth(m)] as const)),
+  const envelopesByMonth = new Map<string, BotEnvelope[]>(
+    await Promise.all(
+      monthsNeeded.map(async (m) => [m, m === today.slice(0, 7) ? envelopes : await loadBotEnvelopes(m)] as const),
+    ),
   );
 
+  const askFirst = confirmModeOf(member) === 'ask';
   const defaultWallet = wallets.find((w) => w.is_default) ?? wallets[0] ?? null;
   const walletFor = (name: string | null) => (matchWalletByName(wallets, name) ?? defaultWallet)?.id ?? null;
 
   const rows: NewSpend[] = expenses.map((entry, index) => {
-    const target = resolveEnvelopeForCategory(refsByMonth.get(entry.spentAt.slice(0, 7)) ?? [], entry.category);
+    const chosen = fileExpense(entry.category, entry.note, envelopes);
+    const target = sameEnvelopeIn(chosen, envelopesByMonth.get(entry.spentAt.slice(0, 7)) ?? envelopes);
     return {
       member_id: member.id,
       amount_ils: entry.amountIls,
-      category: entry.category,
+      category: target.name,
       note: entry.note || null,
       spent_at: entry.spentAt,
-      status: entry.confidence === 'low' ? 'needs_review' : 'confirmed',
+      // "לשאול לפני שרושמים" (Settings → טלגרם): nothing is approved until "לאשר".
+      status: askFirst || entry.confidence === 'low' ? 'needs_review' : 'confirmed',
       confidence: entry.confidence,
       input_kind: inputKind,
       raw_input: input,
@@ -347,8 +505,8 @@ async function logFromNaturalLanguage(
       telegram_update_id: index === 0 ? update.update_id : null,
       telegram_chat_id: chatId,
       telegram_message_id: message.message_id,
-      envelope_id: target?.envelopeId ?? null,
-      envelope_type: target?.type ?? null,
+      envelope_id: target.envelopeId,
+      envelope_type: target.type,
       wallet_id: walletFor(entry.wallet),
     };
   });
@@ -381,13 +539,21 @@ async function logFromNaturalLanguage(
   if (saved.length > 0) {
     const sent = await sendMessage(
       chatId,
-      savedMessage(saved, today, member.display_name),
+      savedMessage(saved, today, memberName(member)),
       spendKeyboard(saved),
     );
     await attachBotMessage(
       saved.map((s) => s.id),
       sent.message_id,
     );
+    // Waiting for "לאשר" is not news yet; the group hears once it is approved.
+    const counted = saved.filter((s) => s.status === 'confirmed');
+    if (counted.length > 0) {
+      await announceToFamily(
+        announcement('💸 נרשם במזומן', memberName(member), counted.map((s) => `• ${spendLine(s, today)}`)),
+        chatId,
+      );
+    }
   }
 
   const walletName = (id: string | null) =>
@@ -397,7 +563,7 @@ async function logFromNaturalLanguage(
     await sendMessage(
       chatId,
       [
-        `💵 נרשמה הכנסה במזומן · ${escapeHtml(member.display_name)}`,
+        `💵 נרשמה הכנסה במזומן · ${escapeHtml(memberName(member))}`,
         '',
         `• <b>${formatIls(Number(t.amount_ils))}</b> · ${escapeHtml(t.category ?? '')}${
           t.note ? ` — ${escapeHtml(t.note)}` : ''
@@ -405,19 +571,27 @@ async function logFromNaturalLanguage(
       ].join('\n'),
       [[{ text: '🗑 מחיקה', callback_data: encodeCallback({ kind: 'delete_income', spendId: t.id }) }]],
     );
+    await announceToFamily(
+      announcement('💵 הכנסה במזומן', memberName(member), [entryLine(Number(t.amount_ils), t.category, t.note, t.occurred_at, today)]),
+      chatId,
+    );
   }
 
   for (const t of savedWithdrawals) {
     await sendMessage(
       chatId,
       [
-        `🏧 נרשמה משיכה · ${escapeHtml(member.display_name)}`,
+        `🏧 נרשמה משיכה · ${escapeHtml(memberName(member))}`,
         '',
         `• <b>${formatIls(Number(t.amount_ils))}</b> · ${friendlyDate(t.occurred_at, today)}${walletName(t.wallet_id)}`,
         '',
         'כשהמשיכה תופיע ברייזאפ היא תותאם לרישום הזה — היא לא תיספר פעמיים.',
       ].join('\n'),
       [[{ text: '🗑 מחיקה', callback_data: encodeCallback({ kind: 'delete_income', spendId: t.id }) }]],
+    );
+    await announceToFamily(
+      announcement('🏧 משיכה מהכספומט', memberName(member), [entryLine(Number(t.amount_ils), null, t.note, t.occurred_at, today)]),
+      chatId,
     );
   }
 }
@@ -470,6 +644,34 @@ async function handleCallback(update: TelegramUpdate): Promise<void> {
     return;
   }
 
+  // "Which wallet did this withdrawal go into?" (asked after a sync).
+  if (action.kind === 'assign_wallet') {
+    const topup = await getTopup(action.spendId);
+    if (!topup || topup.is_dismissed) {
+      await answerCallbackQuery(query.id, 'המשיכה כבר לא קיימת');
+      return;
+    }
+    const wallets = await listWallets();
+    const wallet = wallets[action.walletIndex];
+    if (!wallet || walletTag(wallet.id) !== action.walletTag) {
+      await answerCallbackQuery(query.id, 'רשימת הארנקים השתנתה — אפשר לבחור באפליקציה');
+      return;
+    }
+    // The member was checked above: only the household's Telegram users get here.
+    const result = await assignWithdrawal(topup.id, wallet.id);
+    if (!result.ok) {
+      await answerCallbackQuery(query.id, result.error);
+      return;
+    }
+    await editMessageText(
+      query.message.chat.id,
+      query.message.message_id,
+      `✅ המשיכה של <b>${formatIls(Number(topup.amount_ils))}</b> מ-${friendlyDate(topup.occurred_at, isoDateInIsrael())} נכנסה ל${escapeHtml(result.walletName)} · ${escapeHtml(memberName(member))}`,
+    );
+    await answerCallbackQuery(query.id, wallet.name);
+    return;
+  }
+
   // Top-up actions (cash income, manual or detected withdrawals) act on
   // cash_topups, not on a spend.
   if (action.kind === 'delete_income' || action.kind === 'dismiss_topup') {
@@ -479,6 +681,14 @@ async function handleCallback(update: TelegramUpdate): Promise<void> {
       return;
     }
     await dismissTopup(topup.id);
+    if (action.kind === 'delete_income') {
+      await announceToFamily(
+        announcement('🗑 נמחק', memberName(member), [
+          entryLine(Number(topup.amount_ils), topup.category, topup.note, topup.occurred_at),
+        ]),
+        query.message.chat.id,
+      );
+    }
     await editMessageText(
       query.message.chat.id,
       query.message.message_id,
@@ -491,18 +701,20 @@ async function handleCallback(update: TelegramUpdate): Promise<void> {
   }
 
   const spend = await getSpend(action.spendId);
-  if (!spend) {
+  if (!spend || spend.status === 'deleted') {
     await answerCallbackQuery(query.id, 'הרישום כבר לא קיים');
     return;
   }
 
   const chatId = query.message.chat.id;
   const messageId = query.message.message_id;
-  const today = isoDateInIsrael();
 
   switch (action.kind) {
     case 'delete': {
       await updateSpend(spend.id, { status: 'deleted' });
+      if (spend.status === 'confirmed') {
+        await announceToFamily(announcement('🗑 נמחק', memberName(member), [`• ${spendLine(spend, isoDateInIsrael())}`]), chatId);
+      }
       await editMessageText(
         chatId,
         messageId,
@@ -513,49 +725,91 @@ async function handleCallback(update: TelegramUpdate): Promise<void> {
     }
 
     case 'confirm': {
-      const updated = await updateSpend(spend.id, { status: 'confirmed', confidence: 'high' });
-      await editMessageText(chatId, messageId, `✅ אושר\n\n• ${spendLine(updated, today)}`);
+      // "לאשר" approves everything the message is about.
+      const rows = await messageSpends(spend);
+      const approved: CashSpend[] = [];
+      for (const row of rows.filter((r) => r.status === 'needs_review')) {
+        approved.push(await updateSpend(row.id, { status: 'confirmed', confidence: 'high' }));
+      }
+      await redrawSpendMessage(chatId, messageId, spend);
+      if (approved.length > 0) {
+        const today = isoDateInIsrael();
+        await announceToFamily(
+          announcement('💸 נרשם במזומן', memberName(member), approved.map((s) => `• ${spendLine(s, today)}`)),
+          chatId,
+        );
+      }
       await answerCallbackQuery(query.id, 'אושר');
       return;
     }
 
     case 'pick_category': {
-      const categories = await activeCategories();
+      const envelopes = await loadBotEnvelopes(spend.spent_at.slice(0, 7));
       await editMessageText(
         chatId,
         messageId,
-        `באיזו קטגוריה לרשום את ${formatIls(spend.amount_ils)}?`,
-        categoryKeyboard(spend.id, categories),
+        `לאיזו מעטפה לרשום את ${formatIls(spend.amount_ils)}${spend.note ? ` (${escapeHtml(spend.note)})` : ''}?`,
+        categoryKeyboard(spend.id, envelopes.map((e) => e.name)),
       );
       await answerCallbackQuery(query.id);
       return;
     }
 
+    case 'back': {
+      await redrawSpendMessage(chatId, messageId, spend);
+      await answerCallbackQuery(query.id);
+      return;
+    }
+
     case 'set_category': {
-      const categories = await activeCategories();
-      const category = categories[action.categoryIndex];
-      if (!category) {
-        await answerCallbackQuery(query.id, 'קטגוריה לא נמצאה');
+      // The index is into the spend's own month's envelopes, as the picker showed them.
+      const envelopes = await loadBotEnvelopes(spend.spent_at.slice(0, 7));
+      const target = envelopes[action.categoryIndex];
+      if (!target) {
+        await answerCallbackQuery(query.id, 'המעטפה לא נמצאה');
         return;
       }
-      // A new category can mean a new envelope: re-resolve the pin against the
-      // spend's own month, or the dashboard would keep it in the old card.
-      const target = resolveEnvelopeForCategory(
-        await envelopeRefsForMonth(spend.spent_at.slice(0, 7)),
-        category,
-      );
+      // A new envelope is not an approval: a spend waiting for "לאשר" keeps waiting.
       const updated = await updateSpend(spend.id, {
-        category,
-        status: 'confirmed',
-        confidence: 'high',
-        envelope_id: target?.envelopeId ?? null,
-        envelope_type: target?.type ?? null,
+        category: target.name,
+        envelope_id: target.envelopeId,
+        envelope_type: target.type,
       });
-      await editMessageText(chatId, messageId, `✅ עודכן\n\n• ${spendLine(updated, today)}`);
-      await answerCallbackQuery(query.id, category);
+      await redrawSpendMessage(chatId, messageId, spend);
+      if (updated.status === 'confirmed' && target.name !== spend.category) {
+        await announceToFamily(
+          announcement(`✏️ הועבר ל${target.name}`, memberName(member), [`• ${spendLine(updated, isoDateInIsrael())}`]),
+          chatId,
+        );
+      }
+      await answerCallbackQuery(query.id, target.name);
       return;
     }
   }
+}
+
+/** The live spends a bot reply is about; just this one when it is not linked. */
+async function messageSpends(spend: CashSpend): Promise<CashSpend[]> {
+  if (spend.bot_message_id && spend.telegram_chat_id) {
+    const rows = await spendsOfBotMessage(Number(spend.telegram_chat_id), Number(spend.bot_message_id));
+    if (rows.length > 0) return rows;
+  }
+  const fresh = await getSpend(spend.id);
+  return fresh && fresh.status !== 'deleted' ? [fresh] : [];
+}
+
+/** Put a spend's bot reply back as it is now: text, envelope and buttons. */
+async function redrawSpendMessage(chatId: number, messageId: number, spend: CashSpend): Promise<void> {
+  const rows = await messageSpends(spend);
+  if (rows.length === 0) return;
+  const members = await membersById();
+  const who = members.get(rows[0]!.member_id);
+  await editMessageText(
+    chatId,
+    messageId,
+    savedMessage(rows, isoDateInIsrael(), who ? memberName(who) : ''),
+    spendKeyboard(rows),
+  );
 }
 
 async function sendBalance(chatId: number): Promise<void> {
@@ -626,18 +880,34 @@ async function sendMonth(chatId: number, requested?: string): Promise<void> {
   const month = requested && /^\d{4}-\d{2}$/.test(requested) ? requested : today.slice(0, 7);
   const { from, to } = monthBounds(month);
 
-  const [spends, members] = await Promise.all([spendsBetween(from, to), membersById()]);
+  const [spends, members, envelopes] = await Promise.all([
+    spendsBetween(from, to),
+    membersById(),
+    loadBotEnvelopes(month),
+  ]);
   if (spends.length === 0) {
     await sendMessage(chatId, `אין הוצאות מזומן רשומות ב-${month}.`);
     return;
   }
 
   const total = spends.reduce((sum, s) => sum + Number(s.amount_ils), 0);
-  const byCategory = totalsByCategory(spends);
+  // The same envelopes the dashboard shows, never RiseUp's raw labels.
+  const byEnvelope = new Map<string, { total: number; count: number }>();
+  for (const s of spends) {
+    const name = envelopeOfSpend(s, envelopes).name;
+    const row = byEnvelope.get(name) ?? { total: 0, count: 0 };
+    row.total = Math.round((row.total + Number(s.amount_ils)) * 100) / 100;
+    row.count += 1;
+    byEnvelope.set(name, row);
+  }
+  const byCategory = [...byEnvelope.entries()]
+    .map(([category, row]) => ({ category, ...row }))
+    .sort((a, b) => b.total - a.total);
   const byMember = totalsByMember(spends);
 
   const memberLines = [...byMember.entries()].map(([memberId, amount]) => {
-    const name = members.get(memberId)?.display_name ?? 'לא ידוע';
+    const found = members.get(memberId);
+    const name = found ? memberName(found) : 'לא ידוע';
     return `• ${escapeHtml(name)}: ${formatIls(amount)}`;
   });
 
@@ -646,7 +916,7 @@ async function sendMonth(chatId: number, requested?: string): Promise<void> {
     [
       `<b>💸 מזומן ב-${month} · ${formatIls(total)}</b>`,
       '',
-      '<b>לפי קטגוריה</b>',
+      '<b>לפי מעטפה</b>',
       ...byCategory.map(
         (row) => `• ${escapeHtml(row.category)}: ${formatIls(row.total)} (${row.count})`,
       ),
@@ -667,6 +937,9 @@ async function undoLast(chatId: number, member: HouseholdMember): Promise<void> 
   const today = isoDateInIsrael();
   if (last.kind === 'spend') {
     await updateSpend(last.row.id, { status: 'deleted' });
+    if (last.row.status === 'confirmed') {
+      await announceToFamily(announcement('🗑 בוטל', memberName(member), [`• ${spendLine(last.row, today)}`]), chatId);
+    }
     await sendMessage(
       chatId,
       `🗑 בוטל: ${formatIls(last.row.amount_ils)} · ${escapeHtml(last.row.category)} · ${friendlyDate(last.row.spent_at, today)}`,
@@ -675,6 +948,12 @@ async function undoLast(chatId: number, member: HouseholdMember): Promise<void> 
   }
 
   await dismissTopup(last.row.id);
+  await announceToFamily(
+    announcement('🗑 בוטל', memberName(member), [
+      entryLine(Number(last.row.amount_ils), last.row.category, last.row.note, last.row.occurred_at, today),
+    ]),
+    chatId,
+  );
   const what = last.row.source === 'manual' ? 'משיכה' : (last.row.category ?? 'הכנסה במזומן');
   await sendMessage(
     chatId,
@@ -710,27 +989,9 @@ async function runSync(chatId: number): Promise<void> {
     `מעטפות: ${result.envelopesUpserted}`,
   ];
 
-  await sendMessage(chatId, lines.join('\n'));
-  await announceWithdrawals(chatId, result.newTopups);
-}
-
-/**
- * One message per newly detected withdrawal, each with a "not a withdrawal"
- * button: the detector matches on wording, and a false positive would
- * otherwise inflate the wallet forever.
- */
-export async function announceWithdrawals(
-  chatId: number,
-  topups: { id: string; amount_ils: number | string; business_name: string | null; occurred_at: string }[],
-): Promise<void> {
-  const today = isoDateInIsrael();
-  for (const topup of topups) {
-    await sendMessage(
-      chatId,
-      `🏧 משיכה חדשה נוספה לארנק: <b>${formatIls(Number(topup.amount_ils))}</b> · ${escapeHtml(
-        topup.business_name ?? 'משיכה',
-      )} · ${friendlyDate(topup.occurred_at, today)}`,
-      [[{ text: '↩️ זו לא משיכה', callback_data: encodeCallback({ kind: 'dismiss_topup', spendId: topup.id }) }]],
-    );
+  if (result.newTopups.length > 0) {
+    lines.push(`משיכות חדשות מהכספומט: ${result.newTopups.length} — שאלתי לאיזה ארנק נכנס הכסף.`);
   }
+  // Each new withdrawal's "which wallet?" question was sent by the sync itself.
+  await sendMessage(chatId, lines.join('\n'));
 }

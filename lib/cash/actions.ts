@@ -7,6 +7,7 @@ import { resolveEnvelopeForCategory } from '@/lib/cash/envelopes';
 import { applyIncomeKind } from '@/lib/cash/income-kind-store';
 import { isIncomeKind, type IncomeKind } from '@/lib/cash/income-kinds';
 import { db } from '@/lib/db/client';
+import { announceWebEntry } from '@/lib/telegram/announce';
 import { envelopeRefsForMonth } from '@/lib/db/queries';
 import { syncIfStale } from '@/lib/riseup/sync';
 
@@ -143,6 +144,7 @@ export async function addCashEntry(input: CashEntryInput): Promise<ActionResult>
     if (error) return dbFail(error);
     if (input.kind === 'income' && isIncomeKind(input.incomeKind)) await applyIncomeKind(data.id as string, null);
     refreshPages();
+    await announceWebEntry({ ...announced(input, memberId), kind: input.kind === 'income' ? 'income' : 'withdrawal' });
     return { ok: true, id: data.id as string };
   }
 
@@ -165,7 +167,13 @@ export async function addCashEntry(input: CashEntryInput): Promise<ActionResult>
     .single();
   if (error) return dbFail(error);
   refreshPages();
+  // The family group hears about it, as it would from the bot.
+  await announceWebEntry({ ...announced(input, memberId), kind: 'spend', envelopeId: pin.envelope_id, envelopeType: pin.envelope_type });
   return { ok: true, id: data.id as string };
+}
+
+function announced(input: CashEntryInput, memberId: string) {
+  return { amountIls: input.amountIls, category: input.category.trim(), note: input.note?.trim() || null, date: input.date, memberId };
 }
 
 export async function updateCashEntry(id: string, input: CashEntryInput): Promise<ActionResult> {

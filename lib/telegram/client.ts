@@ -1,5 +1,5 @@
 import { env } from '@/lib/env';
-import type { InlineKeyboard, TelegramMessage } from '@/lib/telegram/types';
+import type { InlineKeyboard, LinkKeyboard, TelegramMessage } from '@/lib/telegram/types';
 
 function apiUrl(method: string): string {
   return `https://api.telegram.org/bot${env.telegramBotToken}/${method}`;
@@ -27,7 +27,7 @@ async function call<T>(method: string, body: Record<string, unknown>): Promise<T
 export async function sendMessage(
   chatId: number,
   text: string,
-  keyboard?: InlineKeyboard,
+  keyboard?: InlineKeyboard | LinkKeyboard,
 ): Promise<TelegramMessage> {
   return call<TelegramMessage>('sendMessage', {
     chat_id: chatId,
@@ -96,9 +96,26 @@ export async function getMe(): Promise<{ id: number; username?: string; first_na
   return call('getMe', {});
 }
 
+/** Leave a group the bot was added to by someone outside the household. */
+export async function leaveChat(chatId: number): Promise<void> {
+  try {
+    await call('leaveChat', { chat_id: chatId });
+  } catch (error) {
+    console.error('Could not leave the chat', error);
+  }
+}
+
+/**
+ * The updates the webhook asks for. my_chat_member tells the bot it was
+ * added to (or removed from) a group, so it can remember the family group
+ * by itself.
+ */
+export const ALLOWED_UPDATES = ['message', 'callback_query', 'my_chat_member'] as const;
+
 export interface WebhookInfo {
   url: string;
   pending_update_count: number;
+  allowed_updates?: string[];
   last_error_date?: number;
   last_error_message?: string;
 }
@@ -116,12 +133,14 @@ export function webhookUrl(): string {
 export async function ensureWebhook(force = false): Promise<{ changed: boolean; info: WebhookInfo }> {
   const info = await call<WebhookInfo>('getWebhookInfo', {});
   const rejected = /401|403|Unauthorized|Forbidden/i.test(info.last_error_message ?? '');
-  if (!force && info.url === webhookUrl() && !rejected) return { changed: false, info };
+  // Registered before group setup existed: ask for the membership updates too.
+  const missingUpdates = Boolean(info.allowed_updates && ALLOWED_UPDATES.some((u) => !info.allowed_updates!.includes(u)));
+  if (!force && info.url === webhookUrl() && !rejected && !missingUpdates) return { changed: false, info };
 
   await call('setWebhook', {
     url: webhookUrl(),
     secret_token: env.telegramWebhookSecret,
-    allowed_updates: ['message', 'callback_query'],
+    allowed_updates: ALLOWED_UPDATES,
   });
   return { changed: true, info: await call<WebhookInfo>('getWebhookInfo', {}) };
 }

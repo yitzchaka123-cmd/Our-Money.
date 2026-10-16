@@ -4,7 +4,7 @@ import { env } from '@/lib/env';
 import { ensureWebhook, escapeHtml, sendMessage } from '@/lib/telegram/client';
 import { pruneOldData } from '@/lib/riseup/prune';
 import { syncRiseup } from '@/lib/riseup/sync';
-import { announceWithdrawals } from '@/lib/telegram/handlers';
+import { familyGroupChatId } from '@/lib/telegram/group';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -26,7 +26,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   const result = await syncRiseup();
   // Once a day is plenty, and this route runs once or twice a day.
   await pruneOldData().catch((error) => console.error('Prune failed', error));
-  const groupChatId = env.telegramGroupChatId;
+  const groupChatId = await familyGroupChatId();
 
   // A dead PAT silently stops the wallet from being topped up, which would
   // quietly corrupt every balance. Always surface it.
@@ -46,9 +46,8 @@ export async function GET(request: Request): Promise<NextResponse> {
       groupChatId,
       `⚠️ סנכרון רייזאפ נכשל:\n<code>${escapeHtml(result.error)}</code>`,
     );
-  } else if (result.newTopups.length > 0 && groupChatId) {
-    await announceWithdrawals(groupChatId, result.newTopups);
   }
+  // New withdrawals: the sync itself asked which wallet each one went into.
 
   return NextResponse.json({
     ok: !result.error,

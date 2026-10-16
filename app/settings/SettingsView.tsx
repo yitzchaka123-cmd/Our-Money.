@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { BriefToggle } from '@/app/settings/BriefToggle';
 import { NameEditor } from '@/app/settings/NameEditor';
 import { PageTopBar } from '@/app/dashboard/components/PageTopBar';
+import { TelegramSettings, type TelegramSettingsData } from '@/app/settings/TelegramSettings';
 import { Bank, ChevronLeft, Download } from '@/app/dashboard/components/icons';
 import { Chat, CreditCard, Lock, LogOut } from '@/app/dashboard/components/icons-extra';
 import type { AccountKind } from '@/lib/dashboard/accounts';
@@ -22,6 +23,8 @@ export interface SettingsData {
   yearAgo: string;
   /** Settings → "הסיכום היומי". Absent means on. */
   briefEnabled?: boolean;
+  /** Settings → טלגרם; absent in older previews. */
+  telegram?: TelegramSettingsData;
 }
 
 /**
@@ -96,6 +99,7 @@ export function SettingsView({ data }: { data: SettingsData }) {
       <SettingsGroup title="בדף הראשי">
         <BriefToggle enabled={data.briefEnabled !== false} />
       </SettingsGroup>
+      {data.telegram ? <TelegramSettings data={data.telegram} /> : null}
 
       <SettingsGroup title="החיבור לרייזאפ">
         <div className="settings-row settings-row--static">

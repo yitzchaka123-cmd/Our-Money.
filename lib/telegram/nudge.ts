@@ -17,6 +17,11 @@ export interface NudgeInput {
   reviewCount: number;
   /** Where the group message goes, or null to message members privately. */
   groupChatId: number | null;
+  /**
+   * Members whose reminder setting (Settings → טלגרם) includes today. Absent
+   * means everyone. Expected-cash buttons are not reminders and still come.
+   */
+  remindToday?: ReadonlySet<string>;
 }
 
 export interface NudgeMessage {
@@ -39,7 +44,10 @@ function firstName(name: string): string {
  * because a nudge that fires every night regardless trains people to ignore it.
  */
 export function composeNudge(input: NudgeInput): NudgeMessage[] {
-  const quiet = input.members.filter((m) => !input.loggedToday.has(m.id));
+  const wantsReminder = (m: NudgeMember) => !input.remindToday || input.remindToday.has(m.id);
+  const quiet = input.members.filter((m) => !input.loggedToday.has(m.id) && wantsReminder(m));
+  // Nobody asked for tonight's reminder: the review line has no one to go to.
+  const anyoneToRemind = input.members.some(wantsReminder);
   const messages: NudgeMessage[] = [];
 
   const reminderLines = (names: string[] | null): string[] => {
@@ -48,7 +56,7 @@ export function composeNudge(input: NudgeInput): NudgeMessage[] {
       lines.push(`🌙 ${names.map(escape).join(' ו')} — היו היום הוצאות במזומן?`);
       lines.push('אפשר פשוט לכתוב או להקליט לי, למשל "50 שקל פלאפל".');
     }
-    if (input.reviewCount > 0) {
+    if (input.reviewCount > 0 && anyoneToRemind) {
       lines.push(
         input.reviewCount === 1
           ? 'יש רישום אחד שמחכה לאישור — /daily או בדאשבורד.'
@@ -84,7 +92,9 @@ export function composeNudge(input: NudgeInput): NudgeMessage[] {
 
   // No group: each member hears about their own day and their own plans.
   for (const member of input.members) {
-    const lines = reminderLines(quiet.includes(member) ? [firstName(member.displayName)] : null);
+    const lines = wantsReminder(member)
+      ? reminderLines(quiet.includes(member) ? [firstName(member.displayName)] : null)
+      : [];
     if (lines.length > 0) messages.push({ chatId: member.telegramUserId, text: lines.join('\n') });
     for (const item of input.due) {
       if (item.plan.member_id === null || item.plan.member_id === member.id) {

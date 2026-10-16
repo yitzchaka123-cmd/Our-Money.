@@ -5,7 +5,10 @@ import { isoDateInIsrael } from '@/lib/dates';
 import { db } from '@/lib/db/client';
 import { env } from '@/lib/env';
 import { sendMessage } from '@/lib/telegram/client';
+import { memberName } from '@/lib/profile/names';
+import { familyGroupChatId } from '@/lib/telegram/group';
 import { composeNudge, type NudgeMember } from '@/lib/telegram/nudge';
+import { nudgeFrequencyOf, wantsNudgeOn } from '@/lib/telegram/settings';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -25,7 +28,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   const today = isoDateInIsrael();
   const supabase = db();
   const [members, spends, topups, review, due] = await Promise.all([
-    supabase.from('household_members').select('id, display_name, telegram_user_id').eq('is_active', true),
+    supabase.from('household_members').select('*').eq('is_active', true),
     supabase.from('cash_spends').select('member_id').eq('spent_at', today).neq('status', 'deleted'),
     supabase.from('cash_topups').select('member_id').eq('occurred_at', today).eq('is_dismissed', false),
     supabase.from('cash_spends').select('id', { count: 'exact', head: true }).eq('status', 'needs_review'),
@@ -38,18 +41,33 @@ export async function GET(request: Request): Promise<NextResponse> {
       .filter((id): id is string => Boolean(id)),
   );
 
+  type MemberRow = {
+    id: string;
+    display_name: string;
+    preferred_name?: string | null;
+    telegram_user_id: number | string;
+    nudge_frequency?: string | null;
+  };
+  const memberRows = (members.data ?? []) as MemberRow[];
+  // Each member's own choice in Settings → טלגרם (daily until they pick).
+  const remindToday = new Set(
+    memberRows.filter((m) => wantsNudgeOn(nudgeFrequencyOf(m), today)).map((m) => m.id),
+  );
+
   const messages = composeNudge({
-    members: (members.data ?? []).map(
+    remindToday,
+    members: memberRows.map(
       (m): NudgeMember => ({
-        id: m.id as string,
-        displayName: m.display_name as string,
+        id: m.id,
+        // The name they chose, never the Telegram account's.
+        displayName: memberName(m),
         telegramUserId: Number(m.telegram_user_id),
       }),
     ),
     loggedToday: logged,
     due,
     reviewCount: review.count ?? 0,
-    groupChatId: env.telegramGroupChatId,
+    groupChatId: await familyGroupChatId(),
   });
 
   let sent = 0;
