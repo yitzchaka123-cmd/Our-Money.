@@ -343,8 +343,12 @@ function CardAmount({ value }: { value: number }) {
   );
 }
 
+/**
+ * One charge or cash entry, as RiseUp lays it out: a panel in the envelope's
+ * colour (category line, amount, business, date, who logged it, the account)
+ * and one sentence under it — an insight, or where it went in the month.
+ */
 function ItemCard({ item }: { item: BriefItem }) {
-  const meta = [cardDate(item.date), item.memberName].filter(Boolean).join(' · ');
   return (
     <div className="brief-item">
       <div className="brief-panel" data-type={item.envelopeType}>
@@ -353,12 +357,13 @@ function ItemCard({ item }: { item: BriefItem }) {
         <div className="brief-main">
           <CardAmount value={item.amountIls} />
           <p className="brief-biz">{item.business}</p>
-          <p className="brief-date">{meta}</p>
+          <p className="brief-date">{cardDate(item.date)}</p>
+          {item.memberName ? <p className="brief-who">נרשם על ידי {item.memberName}</p> : null}
         </div>
         {item.account ? <p className="brief-account">{item.account}</p> : null}
       </div>
       {item.insight ? (
-        <p className="brief-insight">
+        <p className="brief-insight" data-rule={item.insight.rule}>
           <Rich text={item.insight.text} />
         </p>
       ) : null}

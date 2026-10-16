@@ -5,7 +5,8 @@
  *
  *   npx tsx scripts/preview-brief.tsx out.html <mode>
  *
- * Modes: top (insight carousel + blob), intro, item, cash, end, popup.
+ * Modes: top (insight carousel + blob), intro, item, cash, income, tracker, end, popup,
+ * tip1 / tip2 (the carousel at a money tip), tippopup (a tip opened).
  * The brief and the cards are built by the real rules (lib/dashboard/brief.ts,
  * lib/dashboard/insights.ts) from the fixture rows below.
  */
@@ -19,6 +20,7 @@ import { DashboardView } from '../app/dashboard/view';
 import { buildBrief, type BriefEnvelope, type RiseupRow } from '../lib/dashboard/brief';
 import type { DashboardData, EnvelopeView } from '../lib/dashboard/data';
 import { computeInsights } from '../lib/dashboard/insights';
+import { selectTips, TIPS, tipFacts, tipInsight, withTips } from '../lib/dashboard/tips';
 import type { NormalizedActual } from '../lib/riseup/envelopes';
 import type { CashSpend } from '../lib/types';
 
@@ -60,7 +62,7 @@ const envelopes: EnvelopeView[] = [
   },
   {
     key: 'fix', envelopeId: 'fix', type: 'fixed', title: 'הוצאות קבועות', actual: 768.99, expected: 5768, showRemaining: false, pending: [], pendingTotal: 0,
-    actuals: [actual('elec', '2026-10-06', 768.99, ELEC, { categoryLabel: 'חשמל', accountNumberHash: '7722' })],
+    actuals: [actual('elec', '2026-10-06', 768.99, ELEC, { categoryLabel: 'חשמל', accountNumberHash: '7722', accountName: 'כרטיס 7722' })],
   },
   {
     key: 'inc', envelopeId: 'inc', type: 'variableIncome', title: 'הכנסות', actual: 7635, expected: 7635, showRemaining: false, pending: [], pendingTotal: 0,
@@ -70,10 +72,17 @@ const envelopes: EnvelopeView[] = [
     key: 'pharm', envelopeId: 'pharm', type: 'trackingCategory', title: 'פארמה', actual: 300, expected: 450, showRemaining: true, pending: [], pendingTotal: 0,
     actuals: [actual('ph1', '2026-10-03', 300, 'סופר-פארם')],
   },
+  {
+    key: 'super', envelopeId: 'super', type: 'trackingCategory', title: 'סופר', actual: 1684, expected: 3050.73, showRemaining: true, pending: [], pendingTotal: 0,
+    actuals: [
+      actual('shuf0', '2026-10-02', 1610, 'שופרסל דיל'),
+      actual('shuf', '2026-10-09', 74, 'ויוצאה בית שמש', { source: 'leumicard', accountNumberHash: 'cc1', accountName: 'לאומי קארד 1' }),
+    ],
+  },
 ];
 
 const briefEnvelopes: BriefEnvelope[] = envelopes.map((e) => ({
-  envelopeId: e.envelopeId!, type: e.type, title: e.title, planned: e.key === 'pharm' ? 450 : e.expected, actuals: e.actuals,
+  envelopeId: e.envelopeId!, type: e.type, title: e.title, planned: e.key === 'pharm' ? 450 : e.key === 'super' ? 3050.73 : e.expected, actuals: e.actuals,
 }));
 
 const row = (id: string, date: string, amount: number, business: string, seen: string, extra: Partial<RiseupRow> = {}): RiseupRow => ({
@@ -82,8 +91,8 @@ const row = (id: string, date: string, amount: number, business: string, seen: s
 });
 
 const taxi: CashSpend = {
-  id: 's1', member_id: 'm2', amount_ils: 45, category: 'תחבורה', note: 'מונית הביתה', spent_at: '2026-10-07', status: 'needs_review',
-  confidence: 'low', input_kind: 'voice', raw_input: null, transcript: null, telegram_update_id: null, telegram_chat_id: null,
+  id: 's1', member_id: 'm2', amount_ils: 45, category: 'תחבורה', note: 'מונית הביתה', spent_at: '2026-10-07', status: 'confirmed',
+  confidence: 'high', input_kind: 'voice', raw_input: null, transcript: null, telegram_update_id: null, telegram_chat_id: null,
   telegram_message_id: null, bot_message_id: null, envelope_id: 'var', envelope_type: 'variable', wallet_id: 'w-main', created_at: '2026-10-07T18:00:00Z',
 };
 
@@ -93,6 +102,7 @@ const brief = buildBrief({
   newRiseup: [
     row('elec', '2026-10-06', 768.99, ELEC, '2026-10-07T05:00:00Z', { category_label: 'חשמל' }),
     row('salary', '2026-10-08', 7635, 'העברת משכורת', '2026-10-09T05:00:00Z', { is_income: true, account_number_hash: '674-1908922' }),
+    row('shuf', '2026-10-09', 74, 'ויוצאה בית שמש', '2026-10-10T05:00:00Z', { account_number_hash: 'cc1', source: 'leumicard' }),
   ],
   history: [
     { id: 'h0', date: '2026-04-02', business: 'ישן', amount: 10, isIncome: false },
@@ -109,19 +119,22 @@ const brief = buildBrief({
   memberNames: new Map([['m1', 'יצחק'], ['m2', 'שרה']]),
 });
 
-const insights = computeInsights(
-  {
-    today: '2026-10-11',
-    month: '2026-10',
-    envelopes,
-    trackers: [{ name: 'פארמה', planned: 450, actual: 300 }],
-    forecast: -10217,
-    yesterdayForecast: -9400,
-    wallet: { balance: 365, wallets: [{ name: 'ארנק ראשי', balance: 365 }] },
-    baselineExpenses: [40, 60, 80, 90, 100, 120, 35, 55, 70, 64],
-  },
-  new Map(),
-);
+const insightInput = {
+  today: '2026-10-11',
+  month: '2026-10',
+  envelopes,
+  trackers: [
+    { name: 'פארמה', planned: 450, actual: 300 },
+    { name: 'אוכל בחוץ', planned: 600, actual: 640 },
+  ],
+  forecast: -10217,
+  yesterdayForecast: -9400,
+  wallet: { balance: 365, wallets: [{ name: 'ארנק ראשי', balance: 365 }] },
+  baselineExpenses: [40, 60, 80, 90, 100, 120, 35, 55, 70, 64],
+};
+// The data cards, then the tips (V4-10), as the dashboard loads them.
+const allCards = withTips(computeInsights(insightInput, new Map()), insightInput, new Map());
+const tipCards = selectTips(TIPS, tipFacts(insightInput), new Map(), insightInput.today, 2).map(tipInsight);
 
 const data: DashboardData = {
   setupSteps: setupSteps({
@@ -160,8 +173,11 @@ const data: DashboardData = {
 };
 
 const [target = 'brief-preview.html', mode = 'top'] = process.argv.slice(2);
-const step = { intro: 0, item: 1, cash: 2, income: 3, end: brief.count + 1 }[mode];
-const popupKey = mode === 'popup' ? insights.find((i) => i.kind === 'tracker-pace')?.key : undefined;
+const step = { intro: 0, item: 1, cash: 2, income: 3, tracker: 4, end: brief.count + 1 }[mode];
+// tip1 / tip2: the carousel showing the first / second tip; tippopup: a tip opened.
+const insights = mode === 'tip1' || mode === 'tippopup' ? tipCards : mode === 'tip2' ? tipCards.slice(1) : allCards;
+const popupKey =
+  mode === 'popup' ? insights.find((i) => i.kind === 'tracker-pace')?.key : mode === 'tippopup' ? tipCards[0]?.key : undefined;
 
 const css = ['../app/globals.css', '../app/brief-insights.css']
   .map((file) => readFileSync(new URL(file, import.meta.url), 'utf8'))

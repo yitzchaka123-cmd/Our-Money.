@@ -155,7 +155,8 @@ describe('trackerInsights', () => {
   it('flags a tracker running well ahead of the month', () => {
     // 11 of 31 days gone (35%), 300 of 450 spent (67%).
     const [insight] = trackerInsights(input({ trackers: [{ name: 'פארמה', planned: 450, actual: 300 }] }));
-    expect(insight?.key).toBe('tracker-pace:2026-10:פארמה');
+    // Keyed by the quarter of the target gone (here the third), so it returns only as that moves.
+    expect(insight?.key).toBe('tracker-pace:2026-10:פארמה:q2');
     expect(text(insight)).toBe('פארמה בקצב מהיר מהרגיל: כבר יצאו 300 ₪ מתוך 450 ₪, ועברו רק 35% מהחודש.');
     expect(insightText({ text: insight!.detail.paragraphs[0]! })).toBe('בקצב הזה תגיעו לכ-845 ₪ עד סוף החודש, 395 ₪ מעל היעד.');
   });
@@ -197,7 +198,7 @@ describe('cashLowInsight', () => {
 
   it('warns when the wallets hold less than the cash still planned this month', () => {
     const insight = cashLowInsight(withPlans(300, plan(800), plan(150, 'ועד בית')));
-    expect(insight?.key).toBe('cash-low:2026-10');
+    expect(insight?.key).toBe('cash-low:2026-10:4');
     expect(text(insight)).toBe('המזומן בארנקים לא יספיק: יש בהם 300 ₪, ועד סוף החודש מתוכננות הוצאות במזומן של 950 ₪.');
     expect(insightText({ text: insight!.detail.next })).toBe('כדאי למשוך עוד 650 ₪, או לעדכן את התשלומים המתוכננים.');
   });
@@ -241,8 +242,8 @@ describe('computeInsights', () => {
     expect(computeInsights(busy, feedback).map((i) => i.key)).toEqual(['tracker-over:2026-10:פארמה']);
   });
 
-  it('remembers a yes or no answer', () => {
+  it('does not bring back a card once its "זה עזר לך?" was answered (V2-17)', () => {
     const feedback = new Map([['tracker-over:2026-10:פארמה', { dismissed: false, helpful: true }]]);
-    expect(computeInsights(busy, feedback).find((i) => i.kind === 'tracker-over')?.helpful).toBe(true);
+    expect(computeInsights(busy, feedback).find((i) => i.kind === 'tracker-over')).toBeUndefined();
   });
 });

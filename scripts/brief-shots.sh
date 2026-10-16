@@ -18,7 +18,7 @@ if [ -z "${CHROME:-}" ] || [ ! -x "$CHROME" ]; then
   exit 1
 fi
 
-MODES="top intro item cash end popup"
+MODES="${MODES:-top intro item cash income tracker end popup}"
 for mode in $MODES; do
   npx tsx scripts/preview-brief.tsx "$OUT/brief-$mode.html" "$mode" >/dev/null
 done

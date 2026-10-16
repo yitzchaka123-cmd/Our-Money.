@@ -3,10 +3,12 @@
  * and the coin faces of the "זה עזר לך?" answer.
  */
 
+import { TipArtwork } from '@/app/dashboard/components/TipArt';
 import type { InsightArt } from '@/lib/dashboard/insights';
 
 /** The top band of an insight card. */
 export function InsightArtwork({ art }: { art: InsightArt }) {
+  if (art.startsWith('tip-')) return <TipArtwork art={art as Extract<InsightArt, `tip-${string}`>} />;
   switch (art) {
     case 'income':
       // RiseUp's own: one green coin rolling ahead of fading white ones.

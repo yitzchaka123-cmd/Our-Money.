@@ -16,6 +16,8 @@ interface MemberRow {
   display_name: string;
   preferred_name?: string | null;
   is_active: boolean;
+  /** Arrives with migration 0012; absent means on. */
+  show_daily_brief?: boolean | null;
 }
 
 export default async function SettingsPage() {
@@ -39,6 +41,7 @@ export default async function SettingsPage() {
       data={{
         preferredName: me?.preferred_name?.trim() || null,
         telegramName: me?.display_name ?? '',
+        briefEnabled: me?.show_daily_brief !== false,
         members: members.map((m) => ({
           id: m.id,
           name: m.preferred_name?.trim() || m.display_name,

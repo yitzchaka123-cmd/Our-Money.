@@ -1,13 +1,17 @@
 /**
  * The daily brief: one swipe card for everything new since a member last read
  * it — RiseUp charges that reached us since then, cash logged since then, and
- * any cash entry still waiting for review — each with at most one short
- * insight that is true of the couple's own history, or none at all.
+ * any cash entry still waiting for review — each with one short line under
+ * it: an insight that is true of the couple's own history when there is one,
+ * else a plain note of where it went in the month ("נכנס לתזרים של אוקטובר
+ * תחת סופר"), so no card is empty.
  *
  * Pure: the loader (brief-load.ts) gathers the rows, this decides what to say.
  * Safe to import from client components.
  */
 
+import type { AccountRef } from '@/lib/dashboard/accounts';
+import { monthParts } from '@/lib/money';
 import type { NormalizedActual } from '@/lib/riseup/envelopes';
 import type { CashSpend, CashTopup, EnvelopeType } from '@/lib/types';
 
@@ -31,7 +35,9 @@ export type BriefRule =
   | 'tracker-over'
   | 'tracker-near'
   | 'withdrawal-wallet'
-  | 'needs-review';
+  | 'needs-review'
+  /** Nothing notable: where the item went in the month's cashflow. */
+  | 'filed';
 
 export interface BriefInsight {
   rule: BriefRule;
@@ -268,6 +274,9 @@ export interface RiseupRow {
   category_label: string | null;
   is_withdrawal: boolean;
   first_seen_at: string;
+  /** The provider ("leumicard"), so an unnamed card reads as "לאומי קארד 1". */
+  source?: string | null;
+  source_type?: string | null;
 }
 
 /** One envelope of a month, as the dashboard assembles it (cash filed in). */
@@ -297,6 +306,8 @@ export interface BriefSource {
   withdrawalTopups: CashTopup[];
   wallets: Array<{ id: string; name: string; isDefault: boolean }>;
   memberNames: Map<string, string>;
+  /** Names a card or bank account as the dashboard does (lib/dashboard/accounts.ts). */
+  nameAccount?: (account: AccountRef) => string | null;
 }
 
 const TYPE_LABELS: Partial<Record<EnvelopeType, string>> = {
@@ -309,7 +320,7 @@ const TYPE_LABELS: Partial<Record<EnvelopeType, string>> = {
 };
 
 export function briefLabel(type: EnvelopeType, title: string, category: string | null, isCash: boolean): string {
-  const base = type === 'trackingCategory' ? title : (TYPE_LABELS[type] ?? title);
+  const base = type === 'trackingCategory' ? `קטגוריה למעקב · ${title}` : (TYPE_LABELS[type] ?? title);
   const withCategory =
     (type === 'variable' || type === 'fixed' || type === 'fixedIncome') && category && category !== base ? `${base} · ${category}` : base;
   return isCash && type !== 'cashIncome' ? `מזומן · ${withCategory}` : withCategory;
@@ -317,16 +328,48 @@ export function briefLabel(type: EnvelopeType, title: string, category: string |
 
 /**
  * The account line of a RiseUp card: the name the dashboard gives the account
- * (the couple's name, RiseUp's nickname, or the provider). A charge not in any
- * envelope yet falls back to RiseUp's nickname or a real account number —
- * never the opaque code ("cc5910") RiseUp uses to tell cards apart.
+ * (the couple's name, RiseUp's nickname, or the provider, numbered when two
+ * share it). A charge not in any envelope yet is named the same way, then
+ * falls back to RiseUp's nickname or a real account number — never the
+ * opaque code ("cc5910") RiseUp uses to tell cards apart.
  */
-function accountLabel(found: NormalizedActual | undefined, nickname: string | null, hash: string | null): string | null {
+function accountLabel(found: NormalizedActual | undefined, row: RiseupRow, src: BriefSource): string | null {
   if (found?.accountName) return found.accountName;
-  if (nickname?.trim()) return nickname.trim();
-  if (hash && hash.includes('-')) return `חשבון ${hash}`;
+  if (src.nameAccount && (row.source || row.source_type)) {
+    const named = src.nameAccount({
+      source: row.source ?? null,
+      hash: row.account_number_hash,
+      nickname: row.account_nickname,
+      sourceType: row.source_type ?? null,
+    });
+    if (named) return named;
+  }
+  if (row.account_nickname?.trim()) return row.account_nickname.trim();
+  if (row.account_number_hash?.includes('-')) return `חשבון ${row.account_number_hash}`;
   return null;
 }
+
+// ---------------------------------------------------------------------------
+// The plain line: where an item went, when nothing more is worth saying
+// ---------------------------------------------------------------------------
+
+function monthName(month: string): string {
+  return monthParts(month).name;
+}
+
+/** "סופר", "הוצאות קבועות, בקטגוריה חשמל", "הכנסות משתנות". */
+function filedUnder(type: EnvelopeType, title: string, category: string | null): string {
+  if (type === 'trackingCategory') return title;
+  const base = TYPE_LABELS[type] ?? title;
+  return (type === 'variable' || type === 'fixed') && category && category !== base ? `${base}, בקטגוריה ${category}` : base;
+}
+
+function filed(text: string): BriefInsight {
+  return { rule: 'filed', text: [text] };
+}
+
+/** Said of a withdrawal, which moves money rather than spending it (lib/dashboard/data.ts). */
+const WITHDRAWAL_NOTE = 'משיכה לא נספרת כהוצאה בתזרים — רק מה שקונים במזומן.';
 
 function findEnvelope(
   envelopes: BriefEnvelope[] | undefined,
@@ -357,7 +400,7 @@ function fallbackActual(row: RiseupRow): NormalizedActual {
     isIncome: Boolean(row.is_income),
     accountNickname: row.account_nickname,
     accountNumberHash: row.account_number_hash,
-    source: null,
+    source: row.source ?? null,
     isInstallment: false,
     paymentNumber: null,
     totalPayments: null,
@@ -376,7 +419,7 @@ function riseupItem(row: RiseupRow, src: BriefSource): BriefItem {
     isIncome,
     business: row.business_name ?? '',
     date: row.transaction_date,
-    account: accountLabel(undefined, row.account_nickname, row.account_number_hash),
+    account: accountLabel(undefined, row, src),
     memberName: null,
     memberId: null,
     needsReview: false,
@@ -393,7 +436,7 @@ function riseupItem(row: RiseupRow, src: BriefSource): BriefItem {
       envelopeType: 'withdrawal',
       envelopeTitle: 'משיכת מזומן',
       envelopeId: null,
-      insight: wallet ? { rule: 'withdrawal-wallet', text: [`המשיכה נרשמה כמזומן ב-${wallet.name}.`] } : null,
+      insight: wallet ? { rule: 'withdrawal-wallet', text: [`המשיכה נרשמה כמזומן ב-${wallet.name}.`] } : filed(WITHDRAWAL_NOTE),
       actual: fallbackActual(row),
     };
   }
@@ -425,7 +468,7 @@ function riseupItem(row: RiseupRow, src: BriefSource): BriefItem {
 
   return {
     ...base,
-    account: accountLabel(found?.actual, row.account_nickname, row.account_number_hash),
+    account: accountLabel(found?.actual, row, src),
     label: briefLabel(type, title, category, false),
     envelopeType: type,
     envelopeTitle: title,
@@ -435,9 +478,19 @@ function riseupItem(row: RiseupRow, src: BriefSource): BriefItem {
       merchantInsight(
         { id: row.transaction_id, date: row.transaction_date, business: row.business_name ?? '', amount, isIncome },
         src.history,
-      ),
+      ) ??
+      (!month
+        ? null
+        : found
+          ? filed(`${isIncome ? 'נכנסה' : 'נכנס'} לתזרים של ${monthName(month)} תחת ${filedUnder(type, title, category)}.`)
+          : filed(`חדש מרייזאפ — עוד לא מופיע באף קטגוריה בתזרים של ${monthName(month)}.`)),
     actual,
   };
+}
+
+function walletName(src: BriefSource, walletId: string | null): string {
+  const id = walletId ?? src.wallets.find((w) => w.isDefault)?.id;
+  return src.wallets.find((w) => w.id === id)?.name ?? 'הארנק';
 }
 
 function walletLine(src: BriefSource, walletId: string | null): string {
@@ -503,7 +556,10 @@ function spendItem(spend: CashSpend, src: BriefSource): BriefItem {
     memberName,
     memberId: spend.member_id,
     needsReview,
-    insight: needsReview ? { rule: 'needs-review', text: REVIEW_TEXT } : tracker,
+    insight: needsReview
+      ? { rule: 'needs-review', text: REVIEW_TEXT }
+      : (tracker ??
+        filed(`נרשם במזומן ונכנס לתזרים של ${monthName(month)} תחת ${filedUnder(type, title, spend.category)}.`)),
     actual,
     seenAt: spend.created_at,
   };
@@ -532,7 +588,9 @@ function topupItem(topup: CashTopup, src: BriefSource): BriefItem {
     memberName,
     memberId: topup.member_id ?? null,
     needsReview: false,
-    insight: null,
+    insight: income
+      ? filed(`נכנסה ל-${walletName(src, topup.wallet_id)} ונספרת כהכנסה בתזרים של ${monthName(topup.occurred_at.slice(0, 7))}.`)
+      : filed(`המזומן נוסף ל-${walletName(src, topup.wallet_id)}. ${WITHDRAWAL_NOTE}`),
     actual: {
       transactionId: `${income ? 'cash-income' : 'cash-withdrawal'}:${topup.id}`,
       transactionDate: topup.occurred_at,

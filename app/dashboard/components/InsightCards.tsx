@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, useTransition } from 'react';
 import { CoinFace, InsightArtwork } from '@/app/dashboard/components/InsightArt';
 import { Rich } from '@/app/dashboard/components/DailyBrief';
 import { Close, Heart } from '@/app/dashboard/components/icons';
-import { dismissInsight, rateInsight, restoreInsight } from '@/lib/dashboard/insight-actions';
+import { dismissInsight, openInsight, rateInsight, restoreInsight } from '@/lib/dashboard/insight-actions';
 import type { Insight } from '@/lib/dashboard/insights';
 
 /** How long "ביטול" stays on offer after an X. */
@@ -14,7 +14,8 @@ const UNDO_MS = 5000;
 /**
  * RiseUp's row of insight cards at the top of the page: swipe between them,
  * X to dismiss (with an undo), tap for the full explanation, and say whether
- * it helped. A dismissed card never comes back for the same thing.
+ * it helped. Each card is shown on one day only, and one that was opened or
+ * dismissed never comes back for the same thing (lib/dashboard/insights.ts).
  */
 export function InsightCards({
   insights,
@@ -60,6 +61,14 @@ export function InsightCards({
     });
   };
 
+  // Opening is reading: the card stays for now, and does not come back (V2-17).
+  const open = (key: string) => {
+    setOpenKey(key);
+    start(async () => {
+      await openInsight(key);
+    });
+  };
+
   const answer = (key: string, helpful: boolean) => {
     setAnswers((a) => ({ ...a, [key]: helpful }));
     start(async () => {
@@ -84,18 +93,18 @@ export function InsightCards({
         <>
           <div className="ins-track" ref={track} onScroll={onScroll}>
             {visible.map((insight) => (
-              <article key={insight.key} className="ins-card">
+              <article key={insight.key} className="ins-card" data-kind={insight.kind}>
                 <div className="ins-art">
                   <InsightArtwork art={insight.art} />
                   <button className="ins-x" type="button" aria-label="לא להציג שוב" onClick={() => dismiss(insight.key)}>
                     <Close size={14} />
                   </button>
                 </div>
-                <button className="ins-text" type="button" onClick={() => setOpenKey(insight.key)}>
+                <button className="ins-text" type="button" onClick={() => open(insight.key)}>
                   <strong>{insight.title}</strong> <Rich text={insight.body} className="ins-amount" />
                 </button>
                 <div className="ins-foot">
-                  <button className="btn" type="button" onClick={() => setOpenKey(insight.key)}>
+                  <button className="btn" type="button" onClick={() => open(insight.key)}>
                     לפרטים נוספים
                   </button>
                 </div>
@@ -171,10 +180,14 @@ function InsightPopup({
               <Rich text={paragraph} className="ins-amount" />
             </p>
           ))}
-          <p className="ins-next-title">מה עכשיו?</p>
-          <p>
-            <Rich text={insight.detail.next} className="ins-amount" />
-          </p>
+          {insight.detail.next.length > 0 ? (
+            <>
+              <p className="ins-next-title">מה עכשיו?</p>
+              <p>
+                <Rich text={insight.detail.next} className="ins-amount" />
+              </p>
+            </>
+          ) : null}
           <button className="btn" type="button" onClick={onClose}>
             הבנתי, תודה
           </button>

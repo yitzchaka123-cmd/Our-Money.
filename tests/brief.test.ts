@@ -383,3 +383,79 @@ describe('buildBrief', () => {
     expect(brief).toMatchObject({ count: 0, items: [] });
   });
 });
+
+describe('brief cards as RiseUp dresses them (V2-9)', () => {
+  const supermarket: BriefEnvelope = {
+    envelopeId: 'super',
+    type: 'trackingCategory',
+    title: 'סופר',
+    planned: 3000,
+    actuals: [actual('shuf', '2026-10-09', 74, 'שופרסל דיל', { source: 'leumicard', accountNumberHash: 'cc1', accountName: 'לאומי קארד 1' })],
+  };
+
+  it('never leaves a card without a line under it', () => {
+    const topup: CashTopup = {
+      id: 'gift', amount_ils: 200, occurred_at: '2026-10-09', source: 'cash_income', riseup_transaction_id: null, business_name: null,
+      note: null, is_dismissed: false, member_id: 'm1', category: 'מתנה', input_kind: 'text', wallet_id: 'w1', created_at: '2026-10-09T10:00:00Z',
+    };
+    const brief = buildBrief(
+      source({
+        newRiseup: [
+          ...source().newRiseup,
+          row('atm', '2026-10-09', 500, 'משיכת מזומן', '2026-10-10T05:00:00Z', { is_withdrawal: true }),
+          row('late', '2026-10-10', 60, 'קפה', '2026-10-11T05:00:00Z'),
+        ],
+        cashTopups: [topup, { ...topup, id: 'atm-hand', source: 'manual', category: null }],
+      }),
+    );
+    expect(brief.items.length).toBe(7);
+    for (const item of brief.items) expect(item.insight, item.key).not.toBeNull();
+  });
+
+  it('says where a plain charge went when there is nothing more to say', () => {
+    const brief = buildBrief(
+      source({
+        newRiseup: [row('shuf', '2026-10-09', 74, 'שופרסל דיל', '2026-10-10T05:00:00Z')],
+        cashSpends: [],
+        history: [],
+        envelopesByMonth: { '2026-10': [...october, supermarket] },
+      }),
+    );
+    const card = brief.items[0]!;
+    expect(card.label).toBe('קטגוריה למעקב · סופר');
+    expect(card.envelopeType).toBe('trackingCategory');
+    expect(card.account).toBe('לאומי קארד 1');
+    expect(card.insight?.rule).toBe('filed');
+    expect(insightText(card.insight!)).toBe('נכנס לתזרים של אוקטובר תחת סופר.');
+  });
+
+  it('names the envelope and category of a fixed charge, and income as income', () => {
+    const brief = buildBrief(source({ history: [], cashSpends: [] }));
+    expect(insightText(brief.items[0]!.insight!)).toBe('נכנס לתזרים של אוקטובר תחת הוצאות קבועות, בקטגוריה חשמל.');
+    expect(insightText(brief.items[1]!.insight!)).toBe('נכנסה לתזרים של אוקטובר תחת הכנסות משתנות.');
+  });
+
+  it('says a charge is not filed yet when no envelope lists it', () => {
+    const brief = buildBrief(
+      source({ newRiseup: [row('late', '2026-10-10', 60, 'קפה', '2026-10-11T05:00:00Z')], cashSpends: [], history: [], envelopesByMonth: {} }),
+    );
+    expect(insightText(brief.items[0]!.insight!)).toBe('חדש מרייזאפ — עוד לא מופיע באף קטגוריה בתזרים של אוקטובר.');
+  });
+
+  it('says where cash went, and keeps who logged it', () => {
+    const cash = buildBrief(source({ newRiseup: [] })).items[0]!;
+    expect(cash.memberName).toBe('שרה');
+    expect(insightText(cash.insight!)).toBe('נרשם במזומן ונכנס לתזרים של אוקטובר תחת הוצאות משתנות, בקטגוריה תחבורה.');
+  });
+
+  it('names a card not in any envelope the way the dashboard does', () => {
+    const brief = buildBrief(
+      source({
+        newRiseup: [row('new', '2026-10-09', 50, 'קפה', '2026-10-09T08:00:00Z', { account_number_hash: 'cc5910', source: 'leumicard' })],
+        cashSpends: [],
+        nameAccount: (a) => (a.source === 'leumicard' ? `לאומי קארד ${a.hash === 'cc5910' ? 2 : 1}` : null),
+      }),
+    );
+    expect(brief.items[0]!.account).toBe('לאומי קארד 2');
+  });
+});

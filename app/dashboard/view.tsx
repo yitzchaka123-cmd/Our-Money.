@@ -36,8 +36,8 @@ export function DashboardView({
   previewHiddenAccounts,
 }: {
   data: DashboardData;
-  /** The daily brief for whoever is signed in. */
-  brief?: BriefData;
+  /** The daily brief for whoever is signed in; null when they turned it off in Settings. */
+  brief?: BriefData | null;
   /** Insight cards for the current month. */
   insights?: Insight[];
   /** Preview-only: the brief deck open at this card. */
@@ -86,7 +86,7 @@ export function DashboardView({
       userName={data.userName}
       lastUpdated={data.lastUpdated}
       lastSyncAt={data.lastSyncAt}
-      briefCount={data.briefCount}
+      briefCount={brief ? data.briefCount : null}
       onSearch={() => setSearch(true)}
       onFilter={() => setFilterOpen(true)}
       onOpenWallets={() => setWalletsOpen(true)}
@@ -153,14 +153,16 @@ export function DashboardView({
         </div>
       </div>
 
-      <DailyBrief
-        brief={brief}
-        envelopes={data.envelopeChoices}
-        members={data.members}
-        wallets={data.wallet.wallets}
-        sessionMemberId={sessionMemberId}
-        initialStep={briefStep}
-      />
+      {brief ? (
+        <DailyBrief
+          brief={brief}
+          envelopes={data.envelopeChoices}
+          members={data.members}
+          wallets={data.wallet.wallets}
+          sessionMemberId={sessionMemberId}
+          initialStep={briefStep}
+        />
+      ) : null}
 
       {walletsOpen ? (
         <WalletsSheet
