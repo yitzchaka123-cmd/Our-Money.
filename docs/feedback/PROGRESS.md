@@ -46,8 +46,8 @@ Helper branches are `worktree-agent-*`; check `git log` on each for per-item com
 - [x] Helpers started (5): N numbers/forecast/fixed income (0008), W wallets (0009), T Telegram & settings (0010), U drawer/sync line/notes/session (0011), B brief/insights/tips (0012)
 - [x] Merge each helper, apply its migration, push — W merged (0009), B merged (0012), T merged (0010), all applied, deploy READY; N merged 1973566 (no migration), pushed; U merged a4e7e12, 0011 applied, pushed, deploy READY
 - [x] Full run on the final merge: typecheck clean, 612 unit, 146 integration, build passes; lint cannot run (Next 16 has no `next lint`, no eslint in the repo)
-- [ ] Independent check of every item
-- [ ] Deploy live, statuses, answer A–F
+- [x] Independent check of every item: all open rows done; 5 extra problems fixed and deployed
+- [x] Deploy live (no runtime errors), statuses updated, ledger done
 
 ### Stop (videos 2–4)
 - 2026-10-15 ~21:00 UTC: helpers W, T and B stopped on the usage limit (reset 22:50 UTC). Checked 2026-10-16 03:20 UTC:

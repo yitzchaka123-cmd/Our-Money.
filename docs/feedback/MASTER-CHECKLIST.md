@@ -26,11 +26,11 @@ Re-read before every reply. Nothing is marked done without something to point to
 | C16 | Talk in plain, simple words; tell you where to click; never ask for keys in chat | done (standing rule) | — |
 | C17 | Work from screen recordings in the Drive folder; ledger, progress file, helper rules | done | `docs/feedback/LEDGER.md`, `PROGRESS.md`, `helper-brief.md` |
 | C18 | No AI model names in code or commits | done | model id read from `AI_MODEL` (`lib/env.ts`); commits since 08f4fa0 carry no model line |
-| C19 | Transcribe every video three ways and merge; frames every second (half a second when busy); grey-dot zooms | done for videos 2–4 onward | see each video doc's "How it was read" section |
+| C19 | Transcribe every video three ways and merge; frames every second (half a second when busy); grey-dot zooms | done (videos 2–4) | see each video doc's "How it was read" section |
 | C20 | Keep this master checklist | done | this file |
 | C21 | Answer format A–F (transcript, end-result line, numbered problems, what bothers you, ideas, what I need) | done (standing rule) | — |
 | C22 | Mark recordings of other projects "not this app" and don't build them | done (standing rule) | ledger status column |
-| C23 | Set your RiseUp custom category names (סופר, מגנטים, הקשיבה, יציאות וכיף…, בזבוזים, תרומה, תיירות, טרריומים) | not done | answered in video 2 at 3:06 ("I think you can find it") → V2-11 |
+| C23 | Set your RiseUp custom category names (סופר, מגנטים, הקשיבה, יציאות וכיף…, בזבוזים, תרומה, תיירות, טרריומים) | done | answered in video 2 at 3:06 ("I think you can find it") → V2-11 |
 
 ## From video 1 (2026-10-11) — details in [2026-10-11-video1.md](2026-10-11-video1.md)
 
@@ -68,39 +68,39 @@ Re-read before every reply. Nothing is marked done without something to point to
 
 | # | Request | Status | Proof |
 |---|---|---|---|
-| V2-1 | "כלכלה מעל היעד" card used one week's target | not done | |
-| V2-3 | Sync button on every page; "לאומי קארד 1/2" on the accounts page | not done | |
-| V2-4 | Wallet buttons: green + / red − / purple +, drop the duplicate | not done | best guess, also asked |
-| V2-6 | ATM withdrawal asks which wallet; Telegram message per new withdrawal with wallet buttons | not done | |
-| V2-7 | Wallets as tiles | not done | |
-| V2-9 | Daily brief cards like RiseUp's (or remove the feature) | waiting | default: rebuild; question asked |
-| V2-10 | Supermarket spends go to your "סופר" tracker | not done | |
-| V2-11 | Your RiseUp tracker names (from video 1) | not done | |
-| V2-12 | Predict cash coming into the wallets each month, editable | not done | |
-| V2-13 | Wallet card ⋮ menu like the income menu | not done | |
-| V2-15 | Always-visible "last synced" line | not done | |
-| V2-16 | Own notes on RiseUp charges; "היום/אתמול" on recent rows | not done | |
-| V2-17 | A seen insight card doesn't come back | not done | |
-| V2-18 | Forecast closer to RiseUp (past weeks of weekly budget) | not done | |
-| V2-19 | Fixed income (salary) counted as income | not done | |
+| V2-1 | "כלכלה מעל היעד" card used one week's target | done | 2458907 |
+| V2-3 | Sync button on every page; "לאומי קארד 1/2" on the accounts page | done | 7a05318, 1064038 |
+| V2-4 | Wallet buttons: green + / red − / purple +, drop the duplicate | done | 25f3201 |
+| V2-6 | ATM withdrawal asks which wallet; Telegram message per new withdrawal with wallet buttons | done | 0d1de40 (app), d6900d2 (Telegram) |
+| V2-7 | Wallets as tiles | done | d6d5604 (tiles when 2+ wallets) |
+| V2-9 | Daily brief cards like RiseUp's (or remove the feature) | done | ce9a827 (rebuilt + off switch; keep/remove is yours) |
+| V2-10 | Supermarket spends go to your "סופר" tracker | done | c2eb7bd |
+| V2-11 | Your RiseUp tracker names (from video 1) | done | money.tracker_overrides rows (2026-10-15) + loader |
+| V2-12 | Predict cash coming into the wallets each month, editable | done | a00de27 |
+| V2-13 | Wallet card ⋮ menu like the income menu | done | 03bac56 |
+| V2-15 | Always-visible "last synced" line | done | b5e91b6 |
+| V2-16 | Own notes on RiseUp charges; "היום/אתמול" on recent rows | done | 8ef5535 |
+| V2-17 | A seen insight card doesn't come back | done | ca5789e |
+| V2-18 | Forecast closer to RiseUp (past weeks of weekly budget) | partly | 2bb492e (≈351 ₪ fixed gap remains, shown in forecast sheet) |
+| V2-19 | Fixed income (salary) counted as income | done | eda07a9 + check fix |
 
 ## From video 3 (2026-10-15) — details in [2026-10-15-video3.md](2026-10-15-video3.md)
 
 | # | Request | Status | Proof |
 |---|---|---|---|
-| V3-1 | Better instructions for the group / `/id` | not done | → V4-3 |
-| V3-2 | Bot categories = your own envelopes; `/month` by them | not done | → V4-4 |
-| V3-3 | Bot uses your chosen name, not the Telegram name | not done | |
+| V3-1 | Better instructions for the group / `/id` | done | dbc9520 |
+| V3-2 | Bot categories = your own envelopes; `/month` by them | done | c2eb7bd |
+| V3-3 | Bot uses your chosen name, not the Telegram name | done | fe26fde |
 
 ## From video 4 (2026-10-15) — details in [2026-10-15-video4.md](2026-10-15-video4.md)
 
 | # | Request | Status | Proof |
 |---|---|---|---|
-| V4-1 | Side menu from the right | not done | |
-| V4-2 | Telegram settings: nightly reminder off / frequency | not done | |
-| V4-3 | One-tap family group with the bot | not done | |
-| V4-4 | Setting: save right away or approve first; picker with only your envelopes; back button | not done | |
-| V4-7 | Wallet rows open the transaction sheet | not done | |
-| V4-8 | Cash income: kind (variable/fixed/not cashflow) and category incl. your own | not done | |
-| V4-10 | Many more tip cards (~100) | not done | |
-| V4-11 | Stay signed in longer | not done | |
+| V4-1 | Side menu from the right | done | 7ddefc6 |
+| V4-2 | Telegram settings: nightly reminder off / frequency | done | ac5f17d |
+| V4-3 | One-tap family group with the bot | done | dbc9520 |
+| V4-4 | Setting: save right away or approve first; picker with only your envelopes; back button | done | cbb1f8e |
+| V4-7 | Wallet rows open the transaction sheet | done | c059d12 |
+| V4-8 | Cash income: kind (variable/fixed/not cashflow) and category incl. your own | done | 2a294b1 |
+| V4-10 | Many more tip cards (~100) | done | 52ef0ac |
+| V4-11 | Stay signed in longer | done | 91fe216 |
