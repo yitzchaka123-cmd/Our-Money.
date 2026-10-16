@@ -1,6 +1,7 @@
 import { fetchAll } from '@/lib/dashboard/brief-load';
 import type { DashboardData } from '@/lib/dashboard/data';
-import { computeInsights, keysToMarkSeen, type Insight, type InsightFeedback } from '@/lib/dashboard/insights';
+import { computeInsights, keysToMarkSeen, type Insight, type InsightFeedback, type InsightInput } from '@/lib/dashboard/insights';
+import { withTips } from '@/lib/dashboard/tips';
 import { db } from '@/lib/db/client';
 import { isoDateInIsrael } from '@/lib/dates';
 
@@ -113,21 +114,20 @@ export async function loadInsights(data: DashboardData, memberId: string, now = 
 
   const planned = new Map(envelopeRows.map((r) => [r.envelope_id, Number(r.planned_ils)]));
 
-  const cards = computeInsights(
-    {
-      today,
-      month: data.month,
-      envelopes: data.envelopes,
-      trackers: data.envelopes
-        .filter((e) => e.type === 'trackingCategory')
-        .map((e) => ({ name: e.title, planned: (e.envelopeId && planned.get(e.envelopeId)) || 0, actual: e.actual })),
-      forecast: data.forecast,
-      yesterdayForecast,
-      wallet: { balance: data.wallet.balance, wallets: data.wallet.wallets.map((w) => ({ name: w.name, balance: w.balance })) },
-      baselineExpenses: [...riseupAmounts, ...cashRows].map((r) => Math.abs(Number(r.amount_ils ?? 0))).filter((n) => n > 0),
-    },
-    feedback,
-  );
+  const input: InsightInput = {
+    today,
+    month: data.month,
+    envelopes: data.envelopes,
+    trackers: data.envelopes
+      .filter((e) => e.type === 'trackingCategory')
+      .map((e) => ({ name: e.title, planned: (e.envelopeId && planned.get(e.envelopeId)) || 0, actual: e.actual })),
+    forecast: data.forecast,
+    yesterdayForecast,
+    wallet: { balance: data.wallet.balance, wallets: data.wallet.wallets.map((w) => ({ name: w.name, balance: w.balance })) },
+    baselineExpenses: [...riseupAmounts, ...cashRows].map((r) => Math.abs(Number(r.amount_ils ?? 0))).filter((n) => n > 0),
+  };
+  // The data cards, then a money tip or two (V4-10).
+  const cards = withTips(computeInsights(input, feedback), input, feedback);
   await markSeen(memberId, cards, feedback, now);
   return cards;
 }

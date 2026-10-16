@@ -692,3 +692,10 @@ button.blob {
 .brief-switch:disabled {
   opacity: 0.7;
 }
+
+/* --- money tips in the carousel (V4-10) -------------------------------------- */
+/* A tip's title sits on its own line above the sentence, as RiseUp sets a tip. */
+.ins-card[data-kind='tip'] .ins-text strong {
+  display: block;
+  margin-bottom: 4px;
+}

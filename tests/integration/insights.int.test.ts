@@ -83,6 +83,12 @@ describe('insight cards', () => {
     expect(key).toBeTruthy();
     const seenAt = (await loadFeedback(yitzchak)).get(key)?.seenAt;
     expect(seenAt).toBeTruthy();
+    // A money tip joins the carousel after the data cards, and is marked seen too (V4-10).
+    const shown = await loadInsights(data, yitzchak, now);
+    const tip = shown.find((i) => i.kind === 'tip');
+    expect(tip).toBeTruthy();
+    expect(shown.at(-1)?.kind).toBe('tip');
+    expect((await loadFeedback(yitzchak)).get(tip!.key)?.seenAt).toBeTruthy();
     // Later the same day: still there, and the first stamp is kept.
     expect((await loadInsights(data, yitzchak, new Date(now.getTime() + 60_000))).map((i) => i.key)).toContain(key);
     expect((await loadFeedback(yitzchak)).get(key)?.seenAt).toBe(seenAt);

@@ -93,7 +93,7 @@ export function InsightCards({
         <>
           <div className="ins-track" ref={track} onScroll={onScroll}>
             {visible.map((insight) => (
-              <article key={insight.key} className="ins-card">
+              <article key={insight.key} className="ins-card" data-kind={insight.kind}>
                 <div className="ins-art">
                   <InsightArtwork art={insight.art} />
                   <button className="ins-x" type="button" aria-label="לא להציג שוב" onClick={() => dismiss(insight.key)}>
@@ -180,10 +180,14 @@ function InsightPopup({
               <Rich text={paragraph} className="ins-amount" />
             </p>
           ))}
-          <p className="ins-next-title">מה עכשיו?</p>
-          <p>
-            <Rich text={insight.detail.next} className="ins-amount" />
-          </p>
+          {insight.detail.next.length > 0 ? (
+            <>
+              <p className="ins-next-title">מה עכשיו?</p>
+              <p>
+                <Rich text={insight.detail.next} className="ins-amount" />
+              </p>
+            </>
+          ) : null}
           <button className="btn" type="button" onClick={onClose}>
             הבנתי, תודה
           </button>

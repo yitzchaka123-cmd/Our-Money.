@@ -93,7 +93,7 @@ export const screens: Record<string, () => ReactElement> = {
 };
 
 const root = process.cwd();
-const css = ['app/globals.css', 'app/wallets-accounts.css'].map((f) => readFileSync(join(root, f), 'utf8')).join('\n');
+const css = ['app/globals.css', 'app/wallets-accounts.css', 'app/brief-insights.css'].map((f) => readFileSync(join(root, f), 'utf8')).join('\n');
 const out = process.argv[2] ?? '.shots';
 mkdirSync(out, { recursive: true });
 

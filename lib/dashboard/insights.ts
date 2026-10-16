@@ -12,10 +12,13 @@ import type { EnvelopeView } from '@/lib/dashboard/data';
 import { isoDateInIsrael } from '@/lib/dates';
 import { monthLabel } from '@/lib/money';
 
-export type InsightKind = 'forecast' | 'big-charge' | 'tracker-over' | 'tracker-pace' | 'income' | 'cash-low';
+export type InsightKind = 'forecast' | 'big-charge' | 'tracker-over' | 'tracker-pace' | 'income' | 'cash-low' | 'tip';
+
+/** The drawings of the money tips (lib/dashboard/tips.ts, TipArt.tsx). */
+export type TipArt = 'tip-plant' | 'tip-cup' | 'tip-cart' | 'tip-calendar' | 'tip-card' | 'tip-jar' | 'tip-bulb' | 'tip-receipt';
 
 /** Which drawing sits in the card's top band. */
-export type InsightArt = 'chart-down' | 'chart-up' | 'coins' | 'bars' | 'income' | 'wallet';
+export type InsightArt = 'chart-down' | 'chart-up' | 'coins' | 'bars' | 'income' | 'wallet' | TipArt;
 
 export interface Insight {
   /** Stable for the thing it is about, so a dismissal sticks to it. */

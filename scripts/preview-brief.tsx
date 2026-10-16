@@ -5,7 +5,8 @@
  *
  *   npx tsx scripts/preview-brief.tsx out.html <mode>
  *
- * Modes: top (insight carousel + blob), intro, item, cash, income, tracker, end, popup.
+ * Modes: top (insight carousel + blob), intro, item, cash, income, tracker, end, popup,
+ * tip1 / tip2 (the carousel at a money tip), tippopup (a tip opened).
  * The brief and the cards are built by the real rules (lib/dashboard/brief.ts,
  * lib/dashboard/insights.ts) from the fixture rows below.
  */
@@ -19,6 +20,7 @@ import { DashboardView } from '../app/dashboard/view';
 import { buildBrief, type BriefEnvelope, type RiseupRow } from '../lib/dashboard/brief';
 import type { DashboardData, EnvelopeView } from '../lib/dashboard/data';
 import { computeInsights } from '../lib/dashboard/insights';
+import { selectTips, TIPS, tipFacts, tipInsight, withTips } from '../lib/dashboard/tips';
 import type { NormalizedActual } from '../lib/riseup/envelopes';
 import type { CashSpend } from '../lib/types';
 
@@ -117,19 +119,22 @@ const brief = buildBrief({
   memberNames: new Map([['m1', 'יצחק'], ['m2', 'שרה']]),
 });
 
-const insights = computeInsights(
-  {
-    today: '2026-10-11',
-    month: '2026-10',
-    envelopes,
-    trackers: [{ name: 'פארמה', planned: 450, actual: 300 }],
-    forecast: -10217,
-    yesterdayForecast: -9400,
-    wallet: { balance: 365, wallets: [{ name: 'ארנק ראשי', balance: 365 }] },
-    baselineExpenses: [40, 60, 80, 90, 100, 120, 35, 55, 70, 64],
-  },
-  new Map(),
-);
+const insightInput = {
+  today: '2026-10-11',
+  month: '2026-10',
+  envelopes,
+  trackers: [
+    { name: 'פארמה', planned: 450, actual: 300 },
+    { name: 'אוכל בחוץ', planned: 600, actual: 640 },
+  ],
+  forecast: -10217,
+  yesterdayForecast: -9400,
+  wallet: { balance: 365, wallets: [{ name: 'ארנק ראשי', balance: 365 }] },
+  baselineExpenses: [40, 60, 80, 90, 100, 120, 35, 55, 70, 64],
+};
+// The data cards, then the tips (V4-10), as the dashboard loads them.
+const allCards = withTips(computeInsights(insightInput, new Map()), insightInput, new Map());
+const tipCards = selectTips(TIPS, tipFacts(insightInput), new Map(), insightInput.today, 2).map(tipInsight);
 
 const data: DashboardData = {
   setupSteps: setupSteps({
@@ -169,7 +174,10 @@ const data: DashboardData = {
 
 const [target = 'brief-preview.html', mode = 'top'] = process.argv.slice(2);
 const step = { intro: 0, item: 1, cash: 2, income: 3, tracker: 4, end: brief.count + 1 }[mode];
-const popupKey = mode === 'popup' ? insights.find((i) => i.kind === 'tracker-pace')?.key : undefined;
+// tip1 / tip2: the carousel showing the first / second tip; tippopup: a tip opened.
+const insights = mode === 'tip1' || mode === 'tippopup' ? tipCards : mode === 'tip2' ? tipCards.slice(1) : allCards;
+const popupKey =
+  mode === 'popup' ? insights.find((i) => i.kind === 'tracker-pace')?.key : mode === 'tippopup' ? tipCards[0]?.key : undefined;
 
 const css = ['../app/globals.css', '../app/brief-insights.css']
   .map((file) => readFileSync(new URL(file, import.meta.url), 'utf8'))
