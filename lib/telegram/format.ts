@@ -13,7 +13,8 @@ export { formatDate, formatIls, friendlyDate } from '@/lib/money';
 export type CallbackAction =
   | { kind: 'delete'; spendId: string }
   | { kind: 'pick_category'; spendId: string }
-  | { kind: 'set_category'; spendId: string; categoryIndex: number }
+  /** `tag` (short hash of the envelope's name) guards against the list changing between showing and tapping. */
+  | { kind: 'set_category'; spendId: string; categoryIndex: number; tag?: string }
   | { kind: 'confirm'; spendId: string }
   /** "חזרה" from the envelope picker: put the original message back. */
   | { kind: 'back'; spendId: string }
@@ -79,7 +80,7 @@ export function encodeCallback(action: CallbackAction): string {
     case 'assign_wallet':
       return `${PREFIX.assign_wallet}:${id}:${action.walletIndex}:${action.walletTag}`;
     case 'set_category':
-      return `${PREFIX.set_category}:${id}:${action.categoryIndex}`;
+      return `${PREFIX.set_category}:${id}:${action.categoryIndex}${action.tag ? `:${action.tag}` : ''}`;
     case 'settle_plan':
       return `${PREFIX.settle_plan}:${id}:${action.month.replace('-', '')}`;
     case 'skip_plan':
@@ -128,7 +129,8 @@ export function decodeCallback(data: string): CallbackAction | null {
     case PREFIX.set_category: {
       const index = Number(extra);
       if (!Number.isInteger(index) || index < 0) return null;
-      return { kind: 'set_category', spendId, categoryIndex: index };
+      if (more !== undefined && !/^[0-9a-f]{1,8}$/i.test(more)) return null;
+      return { kind: 'set_category', spendId, categoryIndex: index, ...(more ? { tag: more } : {}) };
     }
     default:
       return null;
@@ -206,12 +208,23 @@ export function categoryKeyboard(spendId: string, categories: string[]): InlineK
         kind: 'set_category',
         spendId,
         categoryIndex: i + offset,
+        tag: nameTag(label),
       }),
     }));
     rows.push(row);
   }
   rows.push([{ text: '↩️ חזרה', callback_data: encodeCallback({ kind: 'back', spendId }) }]);
   return rows;
+}
+
+/** A short, stable hash of an envelope name (FNV-1a, 6 hex digits) for callback data. */
+export function nameTag(name: string): string {
+  let hash = 0x811c9dc5;
+  for (const ch of name) {
+    hash ^= ch.codePointAt(0)!;
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, '0').slice(0, 6);
 }
 
 /** The start of a wallet id, enough to tell wallets apart inside callback data. */

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { formatAmount, splitAmount } from '@/lib/money';
 import {
   categoryKeyboard,
+  nameTag,
   decodeCallback,
   encodeCallback,
   formatIls,
@@ -103,6 +104,7 @@ describe('categoryKeyboard', () => {
       kind: 'set_category',
       spendId: UUID,
       categoryIndex: 1,
+      tag: nameTag('ב'),
     });
   });
 });

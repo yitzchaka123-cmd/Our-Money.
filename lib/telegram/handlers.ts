@@ -33,6 +33,7 @@ import {
   savedMessage,
   spendKeyboard,
   spendLine,
+  nameTag,
   walletTag,
 } from '@/lib/telegram/format';
 import { assignWithdrawal } from '@/lib/cash/withdrawal-wallet';
@@ -765,7 +766,8 @@ async function handleCallback(update: TelegramUpdate): Promise<void> {
       // The index is into the spend's own month's envelopes, as the picker showed them.
       const envelopes = await loadBotEnvelopes(spend.spent_at.slice(0, 7));
       const target = envelopes[action.categoryIndex];
-      if (!target) {
+      // Renamed or added since the picker was shown: the index may now point elsewhere.
+      if (!target || (action.tag && nameTag(target.name) !== action.tag)) {
         await answerCallbackQuery(query.id, 'המעטפה לא נמצאה');
         return;
       }

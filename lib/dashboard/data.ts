@@ -674,8 +674,11 @@ export function mergeCashIntoEnvelopes(
 
   for (const spend of spends) {
     const pinned = spend.envelope_id ? (aliases.get(spend.envelope_id) ?? spend.envelope_id) : null;
+    const pinnedTarget = pinned ? byId.get(pinned) : undefined;
     let target =
-      (pinned && byId.get(pinned)) ||
+      // Cash spends are expenses: one pinned to a fixed-income envelope (the
+      // salary sits in RiseUp's fixed group) belongs in the fixed expenses.
+      (pinnedTarget && pinnedTarget.type !== 'fixedIncome' ? pinnedTarget : undefined) ||
       // There is one fixed card a month, so a spend filed as fixed belongs in it.
       (spend.envelope_type === 'fixed' ? pickById(byId, fixedId) : undefined) ||
       pickById(byId, resolveEnvelopeForCategory(refs, spend.category)?.envelopeId);

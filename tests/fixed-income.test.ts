@@ -245,3 +245,35 @@ describe('fixed income not paid yet this month (V2-19)', () => {
     expect(envelopes.some((e) => e.type === 'fixedIncome')).toBe(false);
   });
 });
+
+describe('a cash spend pinned to the salary envelope (check after V2-19)', () => {
+  // The bot used to pick "the first fixed envelope" for a fixed spend, which
+  // could be the salary one. The spend must still count as a fixed expense.
+  const cash = {
+    id: 'cash-1', member_id: 'm1', amount_ils: 200, category: 'ביטוח', note: null, spent_at: '2026-10-10',
+    status: 'confirmed', confidence: 'high', input_kind: 'text', raw_input: null, transcript: null,
+    telegram_update_id: null, telegram_chat_id: null, telegram_message_id: null, bot_message_id: null,
+    envelope_id: fixed(OCT, SALARY_KEY), envelope_type: 'fixed', wallet_id: null, created_at: '2026-10-10T10:00:00Z',
+  } as const;
+  const result = assembleMonth({
+    month: OCT, envelopeRows: rowsFor(OCT), actualRows: octActuals, spends: [cash as never], topups: [], plans: [],
+    skippedPlanIds: new Set(), memberNames: new Map(),
+  });
+
+  it('lands in the fixed expenses card, not in fixed income', () => {
+    const income = result.envelopes.find((e) => e.type === 'fixedIncome')!;
+    const expenses = result.envelopes.find((e) => e.type === 'fixed')!;
+    expect(income.actual).toBe(7635);
+    expect(expenses.actuals.some((a) => a.cash?.id === 'cash-1')).toBe(true);
+  });
+});
+
+describe('a refund alone does not make a fixed envelope income (check after V2-19)', () => {
+  it('stays a fixed expense when the only charge is a small refund', () => {
+    const refund = [...octActuals, actual(fixed(OCT, 'phone-1'), 'refund', 20, 'תשלומים', 'פרטנר', '2026-10-04', true)]
+      .filter((a) => a.transaction_id !== 'phone');
+    const result = month(OCT, refund);
+    const income = result.envelopes.find((e) => e.type === 'fixedIncome')!;
+    expect(income.actual).toBe(7635);
+  });
+});

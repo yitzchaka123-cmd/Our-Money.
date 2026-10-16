@@ -84,7 +84,11 @@ export function botEnvelopes(refs: EnvelopeRef[], overrides: TrackerOverride[], 
   trackers.sort((a, b) => a.name.localeCompare(b.name, 'he'));
 
   const variable = choices.find((c) => c.type === 'variable');
-  const fixed = choices.find((c) => c.type === 'fixed');
+  // RiseUp's fixed group also holds fixed income (the salary); file into one
+  // that has held expenses — income labels are never collected for it.
+  const fixed =
+    choices.find((c) => c.type === 'fixed' && (c.categoryLabels?.length ?? 0) > 0) ??
+    choices.find((c) => c.type === 'fixed');
   return [
     ...trackers,
     { name: VARIABLE_NAME, type: 'variable', envelopeId: variable?.envelopeId ?? null, key: null, hint: VARIABLE_HINT },

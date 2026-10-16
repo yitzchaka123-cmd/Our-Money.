@@ -75,3 +75,17 @@ describe('V4-4: the bot reply and its buttons', () => {
     expect(decodeCallback(`aw:${ID.replace(/-/g, '')}:1`)).toBeNull();
   });
 });
+
+describe('envelope picker guards its index with the name (check after V4-4)', () => {
+  it('encodes and decodes a name tag, and the tag tells names apart', async () => {
+    const { categoryKeyboard, decodeCallback, nameTag } = await import('@/lib/telegram/format');
+    const id = '0f8fad5b-d9cb-469f-a165-70867728950e';
+    const rows = categoryKeyboard(id, ['סופר', 'אוכל בחוץ']);
+    const data = rows[0]![0]!.callback_data!;
+    expect(Buffer.byteLength(data)).toBeLessThanOrEqual(64);
+    expect(decodeCallback(data)).toMatchObject({ kind: 'set_category', categoryIndex: 0, tag: nameTag('סופר') });
+    expect(nameTag('סופר')).not.toBe(nameTag('אוכל בחוץ'));
+    // Old buttons without a tag still decode.
+    expect(decodeCallback(data.split(':').slice(0, 3).join(':'))).toMatchObject({ kind: 'set_category', categoryIndex: 0 });
+  });
+});

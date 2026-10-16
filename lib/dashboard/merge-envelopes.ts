@@ -68,7 +68,13 @@ export function mergeRiseupEnvelopes(
 export function isFixedIncome(envelope: NormalizedEnvelope, names?: NameBook | null): boolean {
   if (envelope.type !== 'fixed') return false;
   const riseup = envelope.actuals.filter((a) => !a.cash);
-  if (riseup.length > 0) return riseup.every((a) => a.isIncome);
+  if (riseup.length > 0) {
+    if (!riseup.every((a) => a.isIncome)) return false;
+    // A lone refund in an expense (a small credit) is not income: the money
+    // that came in must be a real part of what the envelope plans.
+    const cameIn = riseup.reduce((sum, a) => sum + a.amountIls, 0);
+    return envelope.plannedIls <= 0 || cameIn >= envelope.plannedIls / 2;
+  }
   const key = envelopeKey(envelope.envelopeId);
   return Boolean(key && names?.fixed.get(key)?.income);
 }

@@ -59,8 +59,8 @@ export function composeNudge(input: NudgeInput): NudgeMessage[] {
     if (input.reviewCount > 0 && anyoneToRemind) {
       lines.push(
         input.reviewCount === 1
-          ? 'יש רישום אחד שמחכה לאישור — /daily או בדאשבורד.'
-          : `יש ${input.reviewCount} רישומים שמחכים לאישור — /daily או בדאשבורד.`,
+          ? 'יש רישום אחד שמחכה לאישור — בדאשבורד, בסיכום היומי.'
+          : `יש ${input.reviewCount} רישומים שמחכים לאישור — בדאשבורד, בסיכום היומי.`,
       );
     }
     return lines;
