@@ -44,7 +44,14 @@ Helper branches are `worktree-agent-*`; check `git log` on each for per-item com
 - [x] Item lists written and pushed: 2026-10-15-video2.md, -video3.md, -video4.md (7d321c5); master checklist updated
 - [x] V2-11 tracker names saved in money.tracker_overrides (user asked at 3:06)
 - [x] Helpers started (5): N numbers/forecast/fixed income (0008), W wallets (0009), T Telegram & settings (0010), U drawer/sync line/notes/session (0011), B brief/insights/tips (0012)
-- [~] Merge each helper, apply its migration, push — N merged 1973566 (no migration), pushed
+- [~] Merge each helper, apply its migration, push — N merged 1973566 (no migration), pushed; U merged a4e7e12, 0011 applied, pushed, deploy READY
 - [ ] Full run (typecheck, lint, unit, integration, build)
 - [ ] Independent check of every item
 - [ ] Deploy live, statuses, answer A–F
+
+### Stop (videos 2–4)
+- 2026-10-15 ~21:00 UTC: helpers W, T and B stopped on the usage limit (reset 22:50 UTC). Checked 2026-10-16 03:20 UTC:
+  W has V2-04, V2-06, V2-07, V4-07, V2-12 (0009), V2-13 committed + uncommitted work on V4-08;
+  T has V3-3, V4-2, V3-2/V2-10, V4-4, V4-3/V3-1 committed + uncommitted format.ts, V2-6b left;
+  B has V2-09, V2-17 committed + uncommitted tips work (V4-10).
+  Each resumed in its own worktree from its last step with its remaining items; nothing redone.
