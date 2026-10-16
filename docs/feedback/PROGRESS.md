@@ -44,8 +44,8 @@ Helper branches are `worktree-agent-*`; check `git log` on each for per-item com
 - [x] Item lists written and pushed: 2026-10-15-video2.md, -video3.md, -video4.md (7d321c5); master checklist updated
 - [x] V2-11 tracker names saved in money.tracker_overrides (user asked at 3:06)
 - [x] Helpers started (5): N numbers/forecast/fixed income (0008), W wallets (0009), T Telegram & settings (0010), U drawer/sync line/notes/session (0011), B brief/insights/tips (0012)
-- [~] Merge each helper, apply its migration, push — N merged 1973566 (no migration), pushed; U merged a4e7e12, 0011 applied, pushed, deploy READY
-- [ ] Full run (typecheck, lint, unit, integration, build)
+- [x] Merge each helper, apply its migration, push — W merged (0009), B merged (0012), T merged (0010), all applied, deploy READY; N merged 1973566 (no migration), pushed; U merged a4e7e12, 0011 applied, pushed, deploy READY
+- [x] Full run on the final merge: typecheck clean, 612 unit, 146 integration, build passes; lint cannot run (Next 16 has no `next lint`, no eslint in the repo)
 - [ ] Independent check of every item
 - [ ] Deploy live, statuses, answer A–F
 
