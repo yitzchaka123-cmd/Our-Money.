@@ -13,6 +13,7 @@ import {
 import { CashEntrySheet, emptyDraft, type CashEntryDraft } from '@/app/dashboard/components/CashEntrySheet';
 import { AddTrackerButton, AddTrackerSheet } from '@/app/dashboard/components/AddTrackerSheet';
 import { EnvelopeCard } from '@/app/dashboard/components/EnvelopeCard';
+import { IncomeKindSheet } from '@/app/dashboard/components/IncomeKind';
 import { EnvelopeMenu, type EnvelopeMenuAction } from '@/app/dashboard/components/EnvelopeMenu';
 import { BulkMoveSheet, HistorySheet, PlansListSheet } from '@/app/dashboard/components/EnvelopeSheets';
 import { newPlanDraft, PlanSheet, planToDraft, type PlanDraft } from '@/app/dashboard/components/PlanSheet';
@@ -20,7 +21,8 @@ import { RiseupNoteSheet } from '@/app/dashboard/components/RiseupNoteSheet';
 import { TrackerSheets, type TrackerSheetKind } from '@/app/dashboard/components/TrackerSheets';
 import { TransferSheet } from '@/app/dashboard/components/TransferSheet';
 import { TransactionSheet, type OpenTransaction } from '@/app/dashboard/components/TransactionSheet';
-import { WalletCard } from '@/app/dashboard/components/WalletCard';
+import { WalletSection } from '@/app/dashboard/components/WalletSection';
+import { WalletMovementOverlays } from '@/app/dashboard/components/WalletMovementSheet';
 import { WalletsSheet, type WalletsSheetFocus } from '@/app/dashboard/components/WalletsSheet';
 import { deleteCashEntry, markCashSpendAsSavings, type CashKind } from '@/lib/cash/actions';
 import type { EnvelopeRef } from '@/lib/cash/envelopes';
@@ -28,6 +30,7 @@ import { settlePlan } from '@/lib/cash/plan-actions';
 import type { CashPlan } from '@/lib/cash/plans';
 import type { EnvelopeView, PendingPlanView, WalletMovement, WalletView } from '@/lib/dashboard/data';
 import { actualDraft, movementDraft } from '@/lib/dashboard/entry-drafts';
+import { movementTransaction } from '@/lib/dashboard/movement-transaction';
 import { summarySlot } from '@/lib/dashboard/summary-slot';
 import { addTrackerSlot } from '@/lib/dashboard/trackers';
 import type { NormalizedActual } from '@/lib/riseup/envelopes';
@@ -72,6 +75,8 @@ export function EnvelopeList({
   const [draft, setDraft] = useState<CashEntryDraft | null>(null);
   const [walletsFocus, setWalletsFocus] = useState<WalletsSheetFocus | null>(null);
   const [transfer, setTransfer] = useState<WalletMovement | null>(null);
+  const [incomeKindFor, setIncomeKindFor] = useState<NormalizedActual | null>(null);
+  const [movement, setMovement] = useState<{ movement: WalletMovement; action: CashAction | null } | null>(null);
   const [planDraft, setPlanDraft] = useState<PlanDraft | null>(null);
   const [menuFor, setMenuFor] = useState<EnvelopeView | null>(null);
   const [historyFor, setHistoryFor] = useState<EnvelopeView | null>(null);
@@ -133,17 +138,19 @@ export function EnvelopeList({
     setOpenTxn(null);
   };
 
+  // A wallet row opens the transaction sheet, like a row in an envelope: a
+  // spend or income its envelope row's sheet, a withdrawal or money added the
+  // same kind of sheet for it (V4-07).
   const openMovement = (m: WalletMovement) => {
     if (m.kind === 'transfer') {
       setTransfer(m);
       return;
     }
-    if (m.kind === 'adjustment') {
-      setWalletsFocus({ walletId: m.walletId ?? undefined });
-      return;
-    }
-    setDraft(movementDraft(m, sessionMemberId));
+    const txn = movementTransaction(envelopes, m);
+    if (txn) setOpenTxn(txn);
+    else setMovement({ movement: m, action: null });
   };
+  const closeMovement = () => setMovement(null);
 
   const current = openTxn?.actual ?? null;
   const currentKind = current?.cash?.kind ?? 'spend';
@@ -155,25 +162,16 @@ export function EnvelopeList({
 
   return (
     <>
-      <WalletCard
+      <WalletSection
         wallet={wallet}
         onOpenMovement={openMovement}
         onManage={() => setWalletsFocus({})}
         onAddWithdrawal={() => openNew('withdrawal')}
+        onAddSpend={() => openNew('spend')}
         onAddMoney={() => setWalletsFocus({ walletId: wallet.wallets.find((w) => w.isDefault)?.id ?? wallet.wallets[0]?.id, panel: 'add' })}
         onOpenWallet={(walletId) => setWalletsFocus({ walletId })}
+        onTransfer={() => setWalletsFocus({ tab: 'transfer' })}
       />
-
-      <div className="add-row-pair">
-        <button className="add-row" type="button" onClick={() => openNew('spend')}>
-          <span className="add-plus" aria-hidden="true">+</span>
-          <span>הוספת הוצאה במזומן</span>
-        </button>
-        <button className="add-row" type="button" onClick={() => openNew('income')}>
-          <span className="add-plus add-plus--income" aria-hidden="true">+</span>
-          <span>הוספת הכנסה במזומן</span>
-        </button>
-      </div>
 
       {envelopes.map((envelope) => (
         <div key={envelope.key}>
@@ -237,7 +235,16 @@ export function EnvelopeList({
           closeAll();
           start(async () => { await deleteCashEntry(id, kind); });
         }}
+        onIncomeKind={() => {
+          if (!current?.cash) return;
+          const income = current;
+          closeAll();
+          setIncomeKindFor(income);
+        }}
       />
+      {incomeKindFor ? (
+        <IncomeKindSheet actual={incomeKindFor} choices={wallet.incomeCategories} onClose={() => setIncomeKindFor(null)} />
+      ) : null}
 
       {current?.cash && action === 'note' ? <NoteSheet actual={current} kind={currentKind} onClose={closeAll} /> : null}
       {current && !current.cash && action === 'note' ? <RiseupNoteSheet actual={current} month={month} onClose={closeAll} /> : null}
@@ -254,14 +261,35 @@ export function EnvelopeList({
       {current?.cash && action === 'month' ? <MoveMonthSheet actual={current} kind={currentKind} months={months} onClose={closeAll} /> : null}
 
       {draft ? (
-        <CashEntrySheet open draft={draft} envelopes={envelopeChoices} members={members} wallets={wallet.wallets} onClose={() => setDraft(null)} />
+        <CashEntrySheet open draft={draft} envelopes={envelopeChoices} members={members} wallets={wallet.wallets} incomeCategories={wallet.incomeCategories} onClose={() => setDraft(null)} />
       ) : null}
 
       {walletsFocus ? (
-        <WalletsSheet wallets={wallet.wallets} members={members} movements={wallet.movements} focus={walletsFocus} onClose={() => setWalletsFocus(null)} />
+        <WalletsSheet wallets={wallet.wallets} members={members} movements={wallet.movements} focus={walletsFocus} incomeCategories={wallet.incomeCategories} onClose={() => setWalletsFocus(null)} />
       ) : null}
 
       {transfer ? <TransferSheet transfer={transfer} wallets={wallet.wallets} onClose={() => setTransfer(null)} /> : null}
+      {movement ? (
+        <WalletMovementOverlays
+          open={movement}
+          months={months}
+          onAction={(action) => setMovement({ ...movement, action })}
+          onEdit={() => {
+            closeMovement();
+            setDraft(movementDraft(movement.movement, sessionMemberId));
+          }}
+          onDelete={() => {
+            const { id } = movement.movement;
+            closeMovement();
+            start(async () => { await deleteCashEntry(id, 'withdrawal'); });
+          }}
+          onOpenWallet={() => {
+            closeMovement();
+            setWalletsFocus({ walletId: movement.movement.walletId ?? undefined, panel: 'set' });
+          }}
+          onClose={closeMovement}
+        />
+      ) : null}
 
       {menuFor ? (
         <EnvelopeMenu envelope={menuFor} onPick={(pick) => onMenuPick(menuFor, pick)} onClose={() => setMenuFor(null)} />

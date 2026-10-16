@@ -34,6 +34,8 @@ export interface NormalizedActual {
     inputKind: 'text' | 'voice' | 'web';
     status: 'confirmed' | 'needs_review';
     walletId: string | null;
+    /** Cash income: RiseUp's "איזו הכנסה זו?" (lib/cash/income-kinds.ts). */
+    incomeKind?: 'variable' | 'fixed' | 'non_cashflow';
   };
 }
 

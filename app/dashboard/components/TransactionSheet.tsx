@@ -45,6 +45,7 @@ export function TransactionSheet({
   onEditCash,
   onSavings,
   onDeleteCash,
+  onIncomeKind,
 }: {
   open: boolean;
   onClose: () => void;
@@ -54,6 +55,8 @@ export function TransactionSheet({
   onEditCash: () => void;
   onSavings: () => void;
   onDeleteCash: () => void;
+  /** Cash income: RiseUp's "איזו הכנסה זו?" (IncomeKind.tsx). */
+  onIncomeKind?: () => void;
 }) {
   if (!transaction) return null;
 
@@ -88,6 +91,7 @@ export function TransactionSheet({
           isIncome ? (
             <>
               <ActionRow icon={<Note />} label="להוסיף הערה" onClick={() => onCashAction('note')} />
+              {onIncomeKind ? <ActionRow icon={<Coins />} label="איזו הכנסה זו?" onClick={onIncomeKind} /> : null}
               <ActionRow icon={<Scissors />} label="לפצל את ההכנסה" onClick={() => onCashAction('split')} />
               <ActionRow icon={<Calendar />} label="להזיז את העסקה לחודש אחר" onClick={() => onCashAction('month')} />
               <ActionRow icon={<Tag />} label="לערוך — סכום, מקור, תאריך, ארנק" onClick={onEditCash} />

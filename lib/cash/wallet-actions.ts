@@ -3,6 +3,9 @@
 import { revalidatePath } from 'next/cache';
 
 import { SESSION_EXPIRED_MESSAGE, sessionMember } from '@/lib/auth/member';
+import { applyIncomeKind } from '@/lib/cash/income-kind-store';
+import { isIncomeKind, type IncomeKind } from '@/lib/cash/income-kinds';
+import { assignWithdrawal } from '@/lib/cash/withdrawal-wallet';
 import { db } from '@/lib/db/client';
 import { isoDateInIsrael } from '@/lib/dates';
 import { walletBalances } from '@/lib/reconcile';
@@ -30,6 +33,9 @@ export interface AddMoneyInput {
   from: MoneySource;
   note: string | null;
   date: string;
+  /** Income only: "איזו הכנסה זו?" — its kind and category. */
+  incomeKind?: IncomeKind | null;
+  category?: string | null;
 }
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -129,11 +135,17 @@ export async function addMoneyToWallet(input: AddMoneyInput): Promise<WalletActi
   if (!wallet) return { ok: false, error: 'הארנק לא נמצא.' };
 
   const note = input.note?.trim() || null;
+  const incomeKind = input.from === 'income' && isIncomeKind(input.incomeKind) ? input.incomeKind : null;
   const row =
     input.from === 'withdrawal'
       ? { source: 'manual', category: 'משיכה', note }
       : input.from === 'income'
-        ? { source: 'cash_income', category: note ?? 'הכנסה במזומן', note }
+        ? {
+            source: 'cash_income',
+            category: input.category?.trim() || note || 'הכנסה במזומן',
+            note,
+            ...(incomeKind ? { income_kind: incomeKind } : {}),
+          }
         : { source: 'adjustment', category: null, note: note ?? 'הוספת כסף לארנק' };
 
   const { data, error } = await supabase
@@ -149,8 +161,47 @@ export async function addMoneyToWallet(input: AddMoneyInput): Promise<WalletActi
     .select('id')
     .single();
   if (error) return dbFail(error);
+  if (incomeKind) await applyIncomeKind(data.id as string, null);
   refreshPages();
   return { ok: true, id: data.id as string };
+}
+
+/**
+ * "עדכון כמה צפוי להיכנס": the couple's own figure for how much cash comes
+ * into the wallets this month, in place of the app's guess. Null goes back to
+ * the guess. Kept on our side only.
+ */
+export async function setCashInflowOverride(month: string, amountIls: number | null): Promise<WalletActionResult> {
+  const memberId = await sessionMember();
+  if (!memberId) return { ok: false, error: SESSION_EXPIRED_MESSAGE };
+  if (!/^\d{4}-\d{2}$/.test(month)) return { ok: false, error: 'חודש לא תקין.' };
+
+  const supabase = db();
+  if (amountIls === null) {
+    const { error } = await supabase.from('cash_inflow_overrides').delete().eq('month', month);
+    if (error) return dbFail(error);
+  } else {
+    if (!Number.isFinite(amountIls) || amountIls < 0) return { ok: false, error: 'צריך סכום של אפס או יותר.' };
+    const { error } = await supabase
+      .from('cash_inflow_overrides')
+      .upsert({ month, amount_ils: round(amountIls), member_id: memberId, updated_at: new Date().toISOString() }, { onConflict: 'month' });
+    if (error) return dbFail(error);
+  }
+  refreshPages();
+  return { ok: true, id: month };
+}
+
+/**
+ * File an ATM withdrawal into a wallet, from the web. The bot uses
+ * `assignWithdrawal` (lib/cash/withdrawal-wallet.ts) directly, since it has no
+ * session cookie and checks the Telegram user itself.
+ */
+export async function assignWithdrawalToWallet(topupId: string, walletId: string): Promise<WalletActionResult> {
+  if (!(await sessionMember())) return { ok: false, error: SESSION_EXPIRED_MESSAGE };
+  const result = await assignWithdrawal(topupId, walletId);
+  if (!result.ok) return result;
+  refreshPages();
+  return { ok: true, id: result.id };
 }
 
 /**

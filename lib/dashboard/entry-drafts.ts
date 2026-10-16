@@ -33,6 +33,7 @@ export function actualDraft(
     envelopeId: actual.cash.kind === 'spend' ? envelopeId : null,
     memberId: keepMember(actual.cash.memberId, sessionMemberId),
     walletId: actual.cash.walletId,
+    ...(actual.cash.incomeKind ? { incomeKind: actual.cash.incomeKind } : {}),
   };
 }
 
@@ -52,6 +53,7 @@ export function briefDraft(target: BriefItem, sessionMemberId: string | null): C
     envelopeId: kind === 'spend' ? target.envelopeId : null,
     memberId: keepMember(target.memberId, sessionMemberId),
     walletId: target.actual.cash?.walletId ?? null,
+    ...(target.actual.cash?.incomeKind ? { incomeKind: target.actual.cash.incomeKind } : {}),
   };
 }
 
@@ -68,5 +70,6 @@ export function movementDraft(m: WalletMovement, sessionMemberId: string | null)
     envelopeId: null,
     memberId: keepMember(m.memberId, sessionMemberId),
     walletId: m.walletId,
+    ...(m.incomeKind ? { incomeKind: m.incomeKind } : {}),
   };
 }

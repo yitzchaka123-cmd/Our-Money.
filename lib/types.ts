@@ -52,6 +52,8 @@ export interface CashTopup {
   input_kind: InputKind | null;
   /** Which wallet the cash went into; null counts toward the default wallet. */
   wallet_id: string | null;
+  /** Cash income: RiseUp's kind (lib/cash/income-kinds.ts); null means variable. */
+  income_kind?: 'variable' | 'fixed' | 'non_cashflow' | null;
   /** The expected-cash plan this income settles, if any. */
   plan_id?: string | null;
   created_at?: string;

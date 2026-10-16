@@ -596,3 +596,243 @@
     animation: none;
   }
 }
+
+/* --- wallet card (videos 2 and 4) --------------------------------------- */
+/* Money in green, money out red, an ATM withdrawal purple. */
+.add-plus--spend {
+  background: var(--alert);
+  font-size: 24px;
+}
+
+.add-plus--withdrawal {
+  background: var(--primary);
+}
+
+/* Wallets as tiles, two to a row. */
+.wallet-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 2px 0 16px;
+}
+
+.wallet-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px 14px 14px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-row);
+  background: var(--surface-sunken);
+  color: var(--ink);
+  text-align: start;
+  font: inherit;
+  cursor: pointer;
+}
+
+.wallet-tile:active {
+  background: #f1f1f1;
+}
+
+.wallet-tile-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.wallet-tile-name {
+  font-size: 15px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.wallet-tile-balance {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--income);
+  line-height: 1.15;
+}
+
+.wallet-tile-balance.is-negative {
+  color: var(--alert);
+}
+
+.wallet-tile-owner {
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+/* "צפוי להיכנס החודש": RiseUp's income line, for cash. */
+.wallet-inflow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  margin-top: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-row);
+  background: var(--surface);
+  color: var(--ink);
+  text-align: start;
+  font: inherit;
+  cursor: pointer;
+}
+
+.wallet-inflow-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.wallet-inflow-label {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.wallet-inflow-figure {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--income);
+}
+
+.wallet-inflow-bar {
+  display: block;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--income-track);
+  overflow: hidden;
+}
+
+.wallet-inflow-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--income);
+}
+
+.wallet-inflow-note {
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+/* "חודשים קודמים" for cash: in and out side by side per month. */
+.cash-bars {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 0 2px;
+}
+
+.cash-bars-month {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.cash-bars-pair {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 3px;
+  width: 100%;
+  min-height: 150px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.cash-bars-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+
+.cash-bars-value {
+  font-size: 10px;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.cash-bars-bar {
+  display: block;
+  width: 14px;
+  border-radius: 7px 7px 0 0;
+}
+
+.cash-bars-bar.is-in,
+.cash-bars-legend .is-in {
+  background: var(--income);
+}
+
+.cash-bars-bar.is-out,
+.cash-bars-legend .is-out {
+  background: var(--alert);
+}
+
+.cash-bars-label {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.cash-bars-month[data-current='true'] .cash-bars-label {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.cash-bars-legend {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.cash-bars-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cash-bars-legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+/* "איזו הכנסה זו?" — RiseUp's dark green kind icons. */
+.income-kind-icon {
+  background: #0d6b3a;
+  color: #ffffff;
+}
+
+.income-kind-icon[data-kind='non_cashflow'] {
+  background: #6b6b6b;
+}
+
+.income-kind-list {
+  margin-bottom: 8px;
+}
+
+.income-kind-hint {
+  margin: 0 4px 16px;
+}
+
+.inflow-explain {
+  margin: 0 0 14px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}

@@ -4,6 +4,8 @@ import { useState } from 'react';
 
 import { Amount } from '@/app/dashboard/components/Amount';
 import { ChevronDown, Kebab } from '@/app/dashboard/components/icons';
+import { WalletInflowLine } from '@/app/dashboard/components/WalletInflow';
+import { WalletTiles } from '@/app/dashboard/components/WalletTiles';
 import type { WalletMovement, WalletView } from '@/lib/dashboard/data';
 import { shortDate } from '@/app/dashboard/components/EnvelopeCard';
 
@@ -18,12 +20,21 @@ export function WalletCard({
   onManage,
   onAddWithdrawal,
   onAddMoney,
+  onAddSpend,
+  onEditInflow,
+  onMenu,
   onOpenWallet,
 }: {
   wallet: WalletView;
   onOpenMovement?: (movement: WalletMovement) => void;
   onManage?: () => void;
   onAddWithdrawal?: () => void;
+  /** A cash expense: the cash entry sheet. */
+  onAddSpend?: () => void;
+  /** "עדכון כמה צפוי להיכנס". */
+  onEditInflow?: () => void;
+  /** The ⋮: the wallet menu. Without it the ⋮ opens wallet management. */
+  onMenu?: () => void;
   /** Add money to a wallet, or set how much is in it — the wallet's own settings. */
   onAddMoney?: () => void;
   onOpenWallet?: (walletId: string) => void;
@@ -36,31 +47,25 @@ export function WalletCard({
       <div className="card-body">
         <div className="card-head">
           <h2 className="card-title">{several ? 'ארנקי מזומן' : 'ארנק מזומן'}</h2>
-          <span onClick={onManage} role="presentation">
-            <Kebab label="ניהול ארנקים" />
-          </span>
+          {onMenu ? (
+            <Kebab label="תפריט הארנק" onClick={onMenu} />
+          ) : (
+            <span onClick={onManage} role="presentation">
+              <Kebab label="ניהול ארנקים" />
+            </span>
+          )}
         </div>
         <p className="figure-label">{several ? 'סה״כ במזומן' : 'בארנק עכשיו'}</p>
         <Amount value={wallet.balance} className={wallet.balance < 0 ? 'account-figure is-negative' : 'account-figure'} />
 
-        {several ? (
-          <ul className="wallet-list">
-            {wallet.wallets.map((w) => (
-              <li key={w.id}>
-                <button type="button" className="wallet-list-open" onClick={() => onOpenWallet?.(w.id)} aria-label={`הגדרות ${w.name}`}>
-                  <span className="wallet-list-name">{w.name}</span>
-                  <Amount value={w.balance} className={w.balance < 0 ? 'wallet-list-balance is-negative' : 'wallet-list-balance'} />
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : null}
+        {several ? <WalletTiles wallets={wallet.wallets} onOpen={onOpenWallet} /> : null}
 
         <div className="wallet-flows">
           <div><p className="figure-label">נמשך החודש</p><Amount value={wallet.withdrawn} className="figure-expected" /></div>
           <div><p className="figure-label">נכנס במזומן</p><Amount value={wallet.income} className="figure-expected" /></div>
           <div><p className="figure-label">יצא במזומן</p><Amount value={wallet.spent} className="figure-expected" /></div>
         </div>
+        {wallet.inflow ? <WalletInflowLine inflow={wallet.inflow} onEdit={onEditInflow} /> : null}
         {wallet.balance < 0 ? (
           <p className="wallet-warning">נרשמו יותר הוצאות ממה שנכנס — כנראה חסרה משיכה או הכנסה במזומן.</p>
         ) : null}
@@ -92,6 +97,7 @@ export function WalletCard({
                 {m.label}
                 {m.memberName ? ` · ${m.memberName}` : ''}
                 {m.kind === 'withdrawal' ? ' · משיכה' : ''}
+                {m.incomeKind === 'non_cashflow' ? ' · לא תזרימית' : m.incomeKind === 'fixed' ? ' · הכנסה קבועה' : ''}
                 {m.kind === 'adjustment' && m.label !== 'עדכון יתרה' ? ' · עדכון יתרה' : ''}
                 {several && m.walletName && m.kind !== 'transfer' ? ` · ${m.walletName}` : ''}
               </span>
@@ -100,15 +106,23 @@ export function WalletCard({
         </div>
       ) : null}
 
+      {/* Money in is green, money out red, an ATM withdrawal purple. Cash
+          income is one of the sources under "הוספת כסף לארנק". */}
       {onAddMoney ? (
         <button className="add-row add-row--inline" type="button" onClick={onAddMoney}>
           <span className="add-plus add-plus--income" aria-hidden="true">+</span>
           <span>הוספת כסף לארנק</span>
         </button>
       ) : null}
+      {onAddSpend ? (
+        <button className="add-row add-row--inline" type="button" onClick={onAddSpend}>
+          <span className="add-plus add-plus--spend" aria-hidden="true">−</span>
+          <span>הוספת הוצאה במזומן</span>
+        </button>
+      ) : null}
       {onAddWithdrawal ? (
         <button className="add-row add-row--inline" type="button" onClick={onAddWithdrawal}>
-          <span className="add-plus" aria-hidden="true">+</span>
+          <span className="add-plus add-plus--withdrawal" aria-hidden="true">+</span>
           <span>רישום משיכה מהכספומט</span>
         </button>
       ) : null}
