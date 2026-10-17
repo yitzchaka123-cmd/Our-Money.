@@ -17,6 +17,7 @@ import {
   toDateOnly,
   WITHDRAWAL_MATCH_WINDOW_DAYS,
 } from '@/lib/riseup/withdrawals';
+import { askAboutNewBusinesses } from '@/lib/telegram/business-question';
 import { askWhichWallet } from '@/lib/telegram/withdrawal-question';
 import type { CashTopup, RiseupBudget, RiseupTransaction } from '@/lib/types';
 
@@ -113,6 +114,8 @@ export async function syncRiseup(monthsBack = 2): Promise<SyncResult> {
     // Telegram: "which wallet did this withdrawal go into?", once per withdrawal.
     // Never lets a Telegram hiccup fail the sync.
     await askWhichWallet().catch((askError) => console.error('Could not ask about new withdrawals', askError));
+    // "מה קניתם כאן?" — once per charge at a business never seen before (C26).
+    await askAboutNewBusinesses().catch((askError) => console.error('Could not ask about new businesses', askError));
 
     await finish({
       status: 'succeeded',

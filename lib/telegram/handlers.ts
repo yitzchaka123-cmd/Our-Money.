@@ -80,6 +80,7 @@ import type { CashSpend, HouseholdMember } from '@/lib/types';
 import { confirmModeOf } from '@/lib/telegram/settings';
 import { memberName } from '@/lib/profile/names';
 import { photoMeantForBot, readReceiptMessage, receiptFileOf, type ReceiptFile } from '@/lib/telegram/photo';
+import { answerBusinessQuestion } from '@/lib/telegram/business-question';
 
 const HELP = [
   '<b>Our Money</b> — יומן המזומן שלנו 💸',
@@ -151,6 +152,9 @@ export async function handleUpdate(update: TelegramUpdate): Promise<void> {
     if (isPrivate) await sendMessage(message.chat.id, notAuthorized(message.from.id));
     return;
   }
+
+  // "מה קניתם כאן?" (C26): a reply to that question is the answer, kept as a note.
+  if (message.reply_to_message?.from?.is_bot && (await answerBusinessQuestion(message, member))) return;
 
   // In the family group every message from the two of them is for the bot
   // (it stays quiet when there is no amount); in any other group, only what

@@ -31,6 +31,7 @@ const base: SettingsData = {
       { id: 'm2', name: 'שרה', isYou: false, nudge: 'daily', confirm: 'instant' },
     ],
     group: { connected: null, addToGroupUrl: 'https://t.me/our_money_bot?startgroup=family' },
+    features: { weekly_summary: true, ask_new_business: false },
   },
 };
 
@@ -42,7 +43,7 @@ const screens: Record<string, SettingsData> = {
   },
 };
 
-const css = ['app/globals.css', 'app/wallets-accounts.css', 'app/settings/telegram-settings.css']
+const css = ['app/globals.css', 'app/wallets-accounts.css', 'app/brief-insights.css', 'app/settings/telegram-settings.css']
   .map((f) => readFileSync(join(process.cwd(), f), 'utf8'))
   .join('\n');
 const out = process.argv[2] ?? '.shots';
