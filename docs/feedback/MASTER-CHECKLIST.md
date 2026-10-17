@@ -32,7 +32,7 @@ Re-read before every reply. Nothing is marked done without something to point to
 | C22 | Mark recordings of other projects "not this app" and don't build them | done (standing rule) | ledger status column |
 | C23 | Set your RiseUp custom category names (סופר, מגנטים, הקשיבה, יציאות וכיף…, בזבוזים, תרומה, תיירות, טרריומים) | done | answered in video 2 at 3:06 ("I think you can find it") → V2-11 |
 | C24 | Weekly summary in Telegram (like RiseUp's WhatsApp messages), with an on/off setting in our app | not done | chat 2026-10-17 |
-| C25 | Photo of a receipt in Telegram → the bot reads amount and business, you approve | not done | chat 2026-10-17 |
+| C25 | Photo of a receipt in Telegram → the bot reads amount and business, you approve | done | 68ca1a4, 6e98e87 (in the group only captioned photos or replies to the bot) |
 | C26 | "What did we buy here?" — the bot asks once about a new business name and keeps your answer as a note | not done | chat 2026-10-17 |
 | C27 | Shared monthly goal card | no — you said it would change RiseUp's system; our app only adds a cash layer on top | chat 2026-10-17 |
 | C28 | Quick-add buttons in the bot | no — not needed | chat 2026-10-17 |
