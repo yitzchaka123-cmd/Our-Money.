@@ -236,18 +236,71 @@ describe('C25: a photo of a receipt', () => {
     expect(inGroup[0]!.text).toContain('סופר');
 
     telegram.sent = [];
-    await handleUpdate(photoUpdate({}, 111, { id: GROUP, type: 'group' }));
+    await handleUpdate(photoUpdate({ caption: 'מזומן' }, 111, { id: GROUP, type: 'group' }));
     expect(sql('select count(*)::int as n from cash_spends')).toEqual([{ n: 2 }]);
     expect(telegram.sent.map((m) => m.chatId)).toEqual([GROUP]);
   });
 
-  it('in the family group, a photo that is not a receipt gets no reply', async () => {
+  it('in the family group, a captioned photo that is not a receipt gets no reply', async () => {
     run(`insert into app_settings (key, value) values ('telegram_group_chat_id', '${GROUP}')`);
     const { handleUpdate } = await import('@/lib/telegram/handlers');
     ai.output = receipt({ is_receipt: false, total_ils: null });
-    await handleUpdate(photoUpdate({}, 111, { id: GROUP, type: 'group' }));
+    await handleUpdate(photoUpdate({ caption: 'איזה יופי' }, 111, { id: GROUP, type: 'group' }));
+    expect(ai.calls).toHaveLength(1);
     expect(telegram.sent).toEqual([]);
     expect(sql('select id from cash_spends')).toEqual([]);
+  });
+
+  it('in the family group, a plain family photo never reaches the AI', async () => {
+    run(`insert into app_settings (key, value) values ('telegram_group_chat_id', '${GROUP}')`);
+    const { handleUpdate } = await import('@/lib/telegram/handlers');
+    ai.output = receipt();
+    await handleUpdate(photoUpdate({}, 111, { id: GROUP, type: 'group' }));
+    expect(telegram.downloads).toEqual([]);
+    expect(ai.calls).toEqual([]);
+    expect(telegram.sent).toEqual([]);
+    expect(sql('select id from cash_spends')).toEqual([]);
+  });
+
+  it('in the family group, a photo without a caption is read when it replies to the bot', async () => {
+    run(`insert into app_settings (key, value) values ('telegram_group_chat_id', '${GROUP}')`);
+    const { handleUpdate } = await import('@/lib/telegram/handlers');
+    ai.output = receipt();
+    await handleUpdate(
+      photoUpdate(
+        {
+          reply_to_message: {
+            message_id: 1,
+            date: 0,
+            chat: { id: GROUP, type: 'group' },
+            from: { id: 999000, is_bot: true, first_name: 'Our Money' },
+          },
+        },
+        111,
+        { id: GROUP, type: 'group' },
+      ),
+    );
+    expect(ai.calls).toHaveLength(1);
+    expect(sql('select amount_ils from cash_spends')).toEqual([{ amount_ils: 182.4 }]);
+  });
+
+  it('in the family group, a photo that mentions the bot is read', async () => {
+    run(`insert into app_settings (key, value) values ('telegram_group_chat_id', '${GROUP}')`);
+    const { handleUpdate } = await import('@/lib/telegram/handlers');
+    ai.output = receipt();
+    await handleUpdate(photoUpdate({ caption: '@our_money_test_bot' }, 111, { id: GROUP, type: 'group' }));
+    expect(ai.calls).toHaveLength(1);
+    // The mention itself is not context for the AI.
+    const text = ai.calls[0]!.messages[0]!.content.find((b) => b.type === 'text') as { text: string };
+    expect(text.text).not.toContain('@our_money_test_bot');
+    expect(sql('select count(*)::int as n from cash_spends')).toEqual([{ n: 1 }]);
+  });
+
+  it('in the private chat, every photo is read, caption or not', async () => {
+    const { handleUpdate } = await import('@/lib/telegram/handlers');
+    ai.output = receipt();
+    await handleUpdate(photoUpdate());
+    expect(ai.calls).toHaveLength(1);
   });
 
   it('/start mentions photos of receipts', async () => {

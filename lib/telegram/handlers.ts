@@ -79,7 +79,7 @@ import {
 import type { CashSpend, HouseholdMember } from '@/lib/types';
 import { confirmModeOf } from '@/lib/telegram/settings';
 import { memberName } from '@/lib/profile/names';
-import { readReceiptMessage, receiptFileOf, type ReceiptFile } from '@/lib/telegram/photo';
+import { photoMeantForBot, readReceiptMessage, receiptFileOf, type ReceiptFile } from '@/lib/telegram/photo';
 
 const HELP = [
   '<b>Our Money</b> — יומן המזומן שלנו 💸',
@@ -90,7 +90,7 @@ const HELP = [
   '• <i>"120 במכולת ועוד 30 על קפה"</i>',
   '• <i>"קיבלתי 200 שקל מסבתא"</i> — הכנסה במזומן',
   '',
-  '📸 אפשר גם לצלם קבלה ולשלוח לי — אקרא ממנה את הסכום ואת שם העסק, ואפשר להוסיף כיתוב כמו <i>"מזומן"</i>. שליחה כקובץ (לא כתמונה) נותנת טקסט חד יותר.',
+  '📸 אפשר גם לצלם קבלה ולשלוח לי — אקרא ממנה את הסכום ואת שם העסק, ואפשר להוסיף כיתוב כמו <i>"מזומן"</i> (בקבוצה המשפחתית אני קורא רק תמונה עם כיתוב). שליחה כקובץ (לא כתמונה) נותנת טקסט חד יותר.',
   '',
   '<b>פקודות</b>',
   '/balance — כמה מזומן אמור להיות בארנק, לפי ארנק',
@@ -164,7 +164,11 @@ export async function handleUpdate(update: TelegramUpdate): Promise<void> {
   if (text.startsWith('/')) return handleCommand(message, member, text);
 
   const receipt = receiptFileOf(message);
-  if (receipt) return handlePhoto(update, message, member, receipt, quiet);
+  if (receipt) {
+    // In a group, plain family photos are never read — only ones meant for the bot.
+    if (photoMeantForBot(message)) await handlePhoto(update, message, member, receipt, quiet);
+    return;
+  }
   if (message.voice || message.audio) return handleVoice(update, message, member, quiet);
   if (text) return handleText(update, message, member, text, quiet);
 }

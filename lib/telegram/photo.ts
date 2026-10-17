@@ -43,6 +43,17 @@ export function receiptFileOf(message: TelegramMessage): ReceiptFile | null {
   return null;
 }
 
+/**
+ * In a group, only a photo meant for the bot goes to the AI: one with a
+ * caption (which covers an @mention) or one that replies to the bot. Plain
+ * family photos are never read. In the private chat every photo is for the bot.
+ */
+export function photoMeantForBot(message: TelegramMessage): boolean {
+  if (message.chat.type === 'private') return true;
+  if (message.caption?.trim()) return true;
+  return message.reply_to_message?.from?.is_bot === true;
+}
+
 /** What raw_input keeps for a receipt: what was read and where the photo is — never the image. */
 export function receiptRawInput(fileId: string, business: string | null, caption: string | null): string {
   return ['[קבלה]', [business, caption?.slice(0, 100), `file:${fileId}`].filter(Boolean).join(' · ')].join(' ');

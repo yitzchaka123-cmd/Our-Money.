@@ -237,3 +237,25 @@ describe('C25: which messages carry a receipt image', () => {
     expect(receiptRawInput('AgACfile', null, null)).toBe('[קבלה] file:AgACfile');
   });
 });
+
+describe('C25: in the family group, only photos meant for the bot', () => {
+  const group = { id: -100, type: 'group' as const };
+  const photo = [{ file_id: 'f', file_unique_id: 'f', width: 10, height: 10 }];
+
+  it('reads every photo in the private chat', async () => {
+    const { photoMeantForBot } = await import('@/lib/telegram/photo');
+    expect(photoMeantForBot(photoMessage({ photo }))).toBe(true);
+  });
+
+  it('in a group, reads a photo with a caption or one that replies to the bot — never a plain family photo', async () => {
+    const { photoMeantForBot } = await import('@/lib/telegram/photo');
+    expect(photoMeantForBot(photoMessage({ chat: group, photo }))).toBe(false);
+    expect(photoMeantForBot(photoMessage({ chat: group, photo, caption: '   ' }))).toBe(false);
+    expect(photoMeantForBot(photoMessage({ chat: group, photo, caption: 'מזומן' }))).toBe(true);
+    expect(photoMeantForBot(photoMessage({ chat: group, photo, caption: '@our_money_bot' }))).toBe(true);
+    const toBot = photoMessage({ chat: group, from: { id: 9, is_bot: true } });
+    const toPerson = photoMessage({ chat: group, from: { id: 1, is_bot: false } });
+    expect(photoMeantForBot(photoMessage({ chat: group, photo, reply_to_message: toBot }))).toBe(true);
+    expect(photoMeantForBot(photoMessage({ chat: group, photo, reply_to_message: toPerson }))).toBe(false);
+  });
+});
