@@ -39,6 +39,21 @@ export async function sendMessage(
   });
 }
 
+/**
+ * A question whose answer is a reply: Telegram opens the reply box on it by
+ * itself (force_reply), and in a group the reply reaches the bot even with
+ * privacy mode on. A message carries one kind of markup, so no buttons.
+ */
+export async function sendForceReply(chatId: number, text: string, placeholder: string): Promise<TelegramMessage> {
+  return call<TelegramMessage>('sendMessage', {
+    chat_id: chatId,
+    text,
+    parse_mode: 'HTML',
+    link_preview_options: { is_disabled: true },
+    reply_markup: { force_reply: true, input_field_placeholder: placeholder.slice(0, 64) },
+  });
+}
+
 export async function editMessageText(
   chatId: number,
   messageId: number,
