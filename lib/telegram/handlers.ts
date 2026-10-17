@@ -4,7 +4,7 @@ import { loadPlan, settlePlanOccurrence, skipPlanOccurrence } from '@/lib/cash/p
 import { env } from '@/lib/env';
 import { loadBotEnvelopes } from '@/lib/intake/categories';
 import { envelopeOfSpend, fileExpense, sameEnvelopeIn, type BotEnvelope } from '@/lib/intake/envelopes';
-import { isoDateInIsrael, parseIntake } from '@/lib/intake/parse';
+import { isoDateInIsrael, parseIntake, type IntakeResult } from '@/lib/intake/parse';
 import {
   monthBounds,
   totalsByMember,
@@ -79,6 +79,7 @@ import {
 import type { CashSpend, HouseholdMember } from '@/lib/types';
 import { confirmModeOf } from '@/lib/telegram/settings';
 import { memberName } from '@/lib/profile/names';
+import { photoMeantForBot, readReceiptMessage, receiptFileOf, type ReceiptFile } from '@/lib/telegram/photo';
 
 const HELP = [
   '<b>Our Money</b> — יומן המזומן שלנו 💸',
@@ -88,6 +89,8 @@ const HELP = [
   '• <i>"שילמתי 45 על מונית אתמול"</i>',
   '• <i>"120 במכולת ועוד 30 על קפה"</i>',
   '• <i>"קיבלתי 200 שקל מסבתא"</i> — הכנסה במזומן',
+  '',
+  '📸 אפשר גם לצלם קבלה ולשלוח לי — אקרא ממנה את הסכום ואת שם העסק, ואפשר להוסיף כיתוב כמו <i>"מזומן"</i> (בקבוצה המשפחתית אני קורא רק תמונה עם כיתוב). שליחה כקובץ (לא כתמונה) נותנת טקסט חד יותר.',
   '',
   '<b>פקודות</b>',
   '/balance — כמה מזומן אמור להיות בארנק, לפי ארנק',
@@ -160,6 +163,12 @@ export async function handleUpdate(update: TelegramUpdate): Promise<void> {
   const text = (message.text ?? message.caption ?? '').trim();
   if (text.startsWith('/')) return handleCommand(message, member, text);
 
+  const receipt = receiptFileOf(message);
+  if (receipt) {
+    // In a group, plain family photos are never read — only ones meant for the bot.
+    if (photoMeantForBot(message)) await handlePhoto(update, message, member, receipt, quiet);
+    return;
+  }
   if (message.voice || message.audio) return handleVoice(update, message, member, quiet);
   if (text) return handleText(update, message, member, text, quiet);
 }
@@ -425,6 +434,28 @@ async function handleVoice(
   await logFromNaturalLanguage(update, message, member, transcript, 'voice', transcript, quiet);
 }
 
+/** C25: a photo of a receipt, read by the AI, then saved like any other spend. */
+async function handlePhoto(
+  update: TelegramUpdate,
+  message: TelegramMessage,
+  member: HouseholdMember,
+  file: ReceiptFile,
+  quiet = false,
+): Promise<void> {
+  if (await updateAlreadyProcessed(update.update_id)) return;
+  if (!quiet) await sendTyping(message.chat.id);
+  const outcome = await readReceiptMessage(message, file, {
+    speakerName: memberName(member),
+    wallets: (await listWallets()).map((w) => w.name),
+    botUsername: await botUsername(),
+  });
+  if (outcome.kind === 'reply') {
+    if (!quiet) await sendMessage(message.chat.id, outcome.text);
+    return;
+  }
+  await logFromNaturalLanguage(update, message, member, outcome.rawInput, 'text', null, quiet, outcome.parsed);
+}
+
 async function logFromNaturalLanguage(
   update: TelegramUpdate,
   message: TelegramMessage,
@@ -434,15 +465,17 @@ async function logFromNaturalLanguage(
   transcript: string | null,
   /** In the family group, chat that is not about money gets no reply. */
   quiet = false,
+  /** Already read (a receipt photo): skip the text parse. */
+  preParsed: IntakeResult | null = null,
 ): Promise<void> {
   const chatId = message.chat.id;
   const today = isoDateInIsrael();
 
   const wallets = await listWallets();
   const envelopes = await loadBotEnvelopes(today.slice(0, 7));
-  let parsed;
+  let parsed = preParsed;
   try {
-    parsed = await parseIntake(input, {
+    parsed ??= await parseIntake(input, {
       speakerName: memberName(member),
       wallets: wallets.map((w) => w.name),
       envelopes,
