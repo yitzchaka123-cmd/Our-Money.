@@ -22,8 +22,8 @@ import { buildNameBook, type NameBook } from '@/lib/riseup/tracker-names';
  *     actual 7,635 "העברת משכורת", category "משכורת", isIncome = true
  *
  * and the variable income envelope is planned 0, actual 0. Such an envelope
- * is income: its own card "הכנסות קבועות", added in the forecast, never in
- * the expenses.
+ * is income: its own envelope "הכנסות קבועות" (shown inside the one "הכנסות"
+ * card since C34), added in the forecast, never in the expenses.
  */
 const OCT = '2026-10';
 const NOV = '2026-11';
@@ -84,7 +84,7 @@ function month(m: string, actualRows: ActualRow[], names?: NameBook | null) {
 describe('a fixed envelope whose charges are income (V2-19)', () => {
   const { envelopes, riseupEnvelopes } = month(OCT, octActuals);
 
-  it('becomes its own income card, "הכנסות קבועות"', () => {
+  it('becomes its own income envelope, "הכנסות קבועות" (drawn inside the one "הכנסות" card — C34)', () => {
     const income = envelopes.filter((e) => e.type === 'fixedIncome');
     expect(income).toHaveLength(1);
     expect(income[0]).toMatchObject({ title: 'הכנסות קבועות', actual: 7635, expected: 7635 });

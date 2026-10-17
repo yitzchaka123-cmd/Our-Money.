@@ -73,10 +73,26 @@ export function ForecastSheet({
         </p>
 
         <ul className="forecast-lines">
-          <Line hue="income" label="הכנסות צפויות" value={b.incomeExpected} />
-          {b.fixedIncomeExpected !== 0 ? (
-            <Line hue="income" label="הכנסות קבועות" sub="כמו משכורת שסימנתם ברייזאפ כהכנסה קבועה" value={b.fixedIncomeExpected} />
-          ) : null}
+          {/* One income line, as the dashboard has one "הכנסות" card (C34): the
+              fixed income (a salary) and the variable income together. */}
+          <Line
+            hue="income"
+            label="הכנסות צפויות"
+            sub={
+              b.fixedIncomeExpected !== 0 ? (
+                <>
+                  <span className="forecast-nowrap">
+                    הכנסות קבועות <Amount value={b.fixedIncomeExpected} decimals={0} />
+                  </span>{' '}
+                  ·{' '}
+                  <span className="forecast-nowrap">
+                    הכנסות משתנות <Amount value={b.incomeExpected} decimals={0} />
+                  </span>
+                </>
+              ) : undefined
+            }
+            value={b.incomeExpected + b.fixedIncomeExpected}
+          />
           <Line hue="cash" label="הכנסות במזומן" sub="מה שנכנס ומה שעוד צפוי להיכנס" value={b.cashIn} />
           <Line
             hue="fixed"

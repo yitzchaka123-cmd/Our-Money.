@@ -121,14 +121,19 @@ const envelopes: EnvelopeView[] = [
     envelopeId: 'income',
     type: 'variableIncome',
     title: 'הכנסות',
-    actual: 7635,
-    expected: 7635,
+    // The salary comes as fixed income (from the real-shaped rows below) and
+    // sits in this same card's "הכנסות קבועות" section (C34); this is the
+    // variable part.
+    actual: 450,
+    expected: 450,
     showRemaining: false,
     pending: [],
     pendingTotal: 0,
     actuals: [
-      actual('i1', '2026-09-04', 7635, 'בנק הפועלים חשבון 674-1908922', {
+      actual('i1', '2026-09-04', 450, 'מס הכנסה', {
         isIncome: true,
+        categoryLabel: 'החזר מס',
+        accountNumberHash: '1908922',
       }),
     ],
   },
@@ -205,7 +210,9 @@ const envelopes: EnvelopeView[] = [
 // envelope per fixed charge, unnamed trackers, a weekly grocery tracker) run
 // through the live merge; the hand-written ones above give the expected cash.
 const handFixed = envelopes.find((e) => e.type === 'fixed')!;
-const shown: EnvelopeView[] = [
+// "income-due": the salary not paid yet this month — "צפוי להיכנס" in the income card.
+const salaryDue = process.argv[3] === 'income-due';
+const shownAll: EnvelopeView[] = [
   ...envelopes.filter((e) => e.type !== 'fixed' && e.type !== 'trackingCategory'),
   ...realMonthEnvelopes('2026-09').map((e) =>
     e.type === 'fixed'
@@ -213,6 +220,18 @@ const shown: EnvelopeView[] = [
       : e,
   ),
 ].sort((a, b) => ENVELOPE_ORDER.indexOf(a.type) - ENVELOPE_ORDER.indexOf(b.type));
+const shown: EnvelopeView[] = salaryDue
+  ? shownAll.map((e) =>
+      e.type === 'fixedIncome'
+        ? {
+            ...e,
+            actual: 0,
+            actuals: [],
+            upcoming: [{ key: 'salary-due', amountIls: e.expected, categoryLabel: 'משכורת', businessName: 'העברת משכורת' }],
+          }
+        : e,
+    )
+  : shownAll;
 const shownTotals = monthTotals(shown);
 
 const fixture: DashboardData = {
@@ -279,7 +298,7 @@ const css = [
   .map((file) => readFileSync(new URL(file, import.meta.url), 'utf8'))
   .join('\n');
 const target = process.argv[2] ?? 'dashboard-preview.html';
-const expandAll = process.argv[3] === 'expanded';
+const expandAll = process.argv[3] === 'expanded' || salaryDue;
 // Other modes draw a sheet or toast over the page: see preview-overlays.tsx.
 // "forecast" is the hero's ⋮ sheet, drawn from this fixture's own envelopes.
 const overlay =

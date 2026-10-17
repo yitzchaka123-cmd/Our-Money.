@@ -46,7 +46,7 @@ export interface EnvelopeCardProps {
 }
 
 /** Column wording differs per envelope type, exactly as RiseUp words it. */
-interface Labels {
+export interface Labels {
   actual: string;
   /** Column label on the card itself. */
   expected: string;
@@ -55,7 +55,7 @@ interface Labels {
   expander: string;
 }
 
-function labels(type: EnvelopeType): Labels {
+export function labels(type: EnvelopeType): Labels {
   switch (type) {
     case 'variableIncome':
       return {
@@ -250,7 +250,7 @@ function Breakdown({
   );
 }
 
-function BucketRow({
+export function BucketRow({
   bucket,
   upcomingLabel,
   envelopeTitle,

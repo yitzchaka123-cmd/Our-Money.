@@ -29,3 +29,31 @@
 .txn-row.is-awaiting .merchant {
   color: var(--muted);
 }
+
+/* ---------------------------------------------------------------------------
+   C34 — one "הכנסות" card: fixed and variable income as two sections.
+   --------------------------------------------------------------------------- */
+
+.income-section + .income-section {
+  border-top: 1px solid var(--hairline);
+}
+
+.income-section-title {
+  margin: 0;
+  padding: 14px var(--card-pad) 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-2);
+}
+
+.income-section-empty {
+  margin: 0;
+  padding: 14px var(--card-pad);
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* "איך חישבנו את הצפי?": the income line's split never breaks mid-figure. */
+.forecast-nowrap {
+  white-space: nowrap;
+}
