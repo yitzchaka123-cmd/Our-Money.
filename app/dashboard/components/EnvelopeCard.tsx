@@ -41,6 +41,8 @@ export interface EnvelopeCardProps {
   weekly?: boolean;
   /** That tracker's plan per week: each week shows what it is expected to cost. */
   weekPlans?: number[];
+  /** Cash entries waiting for "✅ לאשר": listed greyed, counted nowhere (C32). */
+  awaiting?: NormalizedActual[];
 }
 
 /** Column wording differs per envelope type, exactly as RiseUp words it. */
@@ -113,6 +115,7 @@ export function EnvelopeCard({
   upcoming = [],
   weekly = false,
   weekPlans,
+  awaiting = [],
 }: EnvelopeCardProps) {
   const [open, setOpen] = useState(defaultOpen);
   const text = weekly ? { ...labels(type), expander: 'פירוט שבועי' } : labels(type);
@@ -182,6 +185,10 @@ export function EnvelopeCard({
           onOpenTransaction={onOpenTransaction}
           today={today}
         />
+      ) : null}
+
+      {open && awaiting.length > 0 ? (
+        <AwaitingRows awaiting={awaiting} envelopeTitle={title} today={today} onOpenTransaction={onOpenTransaction} />
       ) : null}
 
       {open && pending.length > 0 ? (
@@ -334,6 +341,56 @@ function BucketRow({
           ))
         : null}
     </>
+  );
+}
+
+/**
+ * Cash entries waiting for "✅ לאשר" (the bot's ask-first mode, or an entry
+ * the AI was unsure of): greyed under the month's rows, out of every figure
+ * above. Tapping one opens its sheet, where "לאשר" makes it count (C32).
+ */
+function AwaitingRows({
+  awaiting,
+  envelopeTitle,
+  today,
+  onOpenTransaction,
+}: {
+  awaiting: NormalizedActual[];
+  envelopeTitle: string;
+  today: string;
+  onOpenTransaction?: (actual: NormalizedActual, envelopeTitle: string) => void;
+}) {
+  return (
+    <div className="pending-block awaiting-block">
+      <p className="pending-title">
+        ממתין לאישור <span className="awaiting-hint">· לא נספר עד שתאשרו</span>
+      </p>
+      {awaiting.map((item) => (
+        <button
+          key={item.transactionId}
+          className="txn-row is-awaiting"
+          type="button"
+          onClick={() => onOpenTransaction?.(item, envelopeTitle)}
+        >
+          <span className="date">{dayLabel(item.transactionDate, today)}</span>
+          <span className="amount">
+            <Amount value={item.amountIls} />
+          </span>
+          <span className="kebab" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </span>
+          <span className="merchant">
+            <span className="cash-mark" aria-label="מזומן">
+              {item.cash?.inputKind === 'voice' ? <Mic /> : '₪'}
+            </span>
+            {merchantLine(item)}
+            <span className="pill">לאישור</span>
+          </span>
+        </button>
+      ))}
+    </div>
   );
 }
 

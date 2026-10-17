@@ -24,7 +24,7 @@ import { TransactionSheet, type OpenTransaction } from '@/app/dashboard/componen
 import { WalletSection } from '@/app/dashboard/components/WalletSection';
 import { WalletMovementOverlays } from '@/app/dashboard/components/WalletMovementSheet';
 import { WalletsSheet, type WalletsSheetFocus } from '@/app/dashboard/components/WalletsSheet';
-import { deleteCashEntry, markCashSpendAsSavings, type CashKind } from '@/lib/cash/actions';
+import { confirmCashSpends, deleteCashEntry, markCashSpendAsSavings, type CashKind } from '@/lib/cash/actions';
 import type { EnvelopeRef } from '@/lib/cash/envelopes';
 import { settlePlan } from '@/lib/cash/plan-actions';
 import type { CashPlan } from '@/lib/cash/plans';
@@ -184,6 +184,7 @@ export function EnvelopeList({
             upcoming={envelope.upcoming}
             weekly={envelope.weekly}
             weekPlans={envelope.weekPlans}
+            awaiting={envelope.awaiting}
             month={month}
             today={today}
             showRemaining={envelope.showRemaining}
@@ -234,6 +235,15 @@ export function EnvelopeList({
           const { id, kind } = current.cash;
           closeAll();
           start(async () => { await deleteCashEntry(id, kind); });
+        }}
+        onApprove={() => {
+          if (!current?.cash) return;
+          const id = current.cash.id;
+          closeAll();
+          start(async () => {
+            const result = await confirmCashSpends([id]);
+            setNotice(result.ok ? null : result.error);
+          });
         }}
         onIncomeKind={() => {
           if (!current?.cash) return;

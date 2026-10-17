@@ -16,7 +16,7 @@ import { RiseupNoteSheet } from '@/app/dashboard/components/RiseupNoteSheet';
 import { Close, Search } from '@/app/dashboard/components/icons';
 import { ArrowBack, Spinner } from '@/app/dashboard/components/icons-extra';
 import { TransactionSheet, type OpenTransaction } from '@/app/dashboard/components/TransactionSheet';
-import { deleteCashEntry, markCashSpendAsSavings } from '@/lib/cash/actions';
+import { confirmCashSpends, deleteCashEntry, markCashSpendAsSavings } from '@/lib/cash/actions';
 import type { EnvelopeRef } from '@/lib/cash/envelopes';
 import { searchTransactions, type SearchHit } from '@/lib/dashboard/actions';
 import type { WalletSummary } from '@/lib/dashboard/data';
@@ -293,6 +293,15 @@ export function SearchSheet({
           closeTxn();
           start(async () => {
             await markCashSpendAsSavings(id);
+            refresh();
+          });
+        }}
+        onApprove={() => {
+          if (!current?.cash) return;
+          const id = current.cash.id;
+          closeTxn();
+          start(async () => {
+            await confirmCashSpends([id]);
             refresh();
           });
         }}

@@ -54,8 +54,8 @@ const envelopes: EnvelopeView[] = [
     envelopeId: 'variable',
     type: 'variable',
     title: 'הוצאות משתנות',
-    actual: 291.7,
-    expected: 291.7,
+    actual: 246.7,
+    expected: 246.7,
     showRemaining: false,
     pending: [],
     pendingTotal: 0,
@@ -70,6 +70,9 @@ const envelopes: EnvelopeView[] = [
         categoryLabel: 'מזון וצריכה',
         cash: { id: 'c1', kind: 'spend', memberName: 'יצחק', inputKind: 'voice', status: 'confirmed', walletId: 'w-main' },
       }),
+    ],
+    // Waiting for "✅ לאשר" (C32): shown under the rows, counted nowhere.
+    awaiting: [
       actual('cash:c2', '2026-09-14', 45, 'מונית הביתה', {
         accountNickname: 'מזומן',
         source: 'cash',
@@ -246,6 +249,7 @@ const fixture: DashboardData = {
       { id: 'w1', kind: 'withdrawal', amountIls: 1200, date: '2026-09-14', label: 'משיכת מזומן', memberName: null, category: null, walletId: 'w-main', walletName: 'ארנק ראשי', note: null, fromBank: true },
       { id: 'x1', kind: 'transfer', amountIls: 200, date: '2026-09-14', label: 'ארנק ראשי ← הארנק של שרה', memberName: 'יצחק', category: null, walletId: 'w-sara', walletName: 'הארנק של שרה', note: null, fromBank: false, fromWalletId: 'w-main', toWalletId: 'w-sara' },
       { id: 'c1', kind: 'spend', amountIls: 85, date: '2026-09-15', label: 'מכולת בפינה', memberName: 'יצחק', category: 'מזון וצריכה', walletId: 'w-main', walletName: 'ארנק ראשי', note: 'מכולת בפינה', fromBank: false },
+      { id: 'c2', kind: 'spend', amountIls: 45, date: '2026-09-14', label: 'מונית הביתה', memberName: 'שרה', category: 'תחבורה', walletId: 'w-sara', walletName: 'הארנק של שרה', note: 'מונית הביתה', fromBank: false, awaiting: true },
       { id: 'ci1', kind: 'income', amountIls: 350, date: '2026-09-10', label: 'מתנה מסבתא', memberName: 'שרה', category: 'מתנה', walletId: 'w-sara', walletName: 'הארנק של שרה', note: 'מתנה מסבתא', fromBank: false },
     ],
   },
@@ -270,6 +274,7 @@ const css = [
   '../app/brief-insights.css',
   '../app/dashboard/trackers-search.css',
   '../app/dashboard/forecast-sheet.css',
+  '../app/dashboard/awaiting-income.css',
 ]
   .map((file) => readFileSync(new URL(file, import.meta.url), 'utf8'))
   .join('\n');

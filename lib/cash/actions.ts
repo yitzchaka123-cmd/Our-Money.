@@ -264,13 +264,17 @@ export async function deleteCashEntry(id: string, kind: CashKind): Promise<Actio
   return { ok: true, id };
 }
 
-/** "Yes, that's right" for entries the AI intake was unsure about. */
+/**
+ * "✅ לאשר" from the app — the brief, the daily list, a cash row's sheet: the
+ * same approval the bot's button gives. The entry is confirmed (and no longer
+ * unsure), and from then on it counts (C32).
+ */
 export async function confirmCashSpends(ids: string[]): Promise<ActionResult> {
   if (!(await sessionMember())) return expired();
   if (ids.length === 0) return fail('לא נבחרו רישומים.');
   const { error } = await db()
     .from('cash_spends')
-    .update({ status: 'confirmed', updated_at: new Date().toISOString() })
+    .update({ status: 'confirmed', confidence: 'high', updated_at: new Date().toISOString() })
     .in('id', ids)
     .eq('status', 'needs_review');
   if (error) return dbFail(error);

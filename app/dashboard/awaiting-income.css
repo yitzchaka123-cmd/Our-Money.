@@ -1,0 +1,31 @@
+/* ---------------------------------------------------------------------------
+   C32 — cash entries waiting for "✅ לאשר": shown greyed, counted nowhere.
+   --------------------------------------------------------------------------- */
+
+/* "לאישור" beside an entry that waits (envelope rows, the wallet's movements). */
+.txn-row .pill,
+.wallet-row-mv .pill {
+  display: inline-block;
+  margin-inline-start: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--muted-faint);
+  color: var(--ink-2);
+  background: var(--surface);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  vertical-align: 1px;
+  white-space: nowrap;
+}
+
+.awaiting-hint {
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.txn-row.is-awaiting .amount,
+.txn-row.is-awaiting .date,
+.txn-row.is-awaiting .merchant {
+  color: var(--muted);
+}

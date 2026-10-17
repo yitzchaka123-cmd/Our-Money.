@@ -13,7 +13,7 @@ import {
 } from '@/lib/cash/plans';
 import { db } from '@/lib/db/client';
 import { isoDateInIsrael } from '@/lib/dates';
-import { monthBounds, walletBalances, walletState } from '@/lib/reconcile';
+import { countsAsSpent, monthBounds, walletBalances, walletState } from '@/lib/reconcile';
 import {
   ENVELOPE_TITLES,
   plannedForType,
@@ -74,6 +74,8 @@ export interface EnvelopeView {
   trackerKey?: string | null;
   /** Set when our own override (money.tracker_overrides) changed this envelope. */
   override?: OverrideInfo;
+  /** Cash entries waiting for "✅ לאשר": shown greyed, counted nowhere (C32). */
+  awaiting?: NormalizedActual[];
 }
 
 export interface PendingPlanView {
@@ -114,6 +116,8 @@ export interface WalletMovement {
   toWalletId?: string;
   /** Cash income only: "איזו הכנסה זו?". */
   incomeKind?: IncomeKind;
+  /** A spend waiting for "✅ לאשר": listed, but not in the balance or "יצא במזומן" (C32). */
+  awaiting?: boolean;
 }
 
 export interface WalletSummary {
@@ -232,11 +236,15 @@ export function assembleMonth(rows: MonthRows): {
     rows.skippedPlanIds,
   );
 
-  const merged = settleTrackers(
-    mergeCashIntoEnvelopes(riseupEnvelopes, rows.spends, rows.memberNames, aliases),
-    overrides,
-    prepared.info,
-    rows.month,
+  // Filed like any spend (so a tracker collects it), then entries waiting
+  // for "✅ לאשר" are set aside: shown, but counted nowhere (C32).
+  const merged = holdAwaiting(
+    settleTrackers(
+      mergeCashIntoEnvelopes(riseupEnvelopes, rows.spends, rows.memberNames, aliases),
+      overrides,
+      prepared.info,
+      rows.month,
+    ),
   );
   const cashIncome = cashIncomeEnvelope(
     rows.topups,
@@ -546,6 +554,7 @@ function toView(envelope: NormalizedEnvelope): EnvelopeView {
     ...(envelope.upcoming?.length ? { upcoming: envelope.upcoming } : {}),
     ...(envelope.weekly ? { weekly: true } : {}),
     ...(envelope.weekPlans ? { weekPlans: envelope.weekPlans } : {}),
+    ...(envelope.awaiting?.length ? { awaiting: envelope.awaiting } : {}),
     trackerKey: envelope.type === 'trackingCategory' ? trackerKey(envelope.envelopeId) : null,
   };
 }
@@ -557,7 +566,8 @@ function toView(envelope: NormalizedEnvelope): EnvelopeView {
 function settlementsFrom(spends: CashSpend[], topups: CashTopup[]): PlanSettlement[] {
   return [
     ...spends
-      .filter((s) => s.plan_id)
+      // A payment still waiting for "✅ לאשר" leaves its plan pending.
+      .filter((s) => s.plan_id && countsAsSpent(s))
       .map((s) => ({ planId: s.plan_id!, entryId: s.id, amountIls: Number(s.amount_ils), date: s.spent_at })),
     ...topups
       .filter((t) => t.plan_id && t.source === 'cash_income')
@@ -697,6 +707,27 @@ export function mergeCashIntoEnvelopes(
     ...e,
     actualIls: round(e.actuals.reduce((sum, a) => sum + a.amountIls, 0)),
   }));
+}
+
+/**
+ * Moves cash spends waiting for "✅ לאשר" out of each envelope's actuals into
+ * `awaiting`, and recounts the envelope without them. Everything downstream —
+ * the envelope's figures, its weeks, the forecast, the insights, the
+ * assistant — sums `actuals` only, so a waiting entry is counted nowhere.
+ * Exported for the tests.
+ */
+export function holdAwaiting(envelopes: NormalizedEnvelope[]): NormalizedEnvelope[] {
+  return envelopes.map((envelope) => {
+    const waiting = envelope.actuals.filter((a) => a.cash?.status === 'needs_review');
+    if (waiting.length === 0) return envelope;
+    const actuals = envelope.actuals.filter((a) => !waiting.includes(a));
+    return {
+      ...envelope,
+      actuals,
+      actualIls: round(actuals.reduce((sum, a) => sum + a.amountIls, 0)),
+      awaiting: [...(envelope.awaiting ?? []), ...waiting],
+    };
+  });
 }
 
 function emptyVariableEnvelope(): NormalizedEnvelope {
@@ -886,6 +917,7 @@ export function buildWallet({
       walletName: nameOf(s.wallet_id),
       note: s.note,
       fromBank: false,
+      ...(s.status === 'needs_review' ? { awaiting: true } : {}),
     })),
     ...monthTransfers.map((x): WalletMovement => ({
       id: x.id,
@@ -910,7 +942,7 @@ export function buildWallet({
     wallets: summaries,
     withdrawn: round(monthTopups.filter((t) => t.source === 'riseup_withdrawal' || t.source === 'manual').reduce((s, t) => s + Number(t.amount_ils), 0)),
     income: round(monthTopups.filter((t) => t.source === 'cash_income').reduce((s, t) => s + Number(t.amount_ils), 0)),
-    spent: round(monthSpends.reduce((s, x) => s + Number(x.amount_ils), 0)),
+    spent: round(monthSpends.filter(countsAsSpent).reduce((s, x) => s + Number(x.amount_ils), 0)),
     movements,
     ...forecast,
     incomeCategories: incomeCategoryChoices(allTopups),

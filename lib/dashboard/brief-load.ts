@@ -199,6 +199,7 @@ async function monthEnvelopes(month: string, memberNames: Map<string, string>): 
     title: e.title,
     planned: (e.envelopeId && planned.get(e.envelopeId)) || 0,
     actuals: e.actuals,
+    ...(e.awaiting ? { awaiting: e.awaiting } : {}),
   }));
 }
 

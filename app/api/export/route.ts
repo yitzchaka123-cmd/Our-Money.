@@ -94,7 +94,8 @@ export async function GET(request: Request): Promise<Response> {
     });
 
     for (const view of views) {
-      for (const actual of view.actuals) {
+      // Entries waiting for "✅ לאשר" are listed too, marked as such (C32).
+      for (const actual of [...view.actuals, ...(view.awaiting ?? [])]) {
         const cash = actual.cash;
         rows.push([
           actual.transactionDate,

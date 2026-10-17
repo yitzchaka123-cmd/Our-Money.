@@ -24,8 +24,11 @@ export function WalletCard({
   onEditInflow,
   onMenu,
   onOpenWallet,
+  defaultOpen = false,
 }: {
   wallet: WalletView;
+  /** Renders the movements open — for the preview and the tests. */
+  defaultOpen?: boolean;
   onOpenMovement?: (movement: WalletMovement) => void;
   onManage?: () => void;
   onAddWithdrawal?: () => void;
@@ -39,7 +42,7 @@ export function WalletCard({
   onAddMoney?: () => void;
   onOpenWallet?: (walletId: string) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const several = wallet.wallets.length > 1;
 
   return (
@@ -83,7 +86,7 @@ export function WalletCard({
             <button
               key={`${m.kind}-${m.id}`}
               type="button"
-              className="txn-row wallet-row-mv"
+              className={m.awaiting ? 'txn-row wallet-row-mv is-awaiting' : 'txn-row wallet-row-mv'}
               data-kind={m.kind}
               onClick={() => onOpenMovement?.(m)}
             >
@@ -100,6 +103,8 @@ export function WalletCard({
                 {m.incomeKind === 'non_cashflow' ? ' · לא תזרימית' : m.incomeKind === 'fixed' ? ' · הכנסה קבועה' : ''}
                 {m.kind === 'adjustment' && m.label !== 'עדכון יתרה' ? ' · עדכון יתרה' : ''}
                 {several && m.walletName && m.kind !== 'transfer' ? ` · ${m.walletName}` : ''}
+                {/* Waiting for "✅ לאשר": not in the balance or "יצא במזומן" yet (C32). */}
+                {m.awaiting ? <span className="pill">לאישור</span> : null}
               </span>
             </button>
           ))}
