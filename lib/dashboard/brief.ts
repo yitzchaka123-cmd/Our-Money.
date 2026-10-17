@@ -287,6 +287,8 @@ export interface BriefEnvelope {
   /** RiseUp's own plan for it — a tracker's target. */
   planned: number;
   actuals: NormalizedActual[];
+  /** Cash entries there waiting for "✅ לאשר" (C32): found, never counted. */
+  awaiting?: NormalizedActual[];
 }
 
 export interface BriefSource {
@@ -376,7 +378,7 @@ function findEnvelope(
   match: (a: NormalizedActual) => boolean,
 ): { envelope: BriefEnvelope; actual: NormalizedActual } | null {
   for (const envelope of envelopes ?? []) {
-    const actual = envelope.actuals.find(match);
+    const actual = envelope.actuals.find(match) ?? envelope.awaiting?.find(match);
     if (actual) return { envelope, actual };
   }
   return null;

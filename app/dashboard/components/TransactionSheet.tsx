@@ -3,6 +3,7 @@
 import { Amount } from '@/app/dashboard/components/Amount';
 import { Sheet } from '@/app/dashboard/components/Sheet';
 import { Calendar, Coins, Move, Note, Scissors, Tag } from '@/app/dashboard/components/icons';
+import { Check } from '@/app/dashboard/components/icons-extra';
 import { merchantLine, shortDate } from '@/app/dashboard/components/EnvelopeCard';
 import type { CashAction } from '@/app/dashboard/components/CashActionSheets';
 import type { NormalizedActual } from '@/lib/riseup/envelopes';
@@ -46,6 +47,7 @@ export function TransactionSheet({
   onSavings,
   onDeleteCash,
   onIncomeKind,
+  onApprove,
 }: {
   open: boolean;
   onClose: () => void;
@@ -57,12 +59,15 @@ export function TransactionSheet({
   onDeleteCash: () => void;
   /** Cash income: RiseUp's "איזו הכנסה זו?" (IncomeKind.tsx). */
   onIncomeKind?: () => void;
+  /** A cash spend waiting for "✅ לאשר": approve it here, as the bot's button does (C32). */
+  onApprove?: () => void;
 }) {
   if (!transaction) return null;
 
   const { actual, envelopeTitle, envelopeType } = transaction;
   const isCash = Boolean(actual.cash);
   const isIncome = actual.cash?.kind === 'income';
+  const awaiting = actual.cash?.status === 'needs_review';
   const onDark = envelopeType !== 'variable';
 
   return (
@@ -82,6 +87,7 @@ export function TransactionSheet({
             <p className="meta">{merchantLine(actual).replace(actual.businessName, '').trim()}</p>
           ) : null}
           <p className="meta">{shortDate(actual.transactionDate)}</p>
+          {awaiting ? <p className="meta">לא נספר עד שתאשרו</p> : null}
           {!isCash && actual.note ? <p className="meta txn-sheet-note">{actual.note}</p> : null}
         </div>
       </div>
@@ -99,6 +105,7 @@ export function TransactionSheet({
             </>
           ) : (
             <>
+              {awaiting && onApprove ? <ActionRow icon={<Check size={22} />} label="לאשר" onClick={onApprove} /> : null}
               <ActionRow icon={<Note />} label="להוסיף הערה" onClick={() => onCashAction('note')} />
               <ActionRow icon={<Move />} label="להזיז את ההוצאה" onClick={() => onCashAction('move')} />
               <ActionRow icon={<Scissors />} label="לפצל את ההוצאה" onClick={() => onCashAction('split')} />

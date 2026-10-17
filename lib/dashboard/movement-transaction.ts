@@ -19,7 +19,8 @@ export function movementTransaction(envelopes: EnvelopeView[], m: WalletMovement
   if (m.kind !== 'spend' && m.kind !== 'income') return null;
   const kind = m.kind;
   for (const envelope of envelopes) {
-    const actual = envelope.actuals.find((a) => a.cash?.id === m.id && a.cash.kind === kind);
+    // A spend waiting for "✅ לאשר" sits in the envelope's `awaiting` (C32).
+    const actual = [...envelope.actuals, ...(envelope.awaiting ?? [])].find((a) => a.cash?.id === m.id && a.cash.kind === kind);
     if (actual) {
       return { actual, envelopeTitle: envelope.title, envelopeType: envelope.type, envelopeId: envelope.envelopeId };
     }
@@ -56,7 +57,7 @@ export function movementActual(m: WalletMovement, kind: 'spend' | 'income' = 'sp
       memberId: m.memberId ?? null,
       memberName: m.memberName,
       inputKind: 'web',
-      status: 'confirmed',
+      status: m.awaiting ? 'needs_review' : 'confirmed',
       walletId: m.walletId,
       ...(m.incomeKind ? { incomeKind: m.incomeKind } : {}),
     },

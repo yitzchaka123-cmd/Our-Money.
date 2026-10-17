@@ -13,6 +13,7 @@ import {
 import { CashEntrySheet, emptyDraft, type CashEntryDraft } from '@/app/dashboard/components/CashEntrySheet';
 import { AddTrackerButton, AddTrackerSheet } from '@/app/dashboard/components/AddTrackerSheet';
 import { EnvelopeCard } from '@/app/dashboard/components/EnvelopeCard';
+import { IncomeCard } from '@/app/dashboard/components/IncomeCard';
 import { IncomeKindSheet } from '@/app/dashboard/components/IncomeKind';
 import { EnvelopeMenu, type EnvelopeMenuAction } from '@/app/dashboard/components/EnvelopeMenu';
 import { BulkMoveSheet, HistorySheet, PlansListSheet } from '@/app/dashboard/components/EnvelopeSheets';
@@ -24,13 +25,14 @@ import { TransactionSheet, type OpenTransaction } from '@/app/dashboard/componen
 import { WalletSection } from '@/app/dashboard/components/WalletSection';
 import { WalletMovementOverlays } from '@/app/dashboard/components/WalletMovementSheet';
 import { WalletsSheet, type WalletsSheetFocus } from '@/app/dashboard/components/WalletsSheet';
-import { deleteCashEntry, markCashSpendAsSavings, type CashKind } from '@/lib/cash/actions';
+import { confirmCashSpends, deleteCashEntry, markCashSpendAsSavings, type CashKind } from '@/lib/cash/actions';
 import type { EnvelopeRef } from '@/lib/cash/envelopes';
 import { settlePlan } from '@/lib/cash/plan-actions';
 import type { CashPlan } from '@/lib/cash/plans';
 import type { EnvelopeView, PendingPlanView, WalletMovement, WalletView } from '@/lib/dashboard/data';
 import { actualDraft, movementDraft } from '@/lib/dashboard/entry-drafts';
 import { movementTransaction } from '@/lib/dashboard/movement-transaction';
+import { incomeCard } from '@/lib/dashboard/income-card';
 import { summarySlot } from '@/lib/dashboard/summary-slot';
 import { addTrackerSlot } from '@/lib/dashboard/trackers';
 import type { NormalizedActual } from '@/lib/riseup/envelopes';
@@ -159,6 +161,9 @@ export function EnvelopeList({
   // spending summary (once), then income and savings. With no fixed envelope
   // the summary follows the trackers and their add button instead.
   const summaryAfter = summarySlot(envelopes);
+  // One "הכנסות" card, as RiseUp has: the fixed income (the salary) inside
+  // RiseUp's income card rather than on a card of its own (C34).
+  const income = incomeCard(envelopes);
 
   return (
     <>
@@ -173,37 +178,52 @@ export function EnvelopeList({
         onTransfer={() => setWalletsFocus({ tab: 'transfer' })}
       />
 
-      {envelopes.map((envelope) => (
+      {envelopes.filter((envelope) => envelope.key !== income?.hidden).map((envelope) => (
         <div key={envelope.key}>
-          <EnvelopeCard
-            type={envelope.type}
-            title={envelope.title}
-            actual={envelope.actual}
-            expected={envelope.expected}
-            actuals={envelope.actuals}
-            upcoming={envelope.upcoming}
-            weekly={envelope.weekly}
-            weekPlans={envelope.weekPlans}
-            month={month}
-            today={today}
-            showRemaining={envelope.showRemaining}
-            defaultOpen={expandAll}
-            onOpenTransaction={(actual, envelopeTitle) =>
-              setOpenTxn({ actual, envelopeTitle, envelopeType: envelope.type, envelopeId: envelope.envelopeId })
-            }
-            onAddCash={
-              envelope.type === 'cashIncome'
-                ? () => openNew('income')
-                : envelope.type === 'variableIncome' || envelope.type === 'fixedIncome' || envelope.type === 'riseupGoal'
-                  ? undefined
-                  : () => openNew('spend', envelope.envelopeId)
-            }
-            pending={envelope.pending}
-            pendingTotal={envelope.pendingTotal}
-            onOpenPlan={openPending}
-            onSettlePlan={settle}
-            onMenu={() => setMenuFor(envelope)}
-          />
+          {income && envelope.key === income.hostKey ? (
+            <IncomeCard
+              variable={income.variable}
+              fixed={income.fixed}
+              month={month}
+              today={today}
+              defaultOpen={expandAll}
+              onOpenTransaction={(actual, part) =>
+                setOpenTxn({ actual, envelopeTitle: part.title, envelopeType: part.type, envelopeId: part.envelopeId })
+              }
+              onMenu={() => setMenuFor(income.variable ?? income.fixed)}
+            />
+          ) : (
+            <EnvelopeCard
+              type={envelope.type}
+              title={envelope.title}
+              actual={envelope.actual}
+              expected={envelope.expected}
+              actuals={envelope.actuals}
+              upcoming={envelope.upcoming}
+              weekly={envelope.weekly}
+              weekPlans={envelope.weekPlans}
+              awaiting={envelope.awaiting}
+              month={month}
+              today={today}
+              showRemaining={envelope.showRemaining}
+              defaultOpen={expandAll}
+              onOpenTransaction={(actual, envelopeTitle) =>
+                setOpenTxn({ actual, envelopeTitle, envelopeType: envelope.type, envelopeId: envelope.envelopeId })
+              }
+              onAddCash={
+                envelope.type === 'cashIncome'
+                  ? () => openNew('income')
+                  : envelope.type === 'variableIncome' || envelope.type === 'fixedIncome' || envelope.type === 'riseupGoal'
+                    ? undefined
+                    : () => openNew('spend', envelope.envelopeId)
+              }
+              pending={envelope.pending}
+              pendingTotal={envelope.pendingTotal}
+              onOpenPlan={openPending}
+              onSettlePlan={settle}
+              onMenu={() => setMenuFor(envelope)}
+            />
+          )}
           {envelope.key === addTrackerAfter ? <AddTrackerButton onClick={() => setAddTrackerOpen(true)} /> : null}
           {envelope.key === summaryAfter ? (
             <SpendSummary actual={totalActualExpenses} expected={totalExpectedExpenses} />
@@ -234,6 +254,15 @@ export function EnvelopeList({
           const { id, kind } = current.cash;
           closeAll();
           start(async () => { await deleteCashEntry(id, kind); });
+        }}
+        onApprove={() => {
+          if (!current?.cash) return;
+          const id = current.cash.id;
+          closeAll();
+          start(async () => {
+            const result = await confirmCashSpends([id]);
+            setNotice(result.ok ? null : result.error);
+          });
         }}
         onIncomeKind={() => {
           if (!current?.cash) return;

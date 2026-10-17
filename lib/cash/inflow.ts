@@ -1,3 +1,4 @@
+import { countsAsSpent } from '@/lib/reconcile';
 import type { CashSpend, CashTopup } from '@/lib/types';
 
 /**
@@ -50,7 +51,7 @@ export function cashFlowsByMonth(topups: CashTopup[], spends: CashSpend[], month
     in: round(topups.filter((t) => isCashIn(t) && t.occurred_at.startsWith(month)).reduce((s, t) => s + Number(t.amount_ils), 0)),
     out: round(
       spends
-        .filter((s) => s.status !== 'deleted' && s.spent_at.startsWith(month))
+        .filter((s) => countsAsSpent(s) && s.spent_at.startsWith(month))
         .reduce((s, x) => s + Number(x.amount_ils), 0),
     ),
   }));

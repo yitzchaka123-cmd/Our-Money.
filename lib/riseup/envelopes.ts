@@ -53,6 +53,11 @@ export interface NormalizedEnvelope {
   weekly?: boolean;
   /** That tracker's plan per calendar week: part `#k` is week k + 1. */
   weekPlans?: number[];
+  /**
+   * Cash entries filed here that wait for "✅ לאשר" (C32): shown, never
+   * counted — they are not in `actuals`, so no sum ever sees them.
+   */
+  awaiting?: NormalizedActual[];
 }
 
 /** A fixed charge RiseUp expects this month that has not been charged yet. */

@@ -54,8 +54,8 @@ const envelopes: EnvelopeView[] = [
     envelopeId: 'variable',
     type: 'variable',
     title: 'הוצאות משתנות',
-    actual: 291.7,
-    expected: 291.7,
+    actual: 246.7,
+    expected: 246.7,
     showRemaining: false,
     pending: [],
     pendingTotal: 0,
@@ -70,6 +70,9 @@ const envelopes: EnvelopeView[] = [
         categoryLabel: 'מזון וצריכה',
         cash: { id: 'c1', kind: 'spend', memberName: 'יצחק', inputKind: 'voice', status: 'confirmed', walletId: 'w-main' },
       }),
+    ],
+    // Waiting for "✅ לאשר" (C32): shown under the rows, counted nowhere.
+    awaiting: [
       actual('cash:c2', '2026-09-14', 45, 'מונית הביתה', {
         accountNickname: 'מזומן',
         source: 'cash',
@@ -118,14 +121,19 @@ const envelopes: EnvelopeView[] = [
     envelopeId: 'income',
     type: 'variableIncome',
     title: 'הכנסות',
-    actual: 7635,
-    expected: 7635,
+    // The salary comes as fixed income (from the real-shaped rows below) and
+    // sits in this same card's "הכנסות קבועות" section (C34); this is the
+    // variable part.
+    actual: 450,
+    expected: 450,
     showRemaining: false,
     pending: [],
     pendingTotal: 0,
     actuals: [
-      actual('i1', '2026-09-04', 7635, 'בנק הפועלים חשבון 674-1908922', {
+      actual('i1', '2026-09-04', 450, 'מס הכנסה', {
         isIncome: true,
+        categoryLabel: 'החזר מס',
+        accountNumberHash: '1908922',
       }),
     ],
   },
@@ -202,7 +210,9 @@ const envelopes: EnvelopeView[] = [
 // envelope per fixed charge, unnamed trackers, a weekly grocery tracker) run
 // through the live merge; the hand-written ones above give the expected cash.
 const handFixed = envelopes.find((e) => e.type === 'fixed')!;
-const shown: EnvelopeView[] = [
+// "income-due": the salary not paid yet this month — "צפוי להיכנס" in the income card.
+const salaryDue = process.argv[3] === 'income-due';
+const shownAll: EnvelopeView[] = [
   ...envelopes.filter((e) => e.type !== 'fixed' && e.type !== 'trackingCategory'),
   ...realMonthEnvelopes('2026-09').map((e) =>
     e.type === 'fixed'
@@ -210,6 +220,18 @@ const shown: EnvelopeView[] = [
       : e,
   ),
 ].sort((a, b) => ENVELOPE_ORDER.indexOf(a.type) - ENVELOPE_ORDER.indexOf(b.type));
+const shown: EnvelopeView[] = salaryDue
+  ? shownAll.map((e) =>
+      e.type === 'fixedIncome'
+        ? {
+            ...e,
+            actual: 0,
+            actuals: [],
+            upcoming: [{ key: 'salary-due', amountIls: e.expected, categoryLabel: 'משכורת', businessName: 'העברת משכורת' }],
+          }
+        : e,
+    )
+  : shownAll;
 const shownTotals = monthTotals(shown);
 
 const fixture: DashboardData = {
@@ -246,6 +268,7 @@ const fixture: DashboardData = {
       { id: 'w1', kind: 'withdrawal', amountIls: 1200, date: '2026-09-14', label: 'משיכת מזומן', memberName: null, category: null, walletId: 'w-main', walletName: 'ארנק ראשי', note: null, fromBank: true },
       { id: 'x1', kind: 'transfer', amountIls: 200, date: '2026-09-14', label: 'ארנק ראשי ← הארנק של שרה', memberName: 'יצחק', category: null, walletId: 'w-sara', walletName: 'הארנק של שרה', note: null, fromBank: false, fromWalletId: 'w-main', toWalletId: 'w-sara' },
       { id: 'c1', kind: 'spend', amountIls: 85, date: '2026-09-15', label: 'מכולת בפינה', memberName: 'יצחק', category: 'מזון וצריכה', walletId: 'w-main', walletName: 'ארנק ראשי', note: 'מכולת בפינה', fromBank: false },
+      { id: 'c2', kind: 'spend', amountIls: 45, date: '2026-09-14', label: 'מונית הביתה', memberName: 'שרה', category: 'תחבורה', walletId: 'w-sara', walletName: 'הארנק של שרה', note: 'מונית הביתה', fromBank: false, awaiting: true },
       { id: 'ci1', kind: 'income', amountIls: 350, date: '2026-09-10', label: 'מתנה מסבתא', memberName: 'שרה', category: 'מתנה', walletId: 'w-sara', walletName: 'הארנק של שרה', note: 'מתנה מסבתא', fromBank: false },
     ],
   },
@@ -270,11 +293,12 @@ const css = [
   '../app/brief-insights.css',
   '../app/dashboard/trackers-search.css',
   '../app/dashboard/forecast-sheet.css',
+  '../app/dashboard/awaiting-income.css',
 ]
   .map((file) => readFileSync(new URL(file, import.meta.url), 'utf8'))
   .join('\n');
 const target = process.argv[2] ?? 'dashboard-preview.html';
-const expandAll = process.argv[3] === 'expanded';
+const expandAll = process.argv[3] === 'expanded' || salaryDue;
 // Other modes draw a sheet or toast over the page: see preview-overlays.tsx.
 // "forecast" is the hero's ⋮ sheet, drawn from this fixture's own envelopes.
 const overlay =

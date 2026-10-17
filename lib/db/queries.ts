@@ -154,11 +154,15 @@ export async function lastSpendForMember(memberId: string): Promise<CashSpend | 
   return (data as CashSpend) ?? null;
 }
 
+/**
+ * The approved spends between two dates — what the bot's totals add up. An
+ * entry waiting for "✅ לאשר" counts nowhere until approved (C32).
+ */
 export async function spendsBetween(from: string, to: string): Promise<CashSpend[]> {
   const { data, error } = await db()
     .from('cash_spends')
     .select('*')
-    .neq('status', 'deleted')
+    .eq('status', 'confirmed')
     .gte('spent_at', from)
     .lte('spent_at', to)
     .order('spent_at', { ascending: false });

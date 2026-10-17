@@ -10,12 +10,22 @@ export interface WalletState {
 }
 
 /**
+ * Whether a cash spend counts: not deleted, and not waiting for "✅ לאשר"
+ * (the bot's ask-first mode, or an entry the AI was unsure about). A waiting
+ * entry is shown — greyed, "לאישור" — but no total, balance or forecast
+ * counts it until it is approved (C32).
+ */
+export function countsAsSpent(spend: Pick<CashSpend, 'status'>): boolean {
+  return spend.status !== 'deleted' && spend.status !== 'needs_review';
+}
+
+/**
  * Wallet arithmetic, kept pure so the interesting part is testable without a
  * database. Everything is rounded to agorot at the boundary.
  */
 export function walletState(topups: CashTopup[], spends: CashSpend[]): WalletState {
   const live = topups.filter((t) => !t.is_dismissed);
-  const counted = spends.filter((s) => s.status !== 'deleted');
+  const counted = spends.filter(countsAsSpent);
 
   const toppedUp = round(live.reduce((sum, t) => sum + Number(t.amount_ils), 0));
   const logged = round(counted.reduce((sum, s) => sum + Number(s.amount_ils), 0));
@@ -39,7 +49,7 @@ export function totalsByCategory(spends: CashSpend[]): CategoryTotal[] {
   const totals = new Map<string, { total: number; count: number }>();
 
   for (const spend of spends) {
-    if (spend.status === 'deleted') continue;
+    if (!countsAsSpent(spend)) continue;
     const current = totals.get(spend.category) ?? { total: 0, count: 0 };
     current.total += Number(spend.amount_ils);
     current.count += 1;
@@ -54,7 +64,7 @@ export function totalsByCategory(spends: CashSpend[]): CategoryTotal[] {
 export function totalsByMember(spends: CashSpend[]): Map<string, number> {
   const totals = new Map<string, number>();
   for (const spend of spends) {
-    if (spend.status === 'deleted') continue;
+    if (!countsAsSpent(spend)) continue;
     totals.set(spend.member_id, round((totals.get(spend.member_id) ?? 0) + Number(spend.amount_ils)));
   }
   return totals;
@@ -110,7 +120,7 @@ export function walletBalances(
     if (b) b.in += Number(t.amount_ils);
   }
   for (const s of spends) {
-    if (s.status === 'deleted') continue;
+    if (!countsAsSpent(s)) continue;
     const b = bucket(s.wallet_id);
     if (b) b.out += Number(s.amount_ils);
   }

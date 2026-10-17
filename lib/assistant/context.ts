@@ -47,6 +47,8 @@ export interface MonthSnapshot {
   transactions: MonthTransaction[];
   /** How many were left out when the month had more than the cap. */
   omitted: number;
+  /** Cash entries waiting for "✅ לאשר": in no figure above until approved (C32). */
+  awaiting?: MonthTransaction[];
 }
 
 export interface CashSnapshot {
@@ -100,11 +102,12 @@ export function monthSnapshot(data: DashboardData): MonthSnapshot {
       .sort((a, b) => b.total - a.total),
     transactions: kept,
     omitted: all.length - kept.length,
+    awaiting: data.envelopes.flatMap((e) => transactionsOf(e, e.awaiting ?? [])),
   };
 }
 
-function transactionsOf(envelope: EnvelopeView): MonthTransaction[] {
-  return envelope.actuals.map((a) => ({
+function transactionsOf(envelope: EnvelopeView, rows = envelope.actuals): MonthTransaction[] {
+  return rows.map((a) => ({
     date: a.transactionDate ?? a.billingDate ?? '',
     name: oneLine(a.businessName),
     amount: round(a.amountIls),
@@ -162,6 +165,13 @@ export function formatMonth(snapshot: MonthSnapshot, heading: string): string {
             `- ${t.date} | ${t.name} | ${t.income ? '+' : ''}${ils(t.amount)} | ${t.envelope} | ${t.category ?? '-'} | ${t.cash ? `מזומן${t.who ? ` (${t.who})` : ''}` : 'כרטיס/בנק'}`,
         )
       : ['- אין תנועות']),
+    ...(snapshot.awaiting?.length
+      ? [
+          '',
+          'ממתינות לאישור (נרשמו במזומן ועוד לא אושרו — לא נספרות באף סכום למעלה עד שיאשרו):',
+          ...snapshot.awaiting.map((t) => `- ${t.date} | ${t.name} | ${ils(t.amount)} | ${t.envelope}${t.who ? ` | ${t.who}` : ''}`),
+        ]
+      : []),
   ];
   return lines.join('\n');
 }

@@ -113,7 +113,8 @@ export async function loadInsights(data: DashboardData, memberId: string, now = 
     supabase
       .from('cash_spends')
       .select('amount_ils')
-      .neq('status', 'deleted')
+      // Only approved entries: one waiting for "✅ לאשר" counts nowhere (C32).
+      .eq('status', 'confirmed')
       .gte('spent_at', since)
       .then((r) => must(r, 'cash baseline') as { amount_ils: number | string }[]),
     loadFeedback(memberId),
