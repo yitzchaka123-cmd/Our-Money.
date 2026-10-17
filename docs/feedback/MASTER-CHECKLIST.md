@@ -39,9 +39,9 @@ Re-read before every reply. Nothing is marked done without something to point to
 | C29 | Set up Telegram (family group) now — step-by-step guide in the chat | done | given in the reply of 2026-10-17 |
 | C30 | Family Telegram group connected | done | you confirmed 2026-10-17; the bot stored the group at 19:29 |
 | C31 | Daily brief: keep it, as an on/off setting | done | Settings → "הסיכום היומי" (ce9a827) |
-| C32 | Ask-first mode: an entry waiting for approval does not count in the totals until approved | not done | chat 2026-10-17 |
+| C32 | Ask-first mode: an entry waiting for approval does not count in the totals until approved | done | 638e894 — shown greyed "לא נספר עד שתאשרו", "לאשר" in the app too |
 | C33 | Wallet buttons green + / red − / purple + — confirmed | done | 25f3201 |
-| C34 | One income card like RiseUp's ("הכנסות" with the salary inside) instead of two | not done | default chosen after you asked what question 3 meant |
+| C34 | One income card like RiseUp's ("הכנסות" with the salary inside) instead of two | done | 37d745a (default chosen after you asked what question 3 meant) |
 
 ## From video 1 (2026-10-11) — details in [2026-10-11-video1.md](2026-10-11-video1.md)
 
