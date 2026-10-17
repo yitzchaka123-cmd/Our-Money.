@@ -3,6 +3,8 @@
 import { useState, useTransition } from 'react';
 
 import { Chat, Check, Plus } from '@/app/dashboard/components/icons-extra';
+import { BotFeatureToggles } from '@/app/settings/BotFeatureToggles';
+import type { BotFeatures } from '@/lib/telegram/bot-features';
 import { setConfirmMode, setNudgeFrequency } from '@/lib/telegram/settings-actions';
 import { CONFIRM_CHOICES, NUDGE_CHOICES, type ConfirmMode, type NudgeFrequency } from '@/lib/telegram/settings';
 
@@ -24,6 +26,8 @@ export interface FamilyGroupData {
 export interface TelegramSettingsData {
   members: TelegramMemberSettings[];
   group?: FamilyGroupData;
+  /** Household-wide switches: the Sunday summary and "מה קניתם כאן?". */
+  features?: BotFeatures;
 }
 
 /**
@@ -41,6 +45,7 @@ export function TelegramSettings({ data }: { data: TelegramSettingsData }) {
         {data.members.map((m) => (
           <MemberSettings key={m.id} member={m} />
         ))}
+        {data.features ? <BotFeatureToggles features={data.features} /> : null}
       </section>
       {data.group ? <FamilyGroupSettings group={data.group} /> : null}
     </>

@@ -106,3 +106,37 @@
 .tg-group-btn:active {
   background: var(--primary-pressed);
 }
+
+/* לכל הבית: the weekly summary and the new-business question (C24, C26). */
+.tg-household {
+  padding: 10px 2px 14px;
+  border-top: 1px solid #f2f2f2;
+}
+
+.tg-switch-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.tg-switch-row + .tg-switch-row {
+  border-top: 1px solid #f7f7f7;
+}
+
+.tg-switch-text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.tg-switch-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.tg-switch-text .tg-hint {
+  margin-top: 2px;
+}
