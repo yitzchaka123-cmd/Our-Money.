@@ -31,9 +31,9 @@ Re-read before every reply. Nothing is marked done without something to point to
 | C21 | Answer format A–F (transcript, end-result line, numbered problems, what bothers you, ideas, what I need) | done (standing rule) | — |
 | C22 | Mark recordings of other projects "not this app" and don't build them | done (standing rule) | ledger status column |
 | C23 | Set your RiseUp custom category names (סופר, מגנטים, הקשיבה, יציאות וכיף…, בזבוזים, תרומה, תיירות, טרריומים) | done | answered in video 2 at 3:06 ("I think you can find it") → V2-11 |
-| C24 | Weekly summary in Telegram (like RiseUp's WhatsApp messages), with an on/off setting in our app | not done | chat 2026-10-17 |
+| C24 | Weekly summary in Telegram (like RiseUp's WhatsApp messages), with an on/off setting in our app | done | 5d15fbb — Sundays ~09:00, Settings → טלגרם → "סיכום שבועי בטלגרם" |
 | C25 | Photo of a receipt in Telegram → the bot reads amount and business, you approve | done | 68ca1a4, 6e98e87 (in the group only captioned photos or replies to the bot) |
-| C26 | "What did we buy here?" — the bot asks once about a new business name and keeps your answer as a note | not done | chat 2026-10-17 |
+| C26 | "What did we buy here?" — the bot asks once about a new business name and keeps your answer as a note | done | 3c17164 + 0013 — reply to the question, or "דלג"; switch "לשאול על עסק חדש" |
 | C27 | Shared monthly goal card | no — you said it would change RiseUp's system; our app only adds a cash layer on top | chat 2026-10-17 |
 | C28 | Quick-add buttons in the bot | no — not needed | chat 2026-10-17 |
 | C29 | Set up Telegram (family group) now — step-by-step guide in the chat | done | given in the reply of 2026-10-17 |
