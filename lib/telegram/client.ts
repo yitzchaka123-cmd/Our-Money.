@@ -72,24 +72,48 @@ export async function answerCallbackQuery(id: string, text?: string): Promise<vo
   }
 }
 
-interface TelegramFile {
+export interface TelegramFile {
   file_id: string;
   file_path?: string;
   file_size?: number;
 }
 
-/** Resolve a file_id to bytes. Two hops: getFile, then the file CDN. */
-export async function downloadFile(fileId: string): Promise<ArrayBuffer> {
-  const file = await call<TelegramFile>('getFile', { file_id: fileId });
-  if (!file.file_path) throw new Error('Telegram returned no file_path for the voice note.');
+/** A file bigger than the caller is willing to download. Nothing was fetched. */
+export class TelegramFileTooLargeError extends Error {
+  constructor(readonly size: number, readonly maxBytes: number) {
+    super(`Telegram file is ${size} bytes, over the ${maxBytes}-byte limit.`);
+    this.name = 'TelegramFileTooLargeError';
+  }
+}
+
+export async function getFile(fileId: string): Promise<TelegramFile> {
+  return call<TelegramFile>('getFile', { file_id: fileId });
+}
+
+/**
+ * Resolve a file_id to bytes. Two hops: getFile, then the file CDN. With
+ * `maxBytes`, a file Telegram reports as bigger is never downloaded, and one
+ * that turns out bigger is dropped.
+ */
+export async function downloadFile(fileId: string, options: { maxBytes?: number } = {}): Promise<ArrayBuffer> {
+  const file = await getFile(fileId);
+  if (!file.file_path) throw new Error('Telegram returned no file_path for the file.');
+  const { maxBytes } = options;
+  if (maxBytes !== undefined && file.file_size !== undefined && file.file_size > maxBytes) {
+    throw new TelegramFileTooLargeError(file.file_size, maxBytes);
+  }
 
   const response = await fetch(
     `https://api.telegram.org/file/bot${env.telegramBotToken}/${file.file_path}`,
   );
   if (!response.ok) {
-    throw new Error(`Failed to download voice note: HTTP ${response.status}`);
+    throw new Error(`Failed to download the file: HTTP ${response.status}`);
   }
-  return response.arrayBuffer();
+  const data = await response.arrayBuffer();
+  if (maxBytes !== undefined && data.byteLength > maxBytes) {
+    throw new TelegramFileTooLargeError(data.byteLength, maxBytes);
+  }
+  return data;
 }
 
 export async function getMe(): Promise<{ id: number; username?: string; first_name: string }> {
